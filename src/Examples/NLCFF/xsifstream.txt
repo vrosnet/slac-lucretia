@@ -1,0 +1,7 @@
+  
+   XSIF Parser Version  2.1             
+   Version Date:        01-JAN-2004
+   Run: 19-FEB-2009  16:27:46
+   XSIF Parser developed by NLC Department,
+       Stanford Linear Accelerator Center.
+  

@@ -1,0 +1,100 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>Lucretia: Synchrotron Radiation</title>
+  <meta name="author" content="Peter Tenenbaum">
+</head>
+<body>
+<div style="text-align: center;"><a href="home.html"><span
+ style="font-size: 24pt;"><img
+ style="border: 0px solid ; width: 80px; height: 90px;"
+ alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif"
+ align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
+</span>
+<div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
+Project</span><br>
+</div>
+<span style="font-size: 24pt;"><br>
+<small>Synchrotron Radiation<br>
+<br>
+</small></span></div>
+Lucretia allows the user to simulate synchrotron radiation losses in
+dipole correctors, sector bends, quads, sextupoles, octupoles,
+multipoles, and transverse-mode cavities.&nbsp; During tracking, there
+are four possible methods of synchrotron radiation simulation, which
+are determined by the SynRad tracking flag of each element:<br>
+<br>
+<span style="font-weight: bold;">TrackFlags.SynRad == 0:</span>&nbsp;
+Synchrotron radiation is completely ignored.&nbsp; This is the default
+settting of the SynRad tracking flag for all elements at instantiation
+time.<br>
+<br>
+<span style="font-weight: bold;">TrackFlags.SynRad == 1:</span>&nbsp;
+For each particle, the mean energy loss from synchrotron radiation is
+calculated, taking into account the particle's momentum and the actual
+field that it encounters (ie, particles which are far from the center
+of a quad or other multipole magnet will have larger losses than
+particles which are near the center of the magnet).&nbsp; Half of the
+loss is applied at the upstream face of the element (ie, before
+tracking), and half at the downstream face of the element (ie, after
+tracking).&nbsp; In this way, the effect of the energy variation on the
+particle's trajectory is approximately taken into account.<br>
+<br>
+<span style="font-weight: bold;">TrackFlags.SynRad == 2:</span>&nbsp;
+For each particle, both the mean and the quantum-fluctuation components
+of the synchrotron radiation are calculated.&nbsp; This is accomplished
+by computing the photon critical energy (u_c) and mean number of
+photons emitted (nphot) for each particle; for each particle generating
+a Poisson-distribued random number with mean nphot to indicate the
+actual number of photons emitted; and finally generating the actual
+energy of each photon emitted by each particle according to the
+incoherent synchrotron radiation spectrum.&nbsp; As with the previous
+option, half the energy loss is applied pre-tracking and half is
+applied post-tracking; the opening angle of the photon is
+ignored.&nbsp; The spectrum generation uses a fast method developed by
+A. Wolski; this method agrees very well with the analytically-expected
+mean particle energy loss, and produces a spectrum of particle energy
+losses which is a few percent wider than the analytically-expected one.<br>
+<br>
+<span style="font-weight: bold;">TrackFlags.SynRad == 3:</span>&nbsp;
+Both the mean and quantum-fluctuation components of the synchrotron
+radiation are calculated in exactly the method described above, except
+that the generation of the photons uses H. Burkhardt's method.&nbsp; In
+this case both the mean and the standard deviation of the particle
+energy loss agree with the analytically-expected values to within
+statistical errors, but the method is much slower than Wolski's.<br>
+<br>
+Methods 2 and 3 make use of Matlab's flat-distributed random number
+generator, rand, in the generation of the Poisson-distributed random
+numbers and also in the generation of the photon energies.&nbsp; All of
+the methods make the thin-lens approximation:&nbsp; the magnetic field
+experienced by a particle at the upstream face of an element, along
+with its effective length, are assumed to be all that is needed to
+compute the emitted radiation.&nbsp; Put another way, the fact that the
+particle changes its transverse offset in a quad or other multipole
+magnet, and thus changes the magnetic field that it samples as it
+passes through the element, is ignored.&nbsp; If this is deemed to be
+critical to correctly computing the synchrotron radiation, and its
+effects on the beam dynamics, one can divide the magnets into
+longitudinal slices which will more accurately emulate thin lens
+elements for this purpose.<br>
+<br>
+The <a href="momentum_profile.html">momentum profile</a> tools will
+also change their behavior based on the SynRad track flag:&nbsp; if
+SynRad != 0, the
+mean SR loss will be included in the momentum profile for bends,
+correctors, TCAVs, and multipoles with a nonzero dipole field.&nbsp; <br>
+<br>
+<br>
+<br>
+<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a><br>
+21-Apr-2006<br>
+<a href="http://www.slac.stanford.edu/detailed.html"><img
+ src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
+ alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
+ align="right"></a><br>
+</body>
+</html>

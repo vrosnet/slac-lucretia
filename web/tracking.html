@@ -1,0 +1,264 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>Lucretia: Tracking</title>
+  <meta name="author" content="Peter Tenenbaum">
+</head>
+<body>
+<div style="text-align: center;"><a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span
+ style="font-size: 24pt;"><img hspace="20" align="right"
+ style="border: 0px solid ; width: 80px; height: 90px;"
+ alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif"></span></a><span
+ style="font-size: 24pt;"><br>
+</span>
+<div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
+Project</span><br>
+</div>
+<span style="font-size: 24pt;"><br>
+<small>Tracking<br>
+<br>
+</small></span></div>
+<div style="text-align: left;">Tracking beams composed of bunches which
+are in turn composed of rays is the heart of Lucretia.&nbsp; All
+Lucretia tracking is accomplished by mexfile function TrackThru.<br>
+<br>
+<span style="font-weight: bold;"><a name="TrackThru"></a>TrackThru:</span><br>
+<br>
+The syntax for the generic tracking command is:<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; [stat,beamout] = TrackThru( elem1,
+elem2, beamin, bunch1, bunch2 )<br>
+<br>
+which takes an initial beam (beamin), tracks bunches bunch1 through
+bunch2 inclusive through elements elem1 through elem2 inclusive, and
+puts the resulting beam in beamout, and also returns a status cell
+array stat (see <a href="beam.html">here</a> for more on beams, <a
+ href="beam_generation.html">here</a> for tools useful for beam
+generation,
+and <a href="function_status.html">here</a> for information on status
+cell arrays).&nbsp; <br>
+<br>
+The command syntax above will track all bunches from bunch1 through
+bunch2 through element elem1 before tracking bunch1 through elem1+1,
+followed by bunch1+1 through elem1+1, etc.&nbsp; This is known as
+element-wise tracking.&nbsp; <br>
+<br>
+If bunch1 != 1, then beamout.Bunch(1) will be the result of tracking
+beamin.Bunch(bunch1), beamout.Bunch(2) will hold the tracking results
+from beamin.Bunch(bunch1+1), etc -- in other words, the output bunches
+will not be put into the same slots in beamout that they occupy in
+beamin.<br>
+<br>
+Successful tracking will yield stat{1} == 1, and no messages.&nbsp; If
+stat{1} == 0, this typically means that a serious failure occurred in
+tracking, for example an element with invalid fields of some form such
+as a zero-length quad.&nbsp; A value of stat{1} == -1 indicates that
+some rays could not be tracked through the full range of elem1 to
+elem2:&nbsp; causes of stoppage include hitting an&nbsp; aperture which
+was turned on via its Aper <a href="element_classes.html#TrackFlag">tracking
+flag</a>, a ray whose trajectory has been bent perpendicular to the
+accelerator axis, or a ray which has been decelerated to zero by an RF
+structure.&nbsp; A bunch in which all rays are lost will generate a
+BUNCHSTOP message in the stat array.&nbsp; To see where a ray got lost,
+use the beamout.Bunch().stop vector to see which element stopped the
+ray; at the time of stopping, the ray's coordinates will be
+frozen.&nbsp; Note that these rays are in the reference frame of the
+element, so the ray coordinates which are preserved at the time of
+stopping may be offset and/or rotated with respect to the accelerator
+survey line.<br>
+<br>
+<span style="font-weight: bold;">Element-wise Versus Bunch-wise
+Tracking:</span><br>
+<br>
+The command syntax above, as was mentioned, will generate element-wise
+tracking in which all bunches are tracked through a given element
+before any bunch is tracked through the next element (for
+code-geeks:&nbsp; the bunch loop is the inner loop, the element loop is
+the outer loop).&nbsp; It is also possible to select bunch-wise
+tracking which performs the operations in the opposite order.&nbsp;
+This is selected by adding a sixth argument to the TrackThru call,
+which is zero for element-wise tracking and one for bunch-wise:<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; [stat,beamout] = TrackThru( elem1,
+elem2, beamin, bunch1, bunch2, 0 ) % element-wise again<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; [stat,beamout] = TrackThru( elem1,
+elem2, beamin, bunch1, bunch2, 1 ) % bunch-wise<br>
+<br>
+What are the differences between bunch-wise and element-wise tracking?<br>
+<br>
+<ul>
+  <li>In element-wise tracking, Lucretia deletes any multibunch
+information in elements elem1 through elem2 inclusive at the beginning
+and the end of tracking.&nbsp; This includes long range wake kicks from
+previous bunches, as well as variations in the energy gain from bunch
+to bunch if the bunch spacing is not matched to the RF frequency.&nbsp;
+In essence, each tracking operation in element-wise mode is assumed to
+be a new bunch train which enters long after the last train (tracked on
+the last TrackThru operation) is passed.</li>
+  <li>By contrast, in bunch-wise tracking Lucretia preserves the
+multibunch information in the elements between TrackThru
+operations.&nbsp; If the command sequence:</li>
+</ul>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; [stat,beamout] = TrackThru( elem1, elem2, beamin, 1,
+1, 1 ) ;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; [stat,beamout] = TrackThru( elem1, elem2, beamin, 2,
+2, 1 ) ;<br>
+<br>
+<div style="margin-left: 40px;">is executed, bunch 2 will experience
+the wake kick from bunch 1 (if any), and will experience an incorrect
+energy gain if beamin.BunchInterval is not matched to the RF
+frequency.&nbsp; <br>
+</div>
+</div>
+<ul>
+  <li>During bunch-wise tracking, Lucretia will clear multibunch
+information from a given element if a bunch is tracked through that
+element which has a bunch number which is &lt;= the number of the last
+bunch tracked through that element.&nbsp; <br>
+  </li>
+</ul>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; [stat,beamout] = TrackThru( elem1, elem2, beamin, 1,
+1, 1 ) ;&nbsp; % bunch-wise&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp; <br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; [stat,beamout] = TrackThru( elem1, elem2, beamin, 2,
+2, 1 ) ;&nbsp; % mb info preserved<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; [stat,beamout] = TrackThru( elem1, elem2, beamin, 2,
+2, 1 ) ;&nbsp; % mb info deleted<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; [stat,beamout] = TrackThru( elem1, elem2, beamin, 1,
+1, 1 ) ;&nbsp; % mb info deleted<br>
+<ul>
+  <li>In bunch-wise tracking, Lucretia has to allocate data tables to
+keep track of the amplitude and phase of every mode in each structure
+which is bunch-wise tracked.&nbsp; This makes bunch-wise tracking
+slower and more memory-intensive than element-wise tracking.</li>
+  <li>If it is necessary to force Lucretia to recognize a new TrackThru
+operation as a new train (ie, I just did bunches 1 to 10 and now I want
+to do 20 to 30 but I want the new track to be a new train), the command
+syntax:</li>
+</ul>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; TrackThru('clear')<br>
+<br>
+<div style="margin-left: 40px;">will delete all multibunch information.<br>
+</div>
+<br>
+<span style="font-weight: bold;">Obtaining Instrument Readings:</span><br>
+<br>
+In general the user will not be content to track a beam from one point
+to another and see the resulting distribution; generally we want to get
+some BPM readings, beam size measurements, etc.&nbsp; To do this, we
+can add a third return argument to TrackThru to capture the instrument
+data:<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; [stat,beamout,instdata] = TrackThru(
+elem1, elem2, beamin, bunch1, bunch2, flag ) ;<br>
+<br>
+Return variable instdata is a 1 x 3 cell array, with contents as
+follows:<br>
+<br>
+<div style="margin-left: 40px;">instdata{1} is a structure array (ie
+instdata{1}(1), instdata{1}(2), etc) containing BPM readings.&nbsp; The
+readings are generated at any BPM between elem1 and elem2 inclusive
+which had either its GetBPMData or its GetBPMBeamPars <a
+ href="element_classes.html#TrackFlag">tracking flags</a> set.&nbsp;
+The fields in instdata{1} are:<br>
+<ul>
+  <li>Index:&nbsp; index into BEAMLINE of this BPM</li>
+  <li>S:&nbsp; S position of the BPM</li>
+  <li>Pmod:&nbsp; design momentum at the BPM (from BEAMLINE{}.P)</li>
+  <li>x: horizontal BPM reading taking into account offsets, rotations,
+electrical offsets, and BPM resolution</li>
+  <li>y: vertical BPM reading taking into account all the same things
+as in x.</li>
+  <li>z: phase error of beam (in m) at the BPM</li>
+  <li>P:&nbsp; actual centroid momentum of the beam at the BPM.</li>
+  <li>sigma:&nbsp; second-moment matrix of the beam at the BPM.</li>
+</ul>
+If the GetBPMBeamPars for a BPM is set to zero, then z, P, and sigma
+are empty for that BPM (ie, the BPM returns only data that you could
+really get from the BPM).&nbsp; If the BPM's MultiBunch flag is zero,
+then x, y, z, and P are scalars, sigma is 6 x 6, and x, y, z, P, sigma
+are computed for the bunch train as a whole.&nbsp; If instead
+MultiBunch == 1, then x, y, z, and P are vectors with 1 value per
+bunch, and sigma is a 3-d matrix, 6 x 6 x nbunch.&nbsp; Also, note that
+the rays in a beam are defined with their 6th coordinate as total
+momentum in GeV/c.&nbsp; This dimension is preserved in the sigma
+matrix, so for example sigma(1,6) has units of m.GeV/C, sigma(6,6) has
+units GeV^2/c^2, etc.<br>
+<br>
+instdata{2} is a structure array of information generated at all
+instruments (including elements of class INST, WIRE, PROF, BLMO, SLMO,
+IMON), with the following fields<br>
+<ul>
+  <li>Index: index into BEAMLINE</li>
+  <li>S:&nbsp; S position.</li>
+  <li>x:&nbsp; beam horizontal position, taking into account offsets
+and rotations of the element</li>
+  <li>sig11:&nbsp; sigma_x^2, taking into account rotations of the
+element</li>
+  <li>y:&nbsp; beam vertical position, taking into account offsets and
+rotations of the element</li>
+  <li>sig33:&nbsp; sigma_y^2, taking into account rotations of the
+element</li>
+  <li>sig13:&nbsp; sigma_xy, taking into account rotations of the
+element</li>
+  <li>z:&nbsp; beam arrival phase error * c, taking into account
+offsets of the element</li>
+  <li>sig55:&nbsp; sig_z^2.</li>
+</ul>
+Only instruments with their GetInstData tracking flag set will return
+non-empty data.&nbsp; As with BPMs, these values can be either scalars
+or 1 x nbunch vectors depending on the setting of each instrument's
+MultiBunch tracking flag.<br>
+<br>
+instdata{3} is a structure array containing data from RF structure
+higher-order mode BPMs, with the following fields:<br>
+<ul>
+  <li>Index: index into BEAMLINE</li>
+  <li>S:&nbsp; S position.</li>
+  <li>x:&nbsp; beam horizontal position, taking into account offsets
+and rotations of the element as well as resolution limits and
+electrical offsets.<br>
+  </li>
+  <li>y:&nbsp; beam vertical position, taking into account offsets and
+rotations of the element as well as resolution limits and electrical
+offsets.</li>
+</ul>
+Only LCAVs with their GetSBPMData flags set to 1 will return
+data.&nbsp; HOM BPMs do not support multibunch data; HOM BPM readings
+in Lucretia are always for the full train.<br>
+</div>
+<br>
+How does Lucretia model the resolution of BPMs and HOM-BPMs?&nbsp; The
+resolution limit is modelled by throwing a Gaussian-distributed random
+number, multiplying it by the resolution figure, and adding the
+resulting product to the beam position.&nbsp; The random number is
+generated by the Matlab randn function, so resetting randn will also
+reset the generation of BPM noise errors.<br>
+<br>
+<span style="font-weight: bold;">Version Information:</span><br>
+<br>
+The TrackThru mexfile requires several different components to build
+properly.&nbsp; To see the version of each component used in your
+version of TrackThru, type<br>
+<br>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; TrackThru('version')<br>
+<br>
+<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a><br>
+09-Apr-2005<br>
+<a href="http://www.slac.stanford.edu/detailed.html"><img
+ src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
+ alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
+ align="right"></a><br>
+</body>
+</html>
