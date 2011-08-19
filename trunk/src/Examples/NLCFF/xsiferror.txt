@@ -1,0 +1,40 @@
+  
+   XSIF Parser Version  2.1             
+   Version Date:        01-JAN-2004
+   Run: 19-FEB-2009  16:27:46
+   XSIF Parser developed by NLC Department,
+       Stanford Linear Accelerator Center.
+  
+ ... READING FILE nlc000.nlc_common.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE nlc001.elec_common.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE nlc040.bds_common.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE nlc041.bds_250GeV.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE effh_250GeV_patch.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE nlc601.ebsy.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE nlc611.eirth.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+ ... READING FILE nlc612.effh.xsif
+ 
+0... READING LOGICAL UNIT NUMBER 15 
+ 
+0... BEAM LINE "BDSH250" EXPANDED:       709 ELEMENTS,       733 POSITIONS
