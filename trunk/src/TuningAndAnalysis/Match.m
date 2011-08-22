@@ -64,6 +64,9 @@ classdef Match
   %display(M)
   %  See how it did
   %
+  % (Note: to use the T/U match conditions you need the "polyfitn" tools
+  % supplied in the Lucretia/src/utils/PolyfitnTools directory)
+  %
   % See also:
   %  InitCondStruc MakeBeam6dGauss findcells fminsearch fmincon lsqnonlin
   %  fgoalattain
