@@ -39,11 +39,11 @@
 all : GetRmats.$(MEXEXT) GetTwiss.$(MEXEXT) RmatAtoB.$(MEXEXT) TrackThru.$(MEXEXT)  VerifyLattice.$(MEXEXT)
 
 release::
-	-mv GetRmats.$(MEXEXT) ../+RMatrix
-	-mv GetTwiss.$(MEXEXT) ../+Twiss
-	-mv RmatAtoB.$(MEXEXT) ../+RMatrix
-	-mv TrackThru.$(MEXEXT) ../+Tracking
-	-mv VerifyLattice.$(MEXEXT) ../+LatticeVerification
+	-mv GetRmats.$(MEXEXT) ../RMatrix
+	-mv GetTwiss.$(MEXEXT) ../Twiss
+	-mv RmatAtoB.$(MEXEXT) ../RMatrix
+	-mv TrackThru.$(MEXEXT) ../Tracking
+	-mv VerifyLattice.$(MEXEXT) ../LatticeVerification
 
 # Mex files:
  GetRmats.$(MEXEXT) : $(LMAIN) $(LMATL) GetRmats.c
@@ -53,7 +53,7 @@ release::
  RmatAtoB.$(MEXEXT) : $(LMAIN) $(LMATL) RmatAtoB.c
 	$(MCOMP) RmatAtoB.c -L. -lLucretiaMatlab -lLucretiaMain
  TrackThru.$(MEXEXT) : $(LMAIN) $(LMATL) TrackThru.c
-	$(MCOMP) TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) -v TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
  VerifyLattice.$(MEXEXT) : $(LMAIN) $(LMATL) VerifyLattice.c
 	$(MCOMP) VerifyLattice.c -L. -lLucretiaMatlab -lLucretiaMain
 
