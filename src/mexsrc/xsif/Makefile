@@ -398,4 +398,4 @@ realclean:	clean
 	-rm -f *.$(MEXEXT)
 
 release:
-	-mv *.$(MEXEXT) ../../+LatticeGeneration
+	-mv *.$(MEXEXT) ../../LatticeGeneration
