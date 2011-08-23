@@ -18,9 +18,9 @@
 #===================================================================
 
 # Link to matlab installation directory
- MATPATH = /home/whitegr/matlab2011a
+ MATPATH = /var/MATLAB/R2011a
 # Name of mex file extension for this architecture (mexglx or mexa64)
- MEXEXT = mexglx
+ MEXEXT = mexa64
 
   MCOMP = $(MATPATH)/bin/mex
   CCOMP = icc
