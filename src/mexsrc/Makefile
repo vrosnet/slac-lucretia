@@ -18,12 +18,12 @@
 #===================================================================
 
 # Link to matlab installation directory
- MATPATH = /var/MATLAB/R2011a
+ MATPATH = /home/whitegr/matlab2011a
 # Name of mex file extension for this architecture (mexglx or mexa64)
- MEXEXT = mexa64
+ MEXEXT = mexglx
 
   MCOMP = $(MATPATH)/bin/mex
-  CCOMP = gcc
+  CCOMP = icc
 # Include "-DGPU" if compiling with cuda libraries
   CFLAGS= -c -fPIC -ansi -D_GNU_SOURCE -pthread 
 #-I/var/MATLAB/R2011a/extern/include
