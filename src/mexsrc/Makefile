@@ -23,13 +23,13 @@
  MEXEXT = mexa64
 
   MCOMP = $(MATPATH)/bin/mex
-  CCOMP = icc
+  CCOMP = gcc
 # Include "-DGPU" if compiling with cuda libraries
   CFLAGS= -c -fPIC -ansi -D_GNU_SOURCE -pthread 
 #-I/var/MATLAB/R2011a/extern/include
 #-D__CUDA_ARCH__
 # Use this for release code
-  COPTIMFLAGS= -O -DNDEBUG
+  COPTIMFLAGS= -O2 -DNDEBUG
 # Use this for debugging code
 #  COPTIMFLAGS = -g
 
