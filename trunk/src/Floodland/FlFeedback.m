@@ -872,6 +872,7 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
     end
     function fbSettings_calCB(obj,~,~)
       cn=get(obj.gui.settings_manualCalInfo,'String');
+      if ~iscell(cn); cn={cn}; end;
       obj.manualCalDataLoad(cn{get(obj.gui.settings_manualCalInfo,'Value')});
       % Update actuator names
       chnames={{'main'} {'x' 'dx' 'y' 'dy' 'z' 'dz'} {'ampl' 'pha'}};
@@ -967,7 +968,10 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       obj.guiCreatePushbutton('settings_changeBpmCuts','Change Cuts','settingsBpmListPanel',[border*2+0.2 border 0.4 0.1]);
       set(obj.gui.settings_changeBpmCuts,'Callback',@(src,event)FlInstr_selectCuts(obj,src,event)) ;
       % Update actuators / BPMs list
-      fbSettings_calCB(obj);
+      try
+        fbSettings_calCB(obj);
+      catch
+      end
     end
     function guiChangeUnits(obj,src,~)
       if src==obj.gui.settings_changeCorrList

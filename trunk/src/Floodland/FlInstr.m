@@ -702,7 +702,7 @@ classdef FlInstr < handle & FlGui & FlUtils
     function accum_sim(obj,Beam)
       persistent lastpulseID
       lastele=obj.Index(find(obj.useInstr,1,'last'));
-      [stat bo instdata]=TrackThru(1,lastele,Beam,1,1,0);
+      [~, bo instdata]=TrackThru(1,lastele,Beam,1,1,0);
       fnames={'x' 'y' 'z' 'sig11' 'sig33' 'sig13' 'sig55'};
       ind2=[0 0 0];
       for ind=1:length(obj.Index)
@@ -842,11 +842,11 @@ classdef FlInstr < handle & FlGui & FlUtils
       ic1=find(obj.instrChoiceFromGui);
       ic2=find(~obj.instrChoiceFromGui);
       if get(obj.gui.display_alpha,'Value')
-        [Y I]=sort(name2);
-        [Y I1]=sort(name1);
+        [~, I]=sort(name2);
+        [~, I1]=sort(name1);
       else
-        [Y I]=sort(s2);
-        [Y I1]=sort(s1);
+        [~, I]=sort(s2);
+        [~, I1]=sort(s1);
       end
       set(obj.gui.instrCbox2,'String',displayStr2(I))
       set(obj.gui.instrCbox2,'UserData',ic2(I))

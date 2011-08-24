@@ -52,7 +52,6 @@ function [stat,Initial] = XSIFToLucretia( filename, varargin )
 %          parsing of multipoles with all field components set to zero.
 
 %=========================================================================
-LucretiaImport;
 
   Initial = [] ; beta0name = [] ; beamname = [] ; linename = [] ;
                  beta0indx = 0  ; beamindx = 0 ;
