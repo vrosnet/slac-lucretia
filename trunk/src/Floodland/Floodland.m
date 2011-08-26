@@ -1,34 +1,96 @@
 classdef Floodland < handle & matlab.mixin.Copyable
   %FLOODLAND Floodland main Class (Hardware interaction module for Lucretia)
-  % Define FL to be global, and construct with
-  %   FL = Floodland('expt_name')
+  %
+  % Specify Model lattice data and tracking data for simulation and methods
+  % for getting at the control system (for power supplies, movers and
+  % klystrons)
+  %
+  % Main public methods:
+  %
+  %   hwGet / hwSet : Get and set hardware values (requiring FlIndex object
+  %   to define what hardware values required)
+  %
+  % See also:
+  %   FlIndex
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc Floodland">doc Floodland</a>
   
   properties
-    expt
-    Initial
-    BeamSingle
-    BeamMacro
-    BeamSparse
-    Twiss
-    Nmacro=1000;
-    sparse_Nslice=31;
-    sparse_Nener=11;
-    issim=true;
-    repRate;
+    expt % Experiment name to associate with this object
+    Initial % Lucretia Initial beam structure
+    BeamSingle % Single ray
+    BeamMacro % Macro-particle beam
+    BeamSparse % Sparse beam
+    Twiss % Lattice twiss parameters (generated from Initial beam structure)
+    Nmacro=1000; % Number of macro-particles in BeamMacro type
+    beamSigmaCut=3; % Number of sigmas to cut when generating Macro-particle beam
+    sparse_Nslice=31; % Number of longitudinal slices per beam for sparse tracking
+    sparse_Nener=11; % Number of energies per slice for sparse beam tracking
+    issim=true; % Simulation switch, if true tracking and hardware get/put simulated else the control system is accessed
+    repRate=10; % repetition rate of machine
     latticeName % Name of lattice associated with this Floodland instance
     latticeDate % Date of lattice, datenum format
-    magTrimStyle='PTRB';
-    timezone % hours east GMT
+    magTrimStyle='PTRB'; % PTRB or TRIM (implemented by low level controls)
+    timezone % hours east GMT (set by constructor)
   end
-  properties(SetAccess=private,GetAccess=private)
-    seed
-    slices
-    blocks
+  properties(Access=private)
+    seed % random number seed
+    slices % BEAMLINE element slices
+    blocks % BEAMLINE element blocks
   end
   
+  %% Get/Set methods
   methods
-    %% Constructor
+    function set.issim(obj,val)
+      obj.issim=logical(val);
+      if ~obj.issim
+        ws=warning('QUERY','Lucretia:Floodland:issim_set');
+        if strcmp(ws.state,'on'); beep; end;
+        warning('Lucretia:Floodland:issim_set','Sim mode disabled, connections to real hardware now permitted')
+      end
+    end
+    function set.Nmacro(obj,val)
+      if ~isnumeric(val) || val<2 || val>1e6
+        error('Supply # macro particles 2-1e6')
+      end
+      obj.Nmacro=val;
+      obj.beamGen;
+    end
+    function set.sparse_Nslice(obj,val)
+      if ~isnumeric(val) || val<1 || val>1e6
+        error('Supply # sparse slices 1-1e6')
+      end
+      obj.sparse_Nslice=val;
+      obj.beamGen;
+    end
+    function set.sparse_Nener(obj,val)
+      if ~isnumeric(val) || val<1 || val>1e6
+        error('Supply # energies per slice 1-1e6')
+      end
+      obj.sparse_Nener=val;
+      obj.beamGen;
+    end
+    function set.Initial(obj,newInitial)
+      obj.Initial=newInitial;
+      obj.genTwiss;
+      obj.beamGen;
+    end
+  end
+  
+  %% Main public methods
+  methods
     function obj=Floodland(exptName,latticeName,latticeDate,Initial)
+      % Floodland(exptName,latticeName,latticeDate,Initial)
+      %   exptName: string describing experiment associated with this
+      %             object
+      %   latticeName: name describing lattice associated with this object
+      %   latticeDate: lattice date tag (any supported Matlab date format)
+      %   Initial: Lucretia Initial structure
+      %
+      % See also:
+      %    InitCondStruc
       global BEAMLINE
       if ~exist('exptName','var')
         error('Must supply an experiment (accelerator) name for this Floodland instance');
@@ -63,91 +125,17 @@ classdef Floodland < handle & matlab.mixin.Copyable
         obj.timezone=0;
       end
     end
-    %% load
-    function b=loadobj(a)
-      b=a.copy;
-    end
-    %% Set issim
-    function set.issim(obj,val)
-      obj.issim=logical(val);
-      if ~obj.issim
-        ws=warning('QUERY','Lucretia:Floodland:issim_set');
-        if strcmp(ws.state,'on'); beep; end;
-        warning('Lucretia:Floodland:issim_set','Sim mode disabled, connections to real hardware now permitted')
-      end
-    end
-    %% Generate Twiss data
-    function obj=genTwiss(obj)
-      global BEAMLINE
-      Tx.alpha=obj.Initial.x.Twiss.alpha;
-      Tx.beta=obj.Initial.x.Twiss.beta;
-      Tx.eta=obj.Initial.x.Twiss.eta;
-      Tx.etap=obj.Initial.x.Twiss.etap;
-      Tx.nu=obj.Initial.x.Twiss.nu;
-      Ty.alpha=obj.Initial.y.Twiss.alpha;
-      Ty.beta=obj.Initial.y.Twiss.beta;
-      Ty.eta=obj.Initial.y.Twiss.eta;
-      Ty.etap=obj.Initial.y.Twiss.etap;
-      Ty.nu=obj.Initial.y.Twiss.nu;
-      [stat, T] = GetTwiss(1,length(BEAMLINE),Tx,Ty);
-      if stat{1}~=1; error('Twiss generation error:\n%s\n',stat{2}); end;
-      obj.Twiss=T;
-    end
-    %% Generate Beams for use in tracking
-    function obj=beamGen(obj,newseed)
-      % store current random generator info
-      if ~exist('newseed','var') || ~newseed
-        s=rng;
-        if isempty(obj.seed); obj.seed=s.Seed; end;
-        olds=s; olds.Seed=obj.seed;
-        rng(olds);
-      end
-      % Generate beam
-      obj.BeamMacro = MakeBeam6DGauss( obj.Initial, 10000, 3, 1 );
-      obj.BeamSparse = MakeBeam6DSparse( obj.Initial, 3,31,11);
-      obj.BeamSingle = MakeBeam6DGauss( obj.Initial, 1, 1, 1 );
-      % Make centroid of all beams initially the same
-      for idim=1:6
-        obj.BeamSparse.Bunch.x(idim,:)=obj.BeamSparse.Bunch.x(idim,:)+(obj.BeamSingle.Bunch.x(idim)-mean(obj.BeamSparse.Bunch.x(idim,:)));
-        obj.BeamMacro.Bunch.x(idim,:)=obj.BeamMacro.Bunch.x(idim,:)+(obj.BeamSingle.Bunch.x(idim)-mean(obj.BeamMacro.Bunch.x(idim,:)));
-      end
-      % Restore current generator seed
-      if ~exist('newseed','var') || ~newseed
-        rng(s);
-      end
-    end
-    %% set Nmacro
-    function set.Nmacro(obj,val)
-      if ~isnumeric(val) || val<2 || val>1e6
-        error('Supply # macro particles 2-1e6')
-      end
-      obj.Nmacro=val;
-      obj.beamGen;
-    end
-    %% set sparse_Nslice
-    function set.sparse_Nslice(obj,val)
-      if ~isnumeric(val) || val<1 || val>1e6
-        error('Supply # sparse slices 1-1e6')
-      end
-      obj.sparse_Nslice=val;
-      obj.beamGen;
-    end
-    %% set sparse_Nener
-    function set.sparse_Nener(obj,val)
-      if ~isnumeric(val) || val<1 || val>1e6
-        error('Supply # energies per slice 1-1e6')
-      end
-      obj.sparse_Nener=val;
-      obj.beamGen;
-    end
-    %% set new Initial
-    function set.Initial(obj,newInitial)
-      obj.Initial=newInitial;
-      obj.genTwiss;
-      obj.beamGen;
-    end
-    %% Read hardware channels into Lucretia
     function hwGet(obj,indxObj,getList)
+      % hwGet(obj,indxObj,getList)
+      % Read hardware channels into Lucretia
+      %   indxObj: FlIndex object or an object that inherits from this
+      %   class
+      %   getList: (optional) [double vector] Only get these elements of
+      %            the provided indxOnj
+      %
+      % See also:
+      %   FlIndex
+      
       % Need to pass FlIndex object or object that inherits from FlIndex Class
       mc=metaclass(indxObj);
       isFlIndex=strcmp(class(indxObj),'FlIndex');
@@ -185,8 +173,17 @@ classdef Floodland < handle & matlab.mixin.Copyable
         klyGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(indxObj.KLYSTRON_list(proplist)));
       end
     end
-    %% Trim hardware channels
     function hwSet(obj,indxObj,putList)
+      % hwSet(obj,indxObj,putList)
+      % Trim hardware channels to values in SetPt
+      %   indxObj: FlIndex object or an object that inherits from this
+      %   class
+      %   putList: (optional) [double vector] Only set these elements of
+      %            the provided indxOnj
+      %
+      % See also:
+      %   FlIndex
+      
       % Need to pass FlIndex object or object that inherits from FlIndex Class
       mc=metaclass(indxObj);
       isFlIndex=strcmp(class(indxObj),'FlIndex');
@@ -229,8 +226,49 @@ classdef Floodland < handle & matlab.mixin.Copyable
     end
   end
   
-  methods(Access=private)
-    %% KLYSTRON fetch
+  %% Internal methods
+  methods(Access=protected)
+    function b=loadobj(a)
+      b=a.copy;
+    end
+    function genTwiss(obj)
+      global BEAMLINE
+      Tx.alpha=obj.Initial.x.Twiss.alpha;
+      Tx.beta=obj.Initial.x.Twiss.beta;
+      Tx.eta=obj.Initial.x.Twiss.eta;
+      Tx.etap=obj.Initial.x.Twiss.etap;
+      Tx.nu=obj.Initial.x.Twiss.nu;
+      Ty.alpha=obj.Initial.y.Twiss.alpha;
+      Ty.beta=obj.Initial.y.Twiss.beta;
+      Ty.eta=obj.Initial.y.Twiss.eta;
+      Ty.etap=obj.Initial.y.Twiss.etap;
+      Ty.nu=obj.Initial.y.Twiss.nu;
+      [stat, T] = GetTwiss(1,length(BEAMLINE),Tx,Ty);
+      if stat{1}~=1; error('Twiss generation error:\n%s\n',stat{2}); end;
+      obj.Twiss=T;
+    end
+    function beamGen(obj,newseed)
+      % store current random generator info
+      if ~exist('newseed','var') || ~newseed
+        s=rng;
+        if isempty(obj.seed); obj.seed=s.Seed; end;
+        olds=s; olds.Seed=obj.seed;
+        rng(olds);
+      end
+      % Generate beam
+      obj.BeamMacro = MakeBeam6DGauss( obj.Initial, obj.Nmacro, obj.beamSigmaCut, 1 );
+      obj.BeamSparse = MakeBeam6DSparse( obj.Initial, obj.beamSigmaCut,obj.sparse_Nslice,obj.sparse_Nener);
+      obj.BeamSingle = MakeBeam6DGauss( obj.Initial, 1, 1, 1 );
+      % Make centroid of all beams initially the same
+      for idim=1:6
+        obj.BeamSparse.Bunch.x(idim,:)=obj.BeamSparse.Bunch.x(idim,:)+(obj.BeamSingle.Bunch.x(idim)-mean(obj.BeamSparse.Bunch.x(idim,:)));
+        obj.BeamMacro.Bunch.x(idim,:)=obj.BeamMacro.Bunch.x(idim,:)+(obj.BeamSingle.Bunch.x(idim)-mean(obj.BeamMacro.Bunch.x(idim,:)));
+      end
+      % Restore current generator seed
+      if ~exist('newseed','var') || ~newseed
+        rng(s);
+      end
+    end
     function klyGet(obj,indxObj,propindx,chanindx,hwindx)
       global KLYSTRON
       if obj.issim; return; end;
@@ -295,7 +333,6 @@ classdef Floodland < handle & matlab.mixin.Copyable
         end
       end
     end
-    %% KLYSTRON trim
     function klyTrim(obj,indxObj,propindx,chanindx,hwindx)
       global KLYSTRON
       klist=indxObj.KLYSTRON(propindx);
@@ -350,7 +387,6 @@ classdef Floodland < handle & matlab.mixin.Copyable
       % Issue control system command(s)
       obj.cntrlSet(comstack,comstackProto,comstackVals);
     end
-    %% PS fetch
     function psGet(obj,indxObj,propindx,chanindx,hwindx)
       global PS
       if obj.issim; return; end;
@@ -423,7 +459,6 @@ classdef Floodland < handle & matlab.mixin.Copyable
         end
       end
     end
-    %% PS trim
     function psTrim(obj,indxObj,propindx,chanindx,hwindx)
       global PS
       pslist=indxObj.PS(propindx);
@@ -531,13 +566,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
       end
       % Issue control system command(s)
       obj.cntrlSet(comstack,comstackProto,comstackVals);
-    end
-    
-  end
-  
-  methods
-    %% Set vals to controls (raw)
+    end    
     function cntrlSet(obj,pv,proto,vals)
+      % Set vals to controls (raw)
       if ~iscell(pv); pv={pv,1}; end;
       if ~iscell(proto); proto={proto}; end;
       % seperate into protocols and get values
@@ -553,9 +584,13 @@ classdef Floodland < handle & matlab.mixin.Copyable
       end
     end
   end
+  
+  %% Utility methods
   methods(Static)
-    %% Get vals from controls (and convert)
     function cvals=cntrlGet(pv,proto,conv)
+      % cvals=Floodland.cntrlGet(pv,proto,conv)
+      %
+      % Get vals from controls (and convert)
       persistent monitorList
       if ~iscell(pv); pv={pv}; end;
       if ~iscell(proto); proto={proto}; end;
@@ -615,18 +650,13 @@ classdef Floodland < handle & matlab.mixin.Copyable
         end
       end
     end
-  end
-    % AIDA (SLC) related functions
-  methods(Static)
-    % microname/bitid data
     function micr=bitid2micr(c2bitid)
+      % micr=bitid2micr(c2bitid)
       %
-      % micr=bitid2micr(bitid)
       %
-      
       % microname/bitid data
-      
-            % from REF_DBSFILE:MICRONAME.DAT (07-AUG-2009)
+      %
+      % from REF_DBSFILE:MICRONAME.DAT (07-AUG-2009)
       
       micrs=[ ...
         'LI00'; ...

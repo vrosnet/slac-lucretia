@@ -6,6 +6,11 @@ function varargout=FlCA(varargin)
 % Missing values are replaced with NaN's
 % Missing PV's are remembered and excluded from future calls
 %
+% FlCA('aidaGet',pvlist) / FlCA('aidaPut',pvlist,data,trimType)
+%   if wanting BPM vector (pvname ending with '//BPMS'):
+%      FlCA('aidaGet',aidapv,aidaNames,chNames,bpmd)
+%   for aidaPut, trimtype='PTRB' | 'TRIM'
+%
 %   FlCA('restore',type,ind) or FlCA('restoreAll')
 % - restore some or all of pv's previously excluded
 %   e.g. FlCA('restore','PS',33) or FlCA('restore','INSTR',133) or
@@ -14,7 +19,7 @@ function varargout=FlCA(varargin)
 %   missingPVs = FlCA('pvlist')
 %     - Get list of any missing PV's
 persistent removedPV removedPVinfo da
-error('temp')
+
 % init
 if isempty(removedPV); removedPV={}; end;
 if isempty(removedPVinfo); removedPVinfo={}; end;
