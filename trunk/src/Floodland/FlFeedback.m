@@ -3,18 +3,72 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
   %  Create one or multiple feedbacks between any chosen actuator(s)
   %  (PS,GIRDER or KLYSTRON) and any BPM(s) using simple gain or PID
   %  feedback algorithms
+  %
+  % It is the intension that this class be used mainly through its
+  % graphical user interface (GUI). To do that, create object with
+  % constructor and then call 'guiMain' method.
+  % It is however also possible to run the feedback class directly through
+  % the object interface if required.
+  %
+  % Constructor:
+  %  FB = FlFeedback(FL,instObj,indxObj)
+  %   Generate a FB object by passing a Floodland object which describes
+  %   the online environment, an FlInstr and FlIndex object which provides
+  %   a full list of BPMs and correctors or other actuator devices
+  %   available to this feedback class from the control system. Multiple FB
+  %   objects can be created under this master object, each of which may
+  %   contain a subset of this master set of control elements.
+  %   The FB object inherits methods and properties from FlIndex, FlInstr
+  %   and FlGui classes. Use methods of those classes to set the BPMs and
+  %   actuators associated with a feedback object.
+  %   Launch the main GUI figure with guiMain method. See the Lucretia
+  %   documentation on the main Lucretia website for useage instructions.
+  %   All FB settings and states are saved along with object, save the FB
+  %   object in a matlab file and reload to continue using a previously
+  %   configured feedback.
+  %
+  % Main public methods:
+  %  guiMain - launch main GUI interface
+  %  + operator available for merging Feedback objects
+  %  manualCal - perform calibration of feedback according to pre-set
+  %              configurations
+  %  manualCalDataList - list of calibrations available
+  %  manualCalDataSave/manualCalDataLoad - save/load previous calibration
+  %                                        set
+  %  calcR - calculate response matrix data from calibration data
+  %  run - operate the feedback one time
+  %  toggle - toggle between running/off states
+  %  start - start feedback timer which operates feedback
+  %  stop - stop the timer
+  %  takeNewFbSetpoint - new set point for the feedback (sets zero point of
+  %                      BPM readings to the currently measured ones)
+  %  resetFbSetpoint - reset setpoint to zero
+  %  newFB - add a new feedback object, list of created objects stored in
+  %          fbList property.
+  %  rmFB(fbObj) - remove the Feedback object passed from the list (cannot
+  %                delete the last entry in the list)
+  %
+  % See also:
+  %  Floodland FlInstr FlIndex FlGui FlApp
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc FlFeedback">doc FlFeedback</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   
 
   properties
-    feedbackAlgorithm = 'Gain' ;
+    feedbackAlgorithm = 'Gain' ; % Choice of feedback algorithm to use, currently supported 'Gain' or 'PID'
     PID = [0.2 5 0] ; % feedback PID coefficients
-    Gain = 0.1 ; % feedback gain factors
+    Gain = 0.1 ; % feedback gain factor
     BPMBufferDepth = 1000 ; % depth of BPM buffer
-    Name = 'myFB' ;
-    manualCalStepsLow
-    manualCalStepsHigh
-    manualCalNsteps
-    manualCalNbpm
+    Name = 'myFB' ; % User name for feedback
+    manualCalStepsLow % lower bound of calibration steps
+    manualCalStepsHigh % upper bound of calibration steps
+    manualCalNsteps % number of calibration steps
+    manualCalNbpm % unused
     manualCalName='none'; % name associated with calibration and settings for this FB
     lastStartDate % datenum of last time feedback was started
     fbResetVals % Values of feedback actuators at last start
@@ -27,32 +81,82 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
     fbID % the id of this FB object in fbList
   end
   properties(Access=private)
-    manualCalDataDate
-    manualCalStepsUsed
-    manualCalUseCntrlChan
-    manualCalR
-    manualCalR_err
-    pid_t0
-    pid_pe
-    pid_ppe
+    manualCalDataDate % date of last calibration
+    manualCalStepsUsed % calibration setup data for loaded calibration
+    manualCalUseCntrlChan % control channel selection for calibration
+    manualCalR % calibrated response matrix data
+    manualCalR_err % error on calibrated response matrix data
+    pid_t0 % t0 for PID loop
+    pid_pe % last error term for PID
+    pid_ppe % previous to last error term for PID
     FL % pointer to Floodland object
-    lasterr
-    calret
+    lasterr % last error
+    calret % data from calibration
   end
   properties(Dependent,Access=private)
-    stateVal
-    stateCol
+    stateVal % unused
+    stateCol % unused
   end
   properties(Constant)
-    version=1.0;
-    fbStates={'stopped' 'running' 'error' 'stopping' 'starting'};
-    appName='Orbit Feedback';
+    version=1.0; % version number for this Floodland app
+    fbStates={'stopped' 'running' 'error' 'stopping' 'starting'}; % possible feedback state flags
+    appName='Orbit Feedback'; % application name
   end
 
-  
+  %% Get/Set methods
   methods
-    %% Constructor
+    function val=get.stateVal(obj)
+      val=ismember(obj.fbStates,obj.state);
+    end
+    function col=get.stateCol(obj)
+      stateCols={[1 0 0] [0 1 0] [1 1 0] [0.5 0 0.01] [0 0.9 0.1]};
+      col=stateCols{obj.stateVal};
+    end
+    function set.feedbackAlgorithm(obj, value)
+      if ~ischar(value) || (~isequal(value,'PID') && ~isequal(value,'Gain'))
+        error('Valid feedbackAlgorithm options are ''PID'' or ''Gain''')
+      end
+      obj.feedbackAlgorithm=value;
+    end
+    function set.state(obj,value)
+      % start/stop feedback
+      
+      if ~ismember(value,obj.fbStates)
+        error('Allowed state choices are: %s',obj.fbStates)
+      end
+      if strcmp(obj.state,'error') && obj.guiExists('guiMain') && ~strcmp(value,'error')
+        try
+          resp=questdlg(sprintf('Reset error condition?\n%s',obj.lasterr.message),'Error reset','run','stop','cancel','cancel'); %#ok<MCSUP>
+        catch
+          resp=questdlg('Reset error condition?','Error reset','run','stop','cancel','cancel');
+        end
+        if strcmp(resp,'run')
+          value='starting';
+        elseif strcmp(resp,'stop')
+          value='stopped';
+        else
+          return
+        end
+      end
+      obj.state=value;
+      % Update GUI
+      if obj.guiExists('guiMain')
+        set(obj.gui.main_runstop,'String',obj.state)
+        set(obj.gui.main_runstop,'BackgroundColor',obj.stateCol) %#ok<MCSUP>
+        drawnow('expose')
+      end
+      obj.stateChangeEvnt;
+    end
+  end
+  %% Main public methods
+  methods
     function obj = FlFeedback(FL,instObj,indxObj)
+      % obj = FlFeedback(FL,instObj,indxObj)
+      % Feedback class constructor, pass Floodland object FL, FlInstr
+      % object instObj and FlIndex object indxObj. These should be the
+      % 'master' objects for all available resources, of which a subset are
+      % selected using this object.
+      
       % Need to pass FlInstr object
       if exist('instObj','var') && ~strcmp(class(instObj),'FlInstr')
         error('Must pass FlInstr object as second argument');
@@ -96,6 +200,7 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       warning('off','MATLAB:lscov:RankDefDesignMat')
     end
     function obj=plus(obj,A)
+      % addition operator for merging two feedback objects
       if strcmp(class(A),'FlIndex')
         plus@FlIndex(obj,A);
       elseif strcmp(class(A),'FlInstr')
@@ -104,8 +209,8 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         error('Plus operator only supported with FlIndex or FlInstr objects')
       end
     end
-    %% Object load method
     function b=loadobj(a)
+      % Specifies object load behaviour
       b=a;
       % warnings to switch off
       warning('off','MATLAB:lscov:RankDefDesignMat')
@@ -115,24 +220,10 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       end
       disp('loading FB obj')
     end
-    %% stateVal
-    function val=get.stateVal(obj)
-      val=ismember(obj.fbStates,obj.state);
-    end
-    %% stateCol
-    function col=get.stateCol(obj)
-      stateCols={[1 0 0] [0 1 0] [1 1 0] [0.5 0 0.01] [0 0.9 0.1]};
-      col=stateCols{obj.stateVal};
-    end
-    %% set feedback algorithm to use
-    function set.feedbackAlgorithm(obj, value)
-      if ~ischar(value) || (~isequal(value,'PID') && ~isequal(value,'Gain'))
-        error('Valid feedbackAlgorithm options are ''PID'' or ''Gain''')
-      end
-      obj.feedbackAlgorithm=value;
-    end
-    %% perform manual calibration of response matrices
     function manualCal(obj)
+      % manualCal(obj)
+      % perform manual calibration of response matrices
+      
       % Make sure FB not running
       if ~strcmp(obj.state,'stopped')
         obj.stop;
@@ -305,8 +396,9 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         delete(obj.gui.takeNewManualCal)
       end
     end
-    %% list manual calibration data files (in date order) MAX=30
     function dataList=manualCalDataList(obj)
+      % dataList=manualCalDataList(obj)
+      % list manual calibration data files (in date order) MAX=30
       caldata=dir(fullfile('FlFeedback_manualCalData',sprintf('%s_*.mat',obj.Name)));
       if ~isempty(caldata)
         cnames={caldata.name};
@@ -317,8 +409,8 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         dataList=[];
       end
     end
-    %% save manual calibration data
     function manualCalDataSave(obj)
+      % save manual calibration data
       mc=?FlFeedback;
       pl={mc.PropertyList.Name};
       cf=pl(cellfun(@(x) ~isempty(x),regexp(pl,'^manualCal')));
@@ -334,8 +426,8 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       bpms=obj.useInstr; %#ok<NASGU>
       save(fullfile('FlFeedback_manualCalData',sprintf('%s_%s.mat',obj.Name,obj.manualCalName)),'manualCalData','version','actuators','bpms')
     end
-    %% load manual calibration data
     function manualCalDataLoad(obj,name)
+      % load manual calibration data
       if ~exist('FlFeedback_manualCalData','dir')
         error('No saved calibration data')
       end
@@ -364,8 +456,8 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         obj.(cf{icf})=manualCalData{icf};
       end
     end
-    %% calculate response matrices from manual calibration data
     function calcR(obj)
+      % calculate response matrices from manual calibration data
       initDataDate=obj.lastdata;
       sz=size(obj.data);
       obj.manualCalR=[]; obj.manualCalR_err=[];
@@ -396,8 +488,9 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       end
       obj.lastdata=initDataDate;
     end
-    %% Run the feedback
     function run(obj)
+      % Run the feedback (once)
+      
       % Check we have a cal loaded
       if strcmp(obj.manualCalName,'none')
         error('No calibation loaded')
@@ -491,35 +584,8 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         obj.fbDiagnostics_update(bpmValsX,bpmErrX,bpmValsY,bpmErrY,cval,climLow,climHigh);
       end
     end
-    %% start/stop feedback
-    function set.state(obj,value)
-      if ~ismember(value,obj.fbStates)
-        error('Allowed state choices are: %s',obj.fbStates)
-      end
-      if strcmp(obj.state,'error') && obj.guiExists('guiMain') && ~strcmp(value,'error')
-        try
-          resp=questdlg(sprintf('Reset error condition?\n%s',obj.lasterr.message),'Error reset','run','stop','cancel','cancel'); %#ok<MCSUP>
-        catch
-          resp=questdlg('Reset error condition?','Error reset','run','stop','cancel','cancel');
-        end
-        if strcmp(resp,'run')
-          value='starting';
-        elseif strcmp(resp,'stop')
-          value='stopped';
-        else
-          return
-        end
-      end
-      obj.state=value;
-      % Update GUI
-      if obj.guiExists('guiMain')
-        set(obj.gui.main_runstop,'String',obj.state)
-        set(obj.gui.main_runstop,'BackgroundColor',obj.stateCol) %#ok<MCSUP>
-        drawnow('expose')
-      end
-      obj.stateChangeEvnt;
-    end
     function toggle(obj,~,~)
+      % Toggle between running or stopped state
       if ismember(obj.state,{'stopped' 'error'})
         obj.start;
       elseif strcmp(obj.timer.running,'off')
@@ -530,16 +596,19 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       end
     end
     function start(obj)
+      % Start timer object which runs feedback
       if ~strcmp(obj.state,'running') && ~strcmp(obj.state,'starting')
         obj.state='starting';
       end
     end
     function stop(obj)
+      % stop the timer which runs the feedback
       if ~strcmp(obj.state,'stopped') && ~strcmp(obj.state,'stopping')
         obj.state='stopping';
       end
     end
     function stateChangeEvnt(obj)
+      % control what happens when the feedback state changes
       switch obj.state
         case 'starting'
           start(obj.timer);
@@ -548,21 +617,19 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
           obj.state='stopped';
       end
     end
-    %% Set new setpoint for FB
     function takeNewFbSetpoint(obj)
+      % Set new setpoint for FB BPMs
       % Update BPMs
       obj.acquire(obj.FL);
       % Get BPM readings
       obj.setRef;
     end
-    %% reset FB setpoint to zero
     function resetFbSetpoint(obj)
+      % reset FB setpoint to zero for BPMs
       obj.setRef('zero');
     end
-  end
-  %% timers
-  methods
     function fbTimer(obj,~,~,cmd)
+      % timer function to run the feedback
       try
         if exist('cmd','var')
           if strcmp(cmd,'start')
@@ -581,16 +648,13 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         disp(ME.message)
       end
     end
-    %% reset FB actuators
     function resetFB(obj,~,~)
+      % reset FB actuators to their pre-stored reset values
       obj.SetPt=obj.fbResetVals;
       obj.FL.hwSet(obj);
     end
-  end
-  %% GUI
-  methods
-    % Make new feedback object
     function newFB(obj,~,~)
+      % Make new feedback object
       obj.fbList{end+1}=obj.copy;
       obj.fbList{end}.Name=sprintf('newFB%d',length(obj.fbList));
       obj.fbList{end}.fbID=length(obj.fbList); % give the obj its ID in the list
@@ -604,8 +668,9 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         obj.guiMain;
       end
     end
-    % delete feedback object
     function rmFB(obj,~,~)
+      % delete feedback object
+      
       % Cannot delete last feedback object
       if length(obj.fbList)<2
         return
@@ -628,9 +693,8 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       end
       
     end
-    % Display FB objects
     function han=guiMain(obj,~,~)
-      % Create main figure window
+      % Create main GUI figure window
       if obj.guiExists('guiMain'); delete(obj.gui.guiMain); end;
       obj.guiCreateFigure('guiMain','Orbit Feedback(s)',[800 75*length(obj.fbList)]);
       border=0.045;
@@ -675,47 +739,11 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       end
     end
   end
-  methods
-    function fbDiagnostics(obj,~,~)
-      % Create main figure window
-      obj.guiCreateFigure('fbDiagnostics',sprintf('%s Diagnostics',obj.Name),[1000 700]);
-      border=0.02;
-      usize=(1-3*border);
-      axsize=usize*0.75;
-      bsize=[(1-4*border)/3 0.2*usize];
-      % axes
-      obj.guiCreateAxes('fbDiagnostics_axes1','fbDiagnostics',[border*3 1-border-axsize 1-5*border axsize*0.95]);
-      % plot select
-      obj.guiCreateButtonGroup('fbDiagnostics_plotSel','Select Plot','fbDiagnostics',[border border bsize]);
-      rsize=(1-4*border)/3;
-      obj.guiCreateRadiobutton('fbDiagnostics_plotBpmsX','BPMs (x)',1,'fbDiagnostics_plotSel',[border border*3+rsize*2 1-2*border rsize]);
-      obj.guiCreateRadiobutton('fbDiagnostics_plotBpmsY','BPMs (y)',0,'fbDiagnostics_plotSel',[border border*2+rsize 1-2*border rsize]);
-      obj.guiCreateRadiobutton('fbDiagnostics_plotActs','Actuators',0,'fbDiagnostics_plotSel',[border border 1-2*border rsize]);
-      % plot ranges
-      obj.guiCreatePanel('fbDiagnostics_plotrangePanel','Plot ranges','fbDiagnostics',[border*2+bsize(1) border bsize]);
-      obj.guiCreateRadiobutton('fbDiagnostics_plotlinear','linear',1,'fbDiagnostics_plotrangePanel',...
-        [border border (1-3*border)/2 (1-3*border)/2]);
-      obj.guiCreateRadiobutton('fbDiagnostics_plotlog','log',0,'fbDiagnostics_plotrangePanel',...
-        [border border+(1-3*border)/2 (1-3*border)/2 (1-3*border)/2]);
-      obj.guiCreateRadiobutton('fbDiagnostics_plotval','value',1,'fbDiagnostics_plotrangePanel',...
-        [1-border-(1-3*border)/2 border (1-3*border)/2 (1-3*border)/2]);
-      obj.guiCreateRadiobutton('fbDiagnostics_plotnorm','normalised',0,'fbDiagnostics_plotrangePanel',...
-        [1-border-(1-3*border)/2 border+(1-3*border)/2 (1-3*border)/2 (1-3*border)/2]);
-      set(obj.gui.fbDiagnostics_plotlinear,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
-      set(obj.gui.fbDiagnostics_plotlog,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
-      set(obj.gui.fbDiagnostics_plotval,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
-      set(obj.gui.fbDiagnostics_plotnorm,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
-      % Menu
-      calmenu=uimenu('Parent',obj.gui.fbDiagnostics,'Label','Cal');
-      obj.gui.fbDiagnostics_menuShowCal=uimenu('Parent',calmenu,'Label','Show Cal Slopes','Callback',...
-        @(src,event)guiCheckSlopes(obj,src,event));
-      % Update
-      rsize=(1-3*border)/2;
-      obj.guiCreatePanel('fbDiagnostics_updatePanel','Time window / s','fbDiagnostics',[border*3+bsize(1)*2 border bsize]);
-      obj.guiCreateTogglebutton('fbDiagnostics_update','Update','fbDiagnostics_updatePanel',[border border 1-2*border rsize]);
-      obj.guiCreateEdit('fbDiagnostics_dt','120','fbDiagnostics_updatePanel',[border 1-border-rsize 1-2*border rsize]);
-    end
+  
+  %% GUI callbacks and sub-GUI elements
+  methods(Hidden)
     function fbDiagnostics_prCallback(obj,src,~)
+      % callback function for diagnostics
       if src==obj.gui.fbDiagnostics_plotlinear
         if ~get(src,'Value')
           set(src,'Value',1)
@@ -742,114 +770,147 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
         end
       end
     end
-    function fbDiagnostics_update(obj,xbpms,xerr,ybpms,yerr,cvals,limLow,limHigh)
-      % Fill data array
-      diagdata=get(obj.gui.fbDiagnostics,'UserData');
-      if isempty(diagdata) || ~iscell(diagdata)
-        diagdata=[];
+    function takeNewManualCal_tableEdit(obj,src,event)
+      tableIndex=get(src,'UserData');
+      inds=event.Indices;
+      indx=tableIndex{inds(1)}(1);
+      ichan=tableIndex{inds(1)}(2);
+      if get(obj.gui.takeNewManualCal_dunits_setpt,'Value')
+        conv=1;
       else
-        sz1=size(diagdata{1}); sz2=size(diagdata{3}); sz3=size(diagdata{5}); sz4=size(diagdata{6});
-        if sz1(1)~=length(xbpms) || sz2(1)~=length(cvals) || sz3(1)~=length(xerr) || sz4(1)~=length(yerr); diagdata=[]; end;
+        conv=obj.Ampl2ACT{indx}(ichan);
       end
-      if isempty(diagdata)
-        diagdata{1}=xbpms;
-        diagdata{2}=ybpms;
-        diagdata{3}=cvals';
-        diagdata{4}=now;
-        diagdata{5}=xerr;
-        diagdata{6}=yerr;
+      switch inds(2)
+        case 2
+          setpt=obj.SetPt;
+          setpt{indx}(ichan)=event.NewData/conv;
+          obj.SetPt=setpt;
+          obj.FL.hwSet(obj,indx);
+        case 3
+          obj.manualCalStepsLow{indx}(ichan)=event.NewData/conv;
+        case 4
+          obj.manualCalStepsHigh{indx}(ichan)=event.NewData/conv;
+        case 5
+          obj.manualCalNsteps{indx}(ichan)=event.NewData;
+        case 6
+          obj.manualCalUseCntrlChan{indx}(ichan)=event.NewData;
+      end
+    end
+    function takeNewManualCal_name(obj,src,~)
+      obj.manualCalName=get(src,'String');
+    end
+    function takeNewManualCal_nbpm(obj,src,~)
+      obj.ndata=str2double(get(src,'String'));
+    end
+    function takeNewManualCal_dunits(obj,src,~)
+      if strcmp(get(src,'String'),'SetPt')
+        if get(obj.gui.takeNewManualCal_dunits_setpt,'Value')
+          set(obj.gui.takeNewManualCal_dunits_act,'Value',false)
+          obj.takeNewManualCal_tableFill;
+        else
+          set(obj.gui.takeNewManualCal_dunits_setpt,'Value',true)
+        end
+      else % ACT
+        if get(obj.gui.takeNewManualCal_dunits_act,'Value')
+          set(obj.gui.takeNewManualCal_dunits_setpt,'Value',false)
+          obj.takeNewManualCal_tableFill;
+        else
+          set(obj.gui.takeNewManualCal_dunits_act,'Value',true)
+        end
+      end
+    end
+    function guiStopEvent(obj,~,~)
+      obj.stopReq=true;
+%       takeNewManualCal(obj,[],[]);
+    end
+    function guiCheckSlopes(obj,~,~)
+      obj.guiCreateFigure('guiCheckSlopes','Check Cal Slopes',[700 500]);
+      border=0.02;
+      obj.guiCreateAxes('checkSlopes_axis1',obj.gui.guiCheckSlopes,[0.1 0.65 0.8 0.28]);
+      obj.guiCreateAxes('checkSlopes_axis2',obj.gui.guiCheckSlopes,[0.1 0.3 0.8 0.28]);
+      bsize=(0.4-3*border)/4;
+      obj.guiCreatePushbutton('checkSlopes_prevact','<','guiCheckSlopes',[0.1 border 0.1 bsize])
+      set(obj.gui.checkSlopes_prevact,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
+      obj.guiCreatePushbutton('checkSlopes_nextact','>','guiCheckSlopes',[0.8 border 0.1 bsize])
+      set(obj.gui.checkSlopes_nextact,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
+      obj.guiCreatePushbutton('checkSlopes_prevbpm','<','guiCheckSlopes',[0.1 border*2+bsize 0.1 bsize])
+      set(obj.gui.checkSlopes_prevbpm,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
+      obj.guiCreatePushbutton('checkSlopes_nextbpm','>','guiCheckSlopes',[0.8 border*2+bsize 0.1 bsize])
+      set(obj.gui.checkSlopes_nextbpm,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
+      obj.guiCreatePopupmenu('checkSlopes_actmenu',obj.INDXused,'guiCheckSlopes',[0.2+border border 0.6-2*border bsize*0.8])
+      set(obj.gui.checkSlopes_actmenu,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
+      obj.guiCreatePopupmenu('checkSlopes_bpmmenu',[{'All BPMs'} obj.instrName(obj.useInstr)],'guiCheckSlopes',...
+        [0.2+border border*2+bsize 0.6-2*border bsize*0.8])
+      set(obj.gui.checkSlopes_bpmmenu,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
+      guiCheckSlopesCallback(obj,obj.gui.checkSlopes_bpmmenu);
+    end
+    function guiCheckSlopesCallback(obj,src,~)
+      if src==obj.gui.checkSlopes_prevact
+        valnow=get(obj.gui.checkSlopes_actmenu,'Value');
+        if valnow>1; valnow=valnow-1; end;
+        set(obj.gui.checkSlopes_actmenu,'Value',valnow)
+      elseif src==obj.gui.checkSlopes_nextact
+        valnow=get(obj.gui.checkSlopes_actmenu,'Value');
+        if valnow<length(get(obj.gui.checkSlopes_actmenu,'String')); valnow=valnow+1; end;
+        set(obj.gui.checkSlopes_actmenu,'Value',valnow)
+      elseif src==obj.gui.checkSlopes_prevbpm
+        valnow=get(obj.gui.checkSlopes_bpmmenu,'Value');
+        if valnow>1; valnow=valnow-1; end;
+        set(obj.gui.checkSlopes_bpmmenu,'Value',valnow)
+      elseif src==obj.gui.checkSlopes_nextbpm
+        valnow=get(obj.gui.checkSlopes_bpmmenu,'Value');
+        if valnow<length(get(obj.gui.checkSlopes_bpmmenu,'String')); valnow=valnow+1; end;
+        set(obj.gui.checkSlopes_bpmmenu,'Value',valnow)
+      end
+      initDataDate=obj.lastdata;
+      chans=obj.INDXchannels;
+      nc=0;
+      bpmStr=get(obj.gui.checkSlopes_bpmmenu,'String');
+      ibpm=get(obj.gui.checkSlopes_bpmmenu,'Value');
+      for indx=find(obj.useCntrl)
+        for ichan=find(obj.useCntrlChan{indx})
+          if ~ismember(ichan,chans{2,indx}); continue; end;
+          nc=nc+1;
+          if nc~=get(obj.gui.checkSlopes_actmenu,'Value'); continue; end;
+          steps=linspace(obj.manualCalStepsLow{indx}(ichan),obj.manualCalStepsHigh{indx}(ichan),obj.manualCalNsteps{indx}(ichan));
+          bpmValsX=NaN(sum(obj.useInstr),length(steps));
+          bpmValsY=bpmValsX;
+          bpmErrX=bpmValsX;
+          bpmErrY=bpmValsX;
+          for istep=obj.manualCalStepsUsed{indx,ichan}
+            obj.lastdata=obj.manualCalDataDate(indx,ichan,istep);
+            [data dataerr]=obj.meanstd;
+            bpmValsX(:,istep)=data(:,1); bpmErrX(:,istep)=dataerr(:,1);
+            bpmValsY(:,istep)=data(:,2); bpmErrY(:,istep)=dataerr(:,2);
+          end
+        end
+      end
+      bx=bpmValsX; bxe=bpmErrX;
+      by=bpmValsY; bye=bpmErrY;
+      szx=size(bx); szy=size(by);
+      if strcmp(bpmStr{ibpm},'All BPMs')
+        plot(obj.gui.checkSlopes_axis1,repmat(steps,szx(1),1)',bx'.*1e6)
+        plot(obj.gui.checkSlopes_axis2,repmat(steps,szy(1),1)',by'.*1e6)
+        lines1=findall(obj.gui.checkSlopes_axis1,'Type','line');
+        lines2=findall(obj.gui.checkSlopes_axis2,'Type','line');
+        names=obj.instrName(obj.useInstr);
+        for iline=1:length(lines1)
+          hcmenu=uicontextmenu;
+          uimenu(hcmenu,'Label',names{end-iline+1});
+          set(lines1(iline),'uicontextmenu',hcmenu);
+          set(lines2(iline),'uicontextmenu',hcmenu);
+        end
       else
-        diagdata{1}=[diagdata{1} xbpms];
-        diagdata{2}=[diagdata{2} ybpms];
-        diagdata{3}=[diagdata{3} cvals'];
-        diagdata{4}=[diagdata{4} now];
-        diagdata{5}=[diagdata{5} xerr];
-        diagdata{6}=[diagdata{6} yerr];
+        errorbar(obj.gui.checkSlopes_axis1,steps,bx(ibpm-1,:).*1e6,bxe(ibpm-1,:).*1e6)
+        errorbar(obj.gui.checkSlopes_axis2,steps,by(ibpm-1,:).*1e6,bye(ibpm-1,:).*1e6)
       end
-      % Throw away data beyond time window
-      dataAge=(now-diagdata{4}).*3600.*24;
-      oldData=dataAge>str2double(get(obj.gui.fbDiagnostics_dt,'String'));
-      if any(~oldData)
-        for idata=[1:3 5 6]
-          diagdata{idata}=diagdata{idata}(:,~oldData);
-        end
-        diagdata{4}=diagdata{4}(~oldData);
-      else
-        diagdata=[];
-      end
-      set(obj.gui.fbDiagnostics,'UserData',diagdata);
-      % Asking for update?
-      if ~get(obj.gui.fbDiagnostics_update,'Value')
-        return
-      end
-      % make requested plot
-      logplot=get(obj.gui.fbDiagnostics_plotlog,'Value');
-      normplot=get(obj.gui.fbDiagnostics_plotnorm,'Value');
-      timevals=(diagdata{4}-now).*3600.*24;
-      if get(obj.gui.fbDiagnostics_plotBpmsX,'Value')
-        if normplot
-          data=diagdata{1}./max(abs(diagdata{1}(:)));
-          dataerr=diagdata{5}./max(abs(diagdata{1}(:)));
-        else
-          data=diagdata{1};
-          dataerr=diagdata{5};
-        end
-        if logplot
-          set(obj.gui.fbDiagnostics_axes1,'YScale','log')
-          if obj.ndata>1
-            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)',dataerr');
-          else
-            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)')
-          end
-        else
-          set(obj.gui.fbDiagnostics_axes1,'YScale','linear')
-          if obj.ndata>1
-            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data',dataerr');
-          else
-            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data')
-          end
-        end
-      elseif get(obj.gui.fbDiagnostics_plotBpmsY,'Value')
-        if normplot
-          data=diagdata{2}./max(abs(diagdata{2}(:)));
-          dataerr=diagdata{6}./max(abs(diagdata{2}(:)));
-        else
-          data=diagdata{2};
-          dataerr=diagdata{6};
-        end
-        if logplot
-          set(obj.gui.fbDiagnostics_axes1,'YScale','log')
-          if obj.ndata>1
-            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)',dataerr');
-          else
-            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)')
-          end
-        else
-          set(obj.gui.fbDiagnostics_axes1,'YScale','linear')
-          if obj.ndata>1
-            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data',dataerr');
-          else
-            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data')
-          end
-        end
-      elseif get(obj.gui.fbDiagnostics_plotActs,'Value')
-        if normplot
-          for isz=1:sz2(1)
-            data(isz,:)=diagdata{3}(isz,:)./abs(limHigh(isz)-limLow(isz));
-          end
-        else
-          data=diagdata{3};
-        end
-        if logplot
-          set(obj.gui.fbDiagnostics_axes1,'YScale','log')
-          plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz2(1),1)',abs(data)');
-        else
-          set(obj.gui.fbDiagnostics_axes1,'YScale','linear')
-          plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz2(1),1)',data');
-        end
-      end
-      grid(obj.gui.fbDiagnostics_axes1,'on')
-      drawnow('expose')
+      grid(obj.gui.checkSlopes_axis1,'on')
+      grid(obj.gui.checkSlopes_axis2,'on')
+      axis(obj.gui.checkSlopes_axis1,'tight')
+      axis(obj.gui.checkSlopes_axis2,'tight')
+      ylabel(obj.gui.checkSlopes_axis1,'x / um')
+      ylabel(obj.gui.checkSlopes_axis2,'y / um')
+      obj.lastdata=initDataDate;
     end
     function changeSetPt(obj,~,~)
       % Create main figure window
@@ -1152,6 +1213,158 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       obj.manualCalName=get(obj.gui.takeNewManualCal_name,'String');
       obj.manualCal;
     end
+    function fbDiagnostics(obj,~,~)
+      % Create feedback diagnostics figure window
+      obj.guiCreateFigure('fbDiagnostics',sprintf('%s Diagnostics',obj.Name),[1000 700]);
+      border=0.02;
+      usize=(1-3*border);
+      axsize=usize*0.75;
+      bsize=[(1-4*border)/3 0.2*usize];
+      % axes
+      obj.guiCreateAxes('fbDiagnostics_axes1','fbDiagnostics',[border*3 1-border-axsize 1-5*border axsize*0.95]);
+      % plot select
+      obj.guiCreateButtonGroup('fbDiagnostics_plotSel','Select Plot','fbDiagnostics',[border border bsize]);
+      rsize=(1-4*border)/3;
+      obj.guiCreateRadiobutton('fbDiagnostics_plotBpmsX','BPMs (x)',1,'fbDiagnostics_plotSel',[border border*3+rsize*2 1-2*border rsize]);
+      obj.guiCreateRadiobutton('fbDiagnostics_plotBpmsY','BPMs (y)',0,'fbDiagnostics_plotSel',[border border*2+rsize 1-2*border rsize]);
+      obj.guiCreateRadiobutton('fbDiagnostics_plotActs','Actuators',0,'fbDiagnostics_plotSel',[border border 1-2*border rsize]);
+      % plot ranges
+      obj.guiCreatePanel('fbDiagnostics_plotrangePanel','Plot ranges','fbDiagnostics',[border*2+bsize(1) border bsize]);
+      obj.guiCreateRadiobutton('fbDiagnostics_plotlinear','linear',1,'fbDiagnostics_plotrangePanel',...
+        [border border (1-3*border)/2 (1-3*border)/2]);
+      obj.guiCreateRadiobutton('fbDiagnostics_plotlog','log',0,'fbDiagnostics_plotrangePanel',...
+        [border border+(1-3*border)/2 (1-3*border)/2 (1-3*border)/2]);
+      obj.guiCreateRadiobutton('fbDiagnostics_plotval','value',1,'fbDiagnostics_plotrangePanel',...
+        [1-border-(1-3*border)/2 border (1-3*border)/2 (1-3*border)/2]);
+      obj.guiCreateRadiobutton('fbDiagnostics_plotnorm','normalised',0,'fbDiagnostics_plotrangePanel',...
+        [1-border-(1-3*border)/2 border+(1-3*border)/2 (1-3*border)/2 (1-3*border)/2]);
+      set(obj.gui.fbDiagnostics_plotlinear,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
+      set(obj.gui.fbDiagnostics_plotlog,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
+      set(obj.gui.fbDiagnostics_plotval,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
+      set(obj.gui.fbDiagnostics_plotnorm,'Callback',@(src,event)fbDiagnostics_prCallback(obj,src,event));
+      % Menu
+      calmenu=uimenu('Parent',obj.gui.fbDiagnostics,'Label','Cal');
+      obj.gui.fbDiagnostics_menuShowCal=uimenu('Parent',calmenu,'Label','Show Cal Slopes','Callback',...
+        @(src,event)guiCheckSlopes(obj,src,event));
+      % Update
+      rsize=(1-3*border)/2;
+      obj.guiCreatePanel('fbDiagnostics_updatePanel','Time window / s','fbDiagnostics',[border*3+bsize(1)*2 border bsize]);
+      obj.guiCreateTogglebutton('fbDiagnostics_update','Update','fbDiagnostics_updatePanel',[border border 1-2*border rsize]);
+      obj.guiCreateEdit('fbDiagnostics_dt','120','fbDiagnostics_updatePanel',[border 1-border-rsize 1-2*border rsize]);
+    end
+  end
+  
+  %% Private methods
+  methods(Access=private)
+    function fbDiagnostics_update(obj,xbpms,xerr,ybpms,yerr,cvals,limLow,limHigh)
+      % Fill data array
+      diagdata=get(obj.gui.fbDiagnostics,'UserData');
+      if isempty(diagdata) || ~iscell(diagdata)
+        diagdata=[];
+      else
+        sz1=size(diagdata{1}); sz2=size(diagdata{3}); sz3=size(diagdata{5}); sz4=size(diagdata{6});
+        if sz1(1)~=length(xbpms) || sz2(1)~=length(cvals) || sz3(1)~=length(xerr) || sz4(1)~=length(yerr); diagdata=[]; end;
+      end
+      if isempty(diagdata)
+        diagdata{1}=xbpms;
+        diagdata{2}=ybpms;
+        diagdata{3}=cvals';
+        diagdata{4}=now;
+        diagdata{5}=xerr;
+        diagdata{6}=yerr;
+      else
+        diagdata{1}=[diagdata{1} xbpms];
+        diagdata{2}=[diagdata{2} ybpms];
+        diagdata{3}=[diagdata{3} cvals'];
+        diagdata{4}=[diagdata{4} now];
+        diagdata{5}=[diagdata{5} xerr];
+        diagdata{6}=[diagdata{6} yerr];
+      end
+      % Throw away data beyond time window
+      dataAge=(now-diagdata{4}).*3600.*24;
+      oldData=dataAge>str2double(get(obj.gui.fbDiagnostics_dt,'String'));
+      if any(~oldData)
+        for idata=[1:3 5 6]
+          diagdata{idata}=diagdata{idata}(:,~oldData);
+        end
+        diagdata{4}=diagdata{4}(~oldData);
+      else
+        diagdata=[];
+      end
+      set(obj.gui.fbDiagnostics,'UserData',diagdata);
+      % Asking for update?
+      if ~get(obj.gui.fbDiagnostics_update,'Value')
+        return
+      end
+      % make requested plot
+      logplot=get(obj.gui.fbDiagnostics_plotlog,'Value');
+      normplot=get(obj.gui.fbDiagnostics_plotnorm,'Value');
+      timevals=(diagdata{4}-now).*3600.*24;
+      if get(obj.gui.fbDiagnostics_plotBpmsX,'Value')
+        if normplot
+          data=diagdata{1}./max(abs(diagdata{1}(:)));
+          dataerr=diagdata{5}./max(abs(diagdata{1}(:)));
+        else
+          data=diagdata{1};
+          dataerr=diagdata{5};
+        end
+        if logplot
+          set(obj.gui.fbDiagnostics_axes1,'YScale','log')
+          if obj.ndata>1
+            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)',dataerr');
+          else
+            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)')
+          end
+        else
+          set(obj.gui.fbDiagnostics_axes1,'YScale','linear')
+          if obj.ndata>1
+            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data',dataerr');
+          else
+            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data')
+          end
+        end
+      elseif get(obj.gui.fbDiagnostics_plotBpmsY,'Value')
+        if normplot
+          data=diagdata{2}./max(abs(diagdata{2}(:)));
+          dataerr=diagdata{6}./max(abs(diagdata{2}(:)));
+        else
+          data=diagdata{2};
+          dataerr=diagdata{6};
+        end
+        if logplot
+          set(obj.gui.fbDiagnostics_axes1,'YScale','log')
+          if obj.ndata>1
+            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)',dataerr');
+          else
+            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',abs(data)')
+          end
+        else
+          set(obj.gui.fbDiagnostics_axes1,'YScale','linear')
+          if obj.ndata>1
+            errorbar(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data',dataerr');
+          else
+            plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz1(1),1)',data')
+          end
+        end
+      elseif get(obj.gui.fbDiagnostics_plotActs,'Value')
+        if normplot
+          for isz=1:sz2(1)
+            data(isz,:)=diagdata{3}(isz,:)./abs(limHigh(isz)-limLow(isz));
+          end
+        else
+          data=diagdata{3};
+        end
+        if logplot
+          set(obj.gui.fbDiagnostics_axes1,'YScale','log')
+          plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz2(1),1)',abs(data)');
+        else
+          set(obj.gui.fbDiagnostics_axes1,'YScale','linear')
+          plot(obj.gui.fbDiagnostics_axes1,repmat(timevals,sz2(1),1)',data');
+        end
+      end
+      grid(obj.gui.fbDiagnostics_axes1,'on')
+      drawnow('expose')
+    end
     function takeNewManualCal_tableFill(obj)
       % Get data for table
       irow=0;
@@ -1200,148 +1413,6 @@ classdef FlFeedback < handle & FlIndex & FlInstr & FlGui & matlab.mixin.Copyable
       end
       set(obj.gui.takeNewManualCal_table,'Data',tableData)
       set(obj.gui.takeNewManualCal_table,'UserData',tableIndex)
-    end
-    function takeNewManualCal_tableEdit(obj,src,event)
-      tableIndex=get(src,'UserData');
-      inds=event.Indices;
-      indx=tableIndex{inds(1)}(1);
-      ichan=tableIndex{inds(1)}(2);
-      if get(obj.gui.takeNewManualCal_dunits_setpt,'Value')
-        conv=1;
-      else
-        conv=obj.Ampl2ACT{indx}(ichan);
-      end
-      switch inds(2)
-        case 2
-          setpt=obj.SetPt;
-          setpt{indx}(ichan)=event.NewData/conv;
-          obj.SetPt=setpt;
-          obj.FL.hwSet(obj,indx);
-        case 3
-          obj.manualCalStepsLow{indx}(ichan)=event.NewData/conv;
-        case 4
-          obj.manualCalStepsHigh{indx}(ichan)=event.NewData/conv;
-        case 5
-          obj.manualCalNsteps{indx}(ichan)=event.NewData;
-        case 6
-          obj.manualCalUseCntrlChan{indx}(ichan)=event.NewData;
-      end
-    end
-    function takeNewManualCal_name(obj,src,~)
-      obj.manualCalName=get(src,'String');
-    end
-    function takeNewManualCal_nbpm(obj,src,~)
-      obj.ndata=str2double(get(src,'String'));
-    end
-    function takeNewManualCal_dunits(obj,src,~)
-      if strcmp(get(src,'String'),'SetPt')
-        if get(obj.gui.takeNewManualCal_dunits_setpt,'Value')
-          set(obj.gui.takeNewManualCal_dunits_act,'Value',false)
-          obj.takeNewManualCal_tableFill;
-        else
-          set(obj.gui.takeNewManualCal_dunits_setpt,'Value',true)
-        end
-      else % ACT
-        if get(obj.gui.takeNewManualCal_dunits_act,'Value')
-          set(obj.gui.takeNewManualCal_dunits_setpt,'Value',false)
-          obj.takeNewManualCal_tableFill;
-        else
-          set(obj.gui.takeNewManualCal_dunits_act,'Value',true)
-        end
-      end
-    end
-    function guiStopEvent(obj,~,~)
-      obj.stopReq=true;
-%       takeNewManualCal(obj,[],[]);
-    end
-    function guiCheckSlopes(obj,~,~)
-      obj.guiCreateFigure('guiCheckSlopes','Check Cal Slopes',[700 500]);
-      border=0.02;
-      obj.guiCreateAxes('checkSlopes_axis1',obj.gui.guiCheckSlopes,[0.1 0.65 0.8 0.28]);
-      obj.guiCreateAxes('checkSlopes_axis2',obj.gui.guiCheckSlopes,[0.1 0.3 0.8 0.28]);
-      bsize=(0.4-3*border)/4;
-      obj.guiCreatePushbutton('checkSlopes_prevact','<','guiCheckSlopes',[0.1 border 0.1 bsize])
-      set(obj.gui.checkSlopes_prevact,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
-      obj.guiCreatePushbutton('checkSlopes_nextact','>','guiCheckSlopes',[0.8 border 0.1 bsize])
-      set(obj.gui.checkSlopes_nextact,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
-      obj.guiCreatePushbutton('checkSlopes_prevbpm','<','guiCheckSlopes',[0.1 border*2+bsize 0.1 bsize])
-      set(obj.gui.checkSlopes_prevbpm,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
-      obj.guiCreatePushbutton('checkSlopes_nextbpm','>','guiCheckSlopes',[0.8 border*2+bsize 0.1 bsize])
-      set(obj.gui.checkSlopes_nextbpm,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
-      obj.guiCreatePopupmenu('checkSlopes_actmenu',obj.INDXused,'guiCheckSlopes',[0.2+border border 0.6-2*border bsize*0.8])
-      set(obj.gui.checkSlopes_actmenu,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
-      obj.guiCreatePopupmenu('checkSlopes_bpmmenu',[{'All BPMs'} obj.instrName(obj.useInstr)],'guiCheckSlopes',...
-        [0.2+border border*2+bsize 0.6-2*border bsize*0.8])
-      set(obj.gui.checkSlopes_bpmmenu,'Callback',@(src,event)guiCheckSlopesCallback(obj,src,event))
-      guiCheckSlopesCallback(obj,obj.gui.checkSlopes_bpmmenu);
-    end
-    function guiCheckSlopesCallback(obj,src,~)
-      if src==obj.gui.checkSlopes_prevact
-        valnow=get(obj.gui.checkSlopes_actmenu,'Value');
-        if valnow>1; valnow=valnow-1; end;
-        set(obj.gui.checkSlopes_actmenu,'Value',valnow)
-      elseif src==obj.gui.checkSlopes_nextact
-        valnow=get(obj.gui.checkSlopes_actmenu,'Value');
-        if valnow<length(get(obj.gui.checkSlopes_actmenu,'String')); valnow=valnow+1; end;
-        set(obj.gui.checkSlopes_actmenu,'Value',valnow)
-      elseif src==obj.gui.checkSlopes_prevbpm
-        valnow=get(obj.gui.checkSlopes_bpmmenu,'Value');
-        if valnow>1; valnow=valnow-1; end;
-        set(obj.gui.checkSlopes_bpmmenu,'Value',valnow)
-      elseif src==obj.gui.checkSlopes_nextbpm
-        valnow=get(obj.gui.checkSlopes_bpmmenu,'Value');
-        if valnow<length(get(obj.gui.checkSlopes_bpmmenu,'String')); valnow=valnow+1; end;
-        set(obj.gui.checkSlopes_bpmmenu,'Value',valnow)
-      end
-      initDataDate=obj.lastdata;
-      chans=obj.INDXchannels;
-      nc=0;
-      bpmStr=get(obj.gui.checkSlopes_bpmmenu,'String');
-      ibpm=get(obj.gui.checkSlopes_bpmmenu,'Value');
-      for indx=find(obj.useCntrl)
-        for ichan=find(obj.useCntrlChan{indx})
-          if ~ismember(ichan,chans{2,indx}); continue; end;
-          nc=nc+1;
-          if nc~=get(obj.gui.checkSlopes_actmenu,'Value'); continue; end;
-          steps=linspace(obj.manualCalStepsLow{indx}(ichan),obj.manualCalStepsHigh{indx}(ichan),obj.manualCalNsteps{indx}(ichan));
-          bpmValsX=NaN(sum(obj.useInstr),length(steps));
-          bpmValsY=bpmValsX;
-          bpmErrX=bpmValsX;
-          bpmErrY=bpmValsX;
-          for istep=obj.manualCalStepsUsed{indx,ichan}
-            obj.lastdata=obj.manualCalDataDate(indx,ichan,istep);
-            [data dataerr]=obj.meanstd;
-            bpmValsX(:,istep)=data(:,1); bpmErrX(:,istep)=dataerr(:,1);
-            bpmValsY(:,istep)=data(:,2); bpmErrY(:,istep)=dataerr(:,2);
-          end
-        end
-      end
-      bx=bpmValsX; bxe=bpmErrX;
-      by=bpmValsY; bye=bpmErrY;
-      szx=size(bx); szy=size(by);
-      if strcmp(bpmStr{ibpm},'All BPMs')
-        plot(obj.gui.checkSlopes_axis1,repmat(steps,szx(1),1)',bx'.*1e6)
-        plot(obj.gui.checkSlopes_axis2,repmat(steps,szy(1),1)',by'.*1e6)
-        lines1=findall(obj.gui.checkSlopes_axis1,'Type','line');
-        lines2=findall(obj.gui.checkSlopes_axis2,'Type','line');
-        names=obj.instrName(obj.useInstr);
-        for iline=1:length(lines1)
-          hcmenu=uicontextmenu;
-          uimenu(hcmenu,'Label',names{end-iline+1});
-          set(lines1(iline),'uicontextmenu',hcmenu);
-          set(lines2(iline),'uicontextmenu',hcmenu);
-        end
-      else
-        errorbar(obj.gui.checkSlopes_axis1,steps,bx(ibpm-1,:).*1e6,bxe(ibpm-1,:).*1e6)
-        errorbar(obj.gui.checkSlopes_axis2,steps,by(ibpm-1,:).*1e6,bye(ibpm-1,:).*1e6)
-      end
-      grid(obj.gui.checkSlopes_axis1,'on')
-      grid(obj.gui.checkSlopes_axis2,'on')
-      axis(obj.gui.checkSlopes_axis1,'tight')
-      axis(obj.gui.checkSlopes_axis2,'tight')
-      ylabel(obj.gui.checkSlopes_axis1,'x / um')
-      ylabel(obj.gui.checkSlopes_axis2,'y / um')
-      obj.lastdata=initDataDate;
     end
   end
 end

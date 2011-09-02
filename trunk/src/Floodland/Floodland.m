@@ -16,6 +16,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
   % Reference page in Help browser for list of accessible properties and
   % methods:
   %   <a href="matlab:doc Floodland">doc Floodland</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   
   properties
     expt % Experiment name to associate with this object
