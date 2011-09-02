@@ -2,6 +2,39 @@ classdef FlSaveRestore < handle & FlIndex & FlApp & FlGui & matlab.mixin.Copyabl
   %FLSAVERESTORE Save/Restore program for Floodland controls
   %   Define 1 or more lists of controls to store save points and ability
   %   to restore lists to those previously saved values
+  %
+  % This class is designed to be mainly used from its graphical user
+  % interface (GUI) which can be launched using the guiMain method. It can
+  % however be driven from the class methods alone if needed.
+  %
+  % Constructor:
+  %  SR=FlSaveRestore(FL,indxObj)
+  %    Provide Floodland object and FlIndex object which forms a master
+  %    list of available hardware objects with controls links that can be
+  %    saved/restored. Sub-selections of hardware elements happen through
+  %    the FlIndex class methods.
+  %    You can generate several "files", each one containing a different
+  %    list of save/restore links.
+  %
+  % Main public methods:
+  %  addFile - add a new save/restore list
+  %  rmFile - remove a list (cannot remove last one)
+  %  setRestoreVals - get current hardware values for selected hardware
+  %                   channels and move to restore vals
+  %  addChannel - add a new hardware channel from list provided at
+  %               construction time (extends FlIndex method)
+  %  rmChannel - remove a selected channel (cannot reomve last one)
+  %  guiMain - launch main application GUI
+  %
+  % See also:
+  %  Floodland FlInstr FlIndex FlGui FlApp
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc FlSaveRestore">doc FlSaveRestore</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   
   properties
     fileName % file name associated with this instance
@@ -11,14 +44,17 @@ classdef FlSaveRestore < handle & FlIndex & FlApp & FlGui & matlab.mixin.Copyabl
     fileList={}; % list of all created other instances (pointers)
     FL % pointer to Floodland object
     guiDisplayUnits='setpt'; % SetPt or ACT display units on GUI
-    selectChan={};
+    selectChan={}; % channel selection
   end
   properties(Constant)
     appName='Save/Restore'; % Application name to appear in menus
   end
   
+  
+  %% Main public methods
   methods
     function obj=FlSaveRestore(FL,indxObj)
+      % obj=FlSaveRestore(FL,indxObj)
       % Constructor, provide Floodland object and master FlIndex object
       
       % Need to pass FlIndex object
@@ -115,9 +151,6 @@ classdef FlSaveRestore < handle & FlIndex & FlApp & FlGui & matlab.mixin.Copyabl
       obj.restoreVals(ind)=[];
       obj.selectChan(ind)=[];
     end
-  end
-  %% GUI
-  methods
     function han=guiMain(obj)
       % Main graphical user interface for this object
       

@@ -49,8 +49,30 @@ classdef distributedLucretia < handle
   %    results. Asynchronous mode returns faster from job submission but
   %    takes longer to complete due to setup overhead.
   %
-  % Main Public methods:
-  %  
+  %  ------- Main Public methods
+  %  setConfig - change distributed matlab scheduler
+  %  PSTrim - trim power supply(ies) (PS)
+  %  MoverTrim - trim movers (GIRDERS)
+  %  KlystronTrim - trim Klystron Ampls and Phases
+  %  latticeCopy - copy in-memory lattice (PS/GIRDER/KLYSTRON) too all
+  %                workers
+  %  delete - delete object when done with it to free up resources
+  %  ------- Asynchrous job related methods
+  %  createAsynTask - create a new asyn task (with function handle)
+  %  launchAsynJob - launch a job of one or more tasks
+  %  clearAsynJob - clear any existing asyn jobs and associated data
+  %  asynWait - block execution of any interactive tasks until job finished
+  %  asynGetData - get data from finished asyn jobs
+  %
+  % See also:
+  %  Track spmd matlabpool createJob
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc distributedLucretia">doc distributedLucretia</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   
   properties(SetAccess=private)
     schedConfigs % list of available scheduler configurations

@@ -1,66 +1,172 @@
 classdef FlInstr < handle & FlGui & FlUtils
-  %FLINSTR Summary of this class goes here
-  %   Detailed explanation goes here
+  %FLINSTR Class to assign and manipulate hardware associated with Instruments & beam diagnostics systems
+  %   Use to store and manipulate lists of Instruments (e.g. BPMs) and read
+  %   data from controls system and perform data reduction tasks (e.g. BPM
+  %   data averaging and quality cuts). See the property descriptions for
+  %   the available beam quality cuts which can be applied.
+  %   Use objects of this class to both get hardware and store tracked data
+  %   from simulation (hardware access provided by Floodland object in
+  %   conjunction with the acquire method when not in sim mode [defined in
+  %   Floodland object]).
+  %   All instrument objects are loaded from the BEAMLINE global array at
+  %   object creation time, attach hardware access details with the
+  %   defineInstrHW method.
+  %
+  %   Get at data, applying quality cuts with the data property.
+  %
+  % Main public methods:
+  %  + operator to merge another FlInstr object
+  %  clearData - clears all internal data buffers
+  %  defineInstrHW - define a variety of properties for hardware access to
+  %                  a given instrument in this object
+  %  meanstd - return mean and standard deviation data from data buffer
+  %            according to selected cuts
+  %  acquire - acquire a new batch of data (simulated or real depending on
+  %            Floodland simmode property)
+  %  setRef - set reference values for instruments based on current
+  %           in-buffer values
+  %  plot - plot functionality for current in-buffer data
+  %  setResolution - Set resolution properties
+  %  guiInstrChoice - main graphical user interface for this object, allows
+  %                   selection from available instruments.
+  %
+  % See also:
+  %  Floodland FlIndex FlGui FlApp Track
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc FlInstr">doc FlInstr</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   
   properties(Dependent)
-    data
-    dataDate
+    data % processed data
+    dataDate % date stamps of processed data
   end
-  
   properties
-    lastdata = 'end' ;
-    ndata = 1 ;
-    hwMultGet = false ;
-    minq = [] ;
-    maxRMS = [] ;
-    maxVal = [] ;
-    qData = [] ;
-    databuffer = [] ;
-    pid = [] ;
-    timestamp = [] ;
-    buffersize = 1000 ;
-    maxStorage = 100 ; % MB
+    lastdata = 'end' ; % index in data array of last required BPM reading, array index or 'end' for the last available
+    ndata = 1 ; % depth of data buffer to reduce data from (averaging size)
+    hwMultGet = false ; % if true then force getting of hardware values to be one PV at a time, else group all hardware requests together
+    minq = [] ; % Minimum absolute bunch charge (Coulombs), cut any pulses or individual BPMs that reported lower than this
+    maxRMS = [] ; % Maximum deviation from an RMS value over the last ndata points to allow
+    maxVal = [] ; % Maximum total absolute value to allow
+    qData = [] ; % Charge data
+    databuffer = [] ; % Internal buffer of instrument data
+    buffersize = 1000 ; % Maximum buffer depth
+    maxStorage = 100 ; % MB - Max buffer size (buffersize adjusted lower if this cannot be fulfilled with buffersize setting)
     Beam = []; % Beam used in simulation, if blank, use Floodland one
-    preCommand = {} ;
-    postCommand = {} ;
-    timeStamp = [] ;
-    monitorPV = [];
-    Class = {} ;
+    preCommand = {} ; % Control commands (PVs) to issue before getting hardware readout vals
+    postCommand = {} ; % Control commands (PVs) to issue after getting hardware readout vals
+    timeStamp = [] ; % Buffer of date/time stamps for data (timestamps from local hardware IOC's where available)
+    monitorPV = []; % PV (string) or list of PVs (cell of strings) to monitor (INSTR hardware acquition happens upon this/these PV(s) posting new data)
+    Class = {} ; % Instrument class ('MONI', 'PROF', 'WIRE',...)
     simBeam='BeamMacro'; % Preferred Floodland Beam type to use for simulation
     maxDataGap=10; % max gap between subsequent data requested in data field in secs
-    useInstr
-    instrName
-    stopReq=false;
-    Type;
+    useInstr % logical array to indicate instrument choice (only get hardware updates from this list)
+    instrName % Names of INSTR BEAMLINE elements
+    stopReq=false; % flag for requesting abort of specific in-class operations
+    Type; % Instrument type ('stripline', 'ccav', etc...)
   end
   properties(Access=protected)
-    AIDA_BPMD = {} ;
-    AIDA_NAMES = {} ;
-    instrChoiceFromGui
+    AIDA_BPMD = {} ; % AIDA BPMD allocation
+    AIDA_NAMES = {} ; % AIDA Names
+    instrChoiceFromGui % INSTR choice returned from user in GUI
   end
   properties(SetAccess=protected)
-    Resolution = [] ;
-    INSTRchannels = {} ;
-    pvname = {} ;
-    hwconv = {} ;
-    protocol = {} ;
-    depth = 0 ;
-    bufpos = 1 ;
-    Data % [ bpmind , bufind , chanind ]
-    DataDate
-    ref
-    referr
-    dispref
-    dispreferr
-    pulseID
+    Resolution = [] ; % instrument resolution array
+    INSTRchannels = {} ; % readout channels active (see obj.chnames)
+    pvname = {} ; % cell array of PV names to connect to hardware channels
+    hwconv = {} ; % Conversion factors between Lucretia and hardware units
+    protocol = {} ; % Hardware protocol: currently 'AIDA' or 'EPICS' supported
+    bufpos = 1 ; % current position in the cyclic data buffer
+    Data % [ bpmind , bufind , chanind ] - raw data
+    DataDate % date/time stamp for raw data
+    ref % reference Instrument readings (e.g. BPM set points/electrical offsets)
+    referr % statistical error on above readings
+    dispref % reference dispersion values at Instrument locations
+    dispreferr % statistical error on above measurements
+    pulseID % unique pulse ID number allocated to each new buffer entry
   end
-  
   properties(Constant)
-    chnames={'x' 'y' 'z' 'sig11' 'sig33' 'sig13' 'sig55' 'Q'};
+    chnames={'x' 'y' 'z' 'sig11' 'sig33' 'sig13' 'sig55' 'Q'}; % Allowed channel names
   end
   
+  %% Set/Get methods
   methods
-    %% Constructor
+    function dataout = get.data(obj)
+      % dataout = get.data(obj)
+      % Unpack raw data from internal buffer and apply any requested cuts
+      
+      % raw data format
+      % - get date sorted order
+      [Y s1]=sort(obj.DataDate,'descend');
+      dord=s1(~isnan(Y));
+      dates=Y(~isnan(Y));
+      if isequal(obj.lastdata,'end')
+        d1=1;
+      else
+        d1=find(dates<obj.lastdata,1,'first');
+      end
+      if length(dord)<obj.ndata
+        dataout=[];
+        return
+      end
+      % Get max time between subsequent stored data requested
+      maxDate=max(diff(dates(dord(d1:d1-1+obj.ndata))).*24.*3600);
+      if obj.ndata>1 && ~isempty(obj.maxDataGap) && maxDate>obj.maxDataGap
+        warning('Lucretia:Floodland:FlInstr:dateGapExceeded','Too large time gap between requested pulses: (%d s)',maxDate)
+        dataout=[];
+        return
+      end
+      dataout=obj.Data(obj.useInstr,dord(d1:d1-1+obj.ndata),:);
+      % +++cuts+++
+      % Q cut
+      if ~isempty(obj.minq) && ~isempty(obj.qData)
+        for ict=1:length(obj.qData)
+          dataout(:,(dataout(ict,:,length(obj.chnames))<obj.minq),:)=NaN;
+        end
+      end
+      % RMS cut
+      if obj.ndata>4 && ~isempty(obj.maxRMS)
+        for idim=1:2
+          [I J]=find(abs(dataout(:,:,idim))>(repmat(mean(dataout(:,:,idim),2),1,obj.ndata)+repmat(std(dataout(:,:,idim),[],2),1,obj.ndata)));
+          dataout(I,J,idim)=NaN;
+        end
+      end
+      % Max value cut
+      if ~isempty(obj.maxVal)
+        for idim=1:2
+          [I J]=find(abs(dataout(:,:,idim))>obj.maxVal);
+          dataout(I,J,idim)=NaN;
+        end
+      end
+      % subtract ref signal
+      if any(obj.ref(:))
+        try
+          sz=size(dataout);
+          for idata=1:sz(2)
+            dataout(:,idata,:)=dataout(:,idata,:)-reshape(obj.ref(obj.useInstr,:),sz(1),1,sz(3));
+          end
+        catch ME
+          if strcmp(ME.identifier,'MATLAB:getReshapeDims:notSameNumel')
+            warning('Lucretia:refOrbitChange','INSTR selection choice changed since last reference orbit, reseting ref orbit to zero')
+            obj.setRef('zero');
+          end
+        end
+      end
+    end
+    function set.simBeam(obj,val)
+      if ischar(val) && ismember(val,{'BeamMacro' 'BeamSingle' 'BeamSparse'})
+        obj.simBeam=val;
+      else
+        error('Invalid beam name, allowed beam names are from Floodland class: (''BeamMacro'' ''BeamSingle'' ''BeamSparse'')')
+      end
+    end
+  end
+  
+  %% Main public methods
+  methods
     function obj = FlInstr
       global BEAMLINE
       tf=findcells(BEAMLINE,'TrackFlag');
@@ -109,8 +215,10 @@ classdef FlInstr < handle & FlGui & FlUtils
       obj.dispref = zeros(size(obj.ref)) ;
       obj.dispreferr = zeros(size(obj.ref)) ;
     end
-    %% +
     function obj=plus(obj,A)
+      % plus(obj,A)
+      % Merge an object of FlInstr class to this one
+      
       % If adding an FlIndex object- use that plus method instead
       if strcmp(class(A),'FlIndex')
         plus@FlIndex(obj,A);
@@ -188,15 +296,21 @@ classdef FlInstr < handle & FlGui & FlUtils
       obj.AIDA_BPMD=A.AIDA_BPMD;
       obj.AIDA_NAMES=A.AIDA_NAMES;
     end
-    %% Clear Data
-    function obj=clearData(obj)
+    function clearData(obj)
+      % Clear internal data buffers
       obj.Data=NaN(length(obj.Index),obj.buffersize,length(obj.chnames));
       obj.DataDate=NaN(1,obj.buffersize);
       obj.pulseID = NaN(1,obj.buffersize);
       obj.bufpos = 1 ;
     end
-    %% Setup INSTR HW channel
-    function obj=defineInstrHW(obj,ind,chan,pvname,proto,conv,varargin)
+    function defineInstrHW(obj,ind,chan,pvname,proto,conv,varargin)
+      % defineInstrHW(obj,ind,chan,pvname,proto,conv,[AIDA_BPMD,AIDA_NAMES])
+      % Setup INSTR HW channel
+      % Provide BEAMLINE index (ind), channel name (chan, from obj.chnames
+      % list), pvname string required to link to hardware, protocol to be
+      % used (proto='AIDA' or 'EPICS'), conversion factor (conv)
+      % For AIDA BPMs, provide AIDA BPMD parameter and AIDA_NAMES if
+      % getting BPM data from a larger local array on the hardware
       global BEAMLINE
       if ~exist('ind','var') || ind<1 || ind>length(BEAMLINE)
         error('Must supply BEAMLINE index')
@@ -312,8 +426,10 @@ classdef FlInstr < handle & FlGui & FlUtils
         end
       end
     end
-    %% meanstd
     function [meanData stdData] = meanstd(obj)
+      % [meanData stdData] = meanstd(obj)
+      % Return mean and standard deviation of data in buffer to depth
+      % obj.ndata
       thisData=obj.data;
       if isempty(thisData)
         meanData=[]; stdData=[]; return;
@@ -334,68 +450,12 @@ classdef FlInstr < handle & FlGui & FlUtils
         end
       end
     end
-    %% Unpack raw data from internal buffer and apply any requested cuts
-    function dataout = get.data(obj)
-      % raw data format
-      % - get date sorted order
-      [Y s1]=sort(obj.DataDate,'descend');
-      dord=s1(~isnan(Y));
-      dates=Y(~isnan(Y));
-      if isequal(obj.lastdata,'end')
-        d1=1;
-      else
-        d1=find(dates<obj.lastdata,1,'first');
-      end
-      if length(dord)<obj.ndata
-        dataout=[];
-        return
-      end
-      % Get max time between subsequent stored data requested
-      maxDate=max(diff(dates(dord(d1:d1-1+obj.ndata))).*24.*3600);
-      if obj.ndata>1 && ~isempty(obj.maxDataGap) && maxDate>obj.maxDataGap
-        warning('Lucretia:Floodland:FlInstr:dateGapExceeded','Too large time gap between requested pulses: (%d s)',maxDate)
-        dataout=[];
-        return
-      end
-      dataout=obj.Data(obj.useInstr,dord(d1:d1-1+obj.ndata),:);
-      % +++cuts+++
-      % Q cut
-      if ~isempty(obj.minq) && ~isempty(obj.qData)
-        for ict=1:length(obj.qData)
-          dataout(:,(dataout(ict,:,length(obj.chnames))<obj.minq),:)=NaN;
-        end
-      end
-      % RMS cut
-      if obj.ndata>4 && ~isempty(obj.maxRMS)
-        for idim=1:2
-          [I J]=find(abs(dataout(:,:,idim))>(repmat(mean(dataout(:,:,idim),2),1,obj.ndata)+repmat(std(dataout(:,:,idim),[],2),1,obj.ndata)));
-          dataout(I,J,idim)=NaN;
-        end
-      end
-      % Max value cut
-      if ~isempty(obj.maxVal)
-        for idim=1:2
-          [I J]=find(abs(dataout(:,:,idim))>obj.maxVal);
-          dataout(I,J,idim)=NaN;
-        end
-      end
-      % subtract ref signal
-      if any(obj.ref(:))
-        try
-          sz=size(dataout);
-          for idata=1:sz(2)
-            dataout(:,idata,:)=dataout(:,idata,:)-reshape(obj.ref(obj.useInstr,:),sz(1),1,sz(3));
-          end
-        catch ME
-          if strcmp(ME.identifier,'MATLAB:getReshapeDims:notSameNumel')
-            warning('Lucretia:refOrbitChange','INSTR selection choice changed since last reference orbit, reseting ref orbit to zero')
-            obj.setRef('zero');
-          end
-        end
-      end
-    end
-    %% Get new data
     function acquire(obj,FL,npulse)
+      % acquire(obj,FL,npulse)
+      % acquire obj.ndata pulse(s) of new data from hardware (if monitor PVs defined,
+      % then wait for these to post new data first)
+      % Supply Floodland object FL
+      % If required, overide value in obj.ndata with 'npulse' variable
       global BEAMLINE
       if ~exist('FL','var') || ~strcmp(class(FL),'Floodland')
         error('Must pass an ''FL'' handle of class ''Floodland''')
@@ -434,8 +494,9 @@ classdef FlInstr < handle & FlGui & FlUtils
         obj.accum_real(FL,npulse);
       end
     end
-    %% set reference orbit
     function setRef(obj,cmd)
+      % setRef(obj,cmd)
+      % set reference orbit
       if exist('cmd','var') && strcmp(cmd,'zero')
         sz=size(obj.Data);
         obj.ref=zeros(sz(1),sz(3));
@@ -445,8 +506,14 @@ classdef FlInstr < handle & FlGui & FlUtils
         obj.referr(obj.useInstr,:)=dataerr;
       end
     end
-    %% Plot
     function plot(obj,varargin)
+      % plot(obj,dim,[type, magbar])
+      % Plot data in buffer according to buffer size and cuts requested
+      % dim=one of channels in obj.chnames
+      % type is 'orbit' or 'data' (default orbit) data shows points with
+      % error bars, orbit shows connected lines without errors
+      % magbar=true|false (default true), show graphical depiction of
+      % magnets above plot or not
       global BEAMLINE
       % Extract arguments
       if nargin<2
@@ -542,16 +609,13 @@ classdef FlInstr < handle & FlGui & FlUtils
         AddMagnetPlot(obj.Index(1),obj.Index(end));
       end
     end
-    %% set simBeam
-    function set.simBeam(obj,val)
-      if ischar(val) && ismember(val,{'BeamMacro' 'BeamSingle' 'BeamSparse'})
-        obj.simBeam=val;
-      else
-        error('Invalid beam name, allowed beam names are from Floodland class: (''BeamMacro'' ''BeamSingle'' ''BeamSparse'')')
-      end
-    end
-    %% set Resolutions
-    function obj=setResolution(obj,ind,chan,val)
+    function setResolution(obj,ind,chan,val)
+      % setResolution(obj)
+      %  Set internal resolution values for instrument devices to BEAMLINE
+      %  values
+      % setResolution(obj,ind,chan,val)
+      %  Set resolution of instr entry 'ind', channel 'chan' to 'val'
+      
       global BEAMLINE
       % Set according to BEAMLINE
       if ~exist('ind','var')
@@ -562,11 +626,190 @@ classdef FlInstr < handle & FlGui & FlUtils
       end
       obj.Resolution(ind,ismember(obj.chnames,chan))=val;
     end
+    function han=guiInstrChoice(obj)
+      % Setup GUI and display
+      
+      % Create main figure window
+      obj.guiCreateFigure('guiInstrChoice','Choose INSTR',[800 600]);
+      set(obj.gui.guiInstrChoice,'CloseRequestFcn',@(src,event)guiInstrCallback(obj,src,event));
+      han=obj.gui.guiInstrChoice;
+      % Define borders
+      border_top=0.02; 
+      border_bottom=0.02;
+      border_left=0.02;
+      border_right=0.02;
+      % Define element areas
+      area_ver=[80 5 15].*0.01; %
+      area_hor={[45 10 45].*0.01 [22 4 22 4 22 4 22].*0.01};
+      % User Area
+      userSize=[(1-(border_left+border_right)) (1-(border_top+border_bottom))];
+      % Define choice box panels
+      cpanpos{1}=[border_left border_bottom+(area_ver(3)+area_ver(2))*userSize(2)];
+      cpanpos{2}=[border_left+(area_hor{1}(1)+area_hor{1}(2))*userSize(1) ...
+        border_bottom+(area_ver(3)+area_ver(2))*userSize(2)];
+      cpansize(1)=userSize(1)*area_hor{1}(1) ;
+      cpansize(2)=userSize(2)*area_ver(1) ;
+      cpanborder=[0.01 0.01];
+      obj.guiCreatePanel('cbox1_panel','Instr Selection','guiInstrChoice',[cpanpos{1}(1) cpanpos{1}(2) cpansize]);
+      obj.guiCreatePanel('cbox2_panel','Instr Available','guiInstrChoice',[cpanpos{2}(1) cpanpos{2}(2) cpansize]);
+      % Define choice listboxes
+      obj.guiCreateListbox('instrCbox1','','cbox1_panel',[cpanborder 1-2*cpanborder]);
+      obj.guiCreateListbox('instrCbox2','','cbox2_panel',[cpanborder 1-2*cpanborder]);
+      % Define selection buttons
+      selborder=0.01;
+      selsize=[area_hor{1}(2)*userSize(1)*0.9 cpansize(2)*0.1];
+      selpos=[border_left+userSize(1)*(area_hor{1}(1)+area_hor{1}(2)*selborder) ...
+        border_bottom+userSize(2)*(area_ver(3)+area_ver(2))]+[0 cpansize(2)*0.6];
+      obj.guiCreatePushbutton('selbutton1','->','guiInstrChoice',[selpos selsize]);
+      set(obj.gui.selbutton1,'Callback',@(src,event)guiInstrCallback(obj,src,event));
+      selpos=selpos-[0 cpansize(2)*0.2];
+      obj.guiCreatePushbutton('selbutton2','<-','guiInstrChoice',[selpos selsize]);
+      set(obj.gui.selbutton2,'Callback',@(src,event)guiInstrCallback(obj,src,event));
+      % Define option panels
+      oppansize{1}=[area_hor{2}(1).*userSize(1) area_ver(3)*userSize(2)];
+      oppansize{2}=[area_hor{2}(3).*userSize(1) area_ver(3)*userSize(2)];
+      oppansize{3}=[area_hor{2}(5).*userSize(1) area_ver(3)*userSize(2)];
+      oppansize{4}=[area_hor{2}(7).*userSize(1) area_ver(3)*userSize(2)];
+      oppanpos={[border_left border_bottom] ...
+        [border_left+userSize(1)*sum(area_hor{2}(1:2)) border_bottom] ...
+        [border_left+userSize(1)*sum(area_hor{2}(1:4)) border_bottom] ...
+        [border_left+userSize(1)*sum(area_hor{2}(1:6)) border_bottom]};
+      obj.guiCreatePanel('oppan1','Sort by...','guiInstrChoice',[oppanpos{1} oppansize{1}]);
+      obj.guiCreatePanel('oppan4','Make Selection','guiInstrChoice',[oppanpos{4} oppansize{4}]);
+      % List options
+      % - display
+      border=0.02;
+      osize=(1-3*border)/2;
+      obj.guiCreateRadiobutton('display_alpha','Name',0,'oppan1',[border border 1-2*border osize]);
+      set(obj.gui.display_alpha,'Callback',@(src,event)guiInstrCallback(obj,src,event));
+      obj.guiCreateRadiobutton('display_s','S',1,'oppan1',[border border*2+osize 1-2*border osize]);
+      set(obj.gui.display_s,'Callback',@(src,event)guiInstrCallback(obj,src,event));
+      % - make selection
+      obj.guiCreatePushbutton('select_accept','Accept','oppan4',[border border 1-2*border osize]);
+      set(obj.gui.select_accept,'Callback',@(src,event)guiInstrCallback(obj,src,event));
+      set(obj.gui.select_accept,'BackgroundColor','green');
+      obj.guiCreatePushbutton('select_cancel','Cancel','oppan4',[border border*2+osize 1-2*border osize]);
+      set(obj.gui.select_cancel,'Callback',@(src,event)guiInstrCallback(obj,src,event));
+      set(obj.gui.select_cancel,'BackgroundColor','red');
+      % Update fields
+      obj.instrChoiceFromGui=obj.useInstr;
+      obj.updateInstrGui;
+    end
   end
   
-  methods(Access=private)
-    %% Accumulate data from control system
+  %% GUI callbacks
+  methods(Hidden)
+    function guiInstrCallback(obj,src,~)
+      % Process GUI callbacks
+      if src==obj.gui.display_s
+        if get(obj.gui.display_s,'Value')
+          set(obj.gui.display_alpha,'Value',false)
+          obj.updateInstrGui;
+        else
+          set(obj.gui.display_s,'Value',true)
+        end
+      elseif src==obj.gui.display_alpha
+        if get(obj.gui.display_alpha,'Value')
+          set(obj.gui.display_s,'Value',false)
+          obj.updateInstrGui;
+        else
+          set(obj.gui.display_alpha,'Value',true)
+        end
+      elseif src==obj.gui.select_accept
+        delete(obj.gui.guiInstrChoice);
+        obj.gui.guiInstrChoice=[];
+      elseif src==obj.gui.select_cancel || src==obj.gui.guiInstrChoice
+        obj.instrChoiceFromGui=[];
+        delete(obj.gui.guiInstrChoice);
+        obj.gui.guiInstrChoice=[];
+      elseif src==obj.gui.selbutton1
+        sel=get(obj.gui.instrCbox1,'Value');
+        mI=get(obj.gui.instrCbox1,'UserData');
+        obj.instrChoiceFromGui(mI(sel))=false;
+        set(obj.gui.instrCbox1,'Value',1)
+        obj.updateInstrGui;
+      elseif src==obj.gui.selbutton2
+        sel=get(obj.gui.instrCbox2,'Value');
+        mI=get(obj.gui.instrCbox2,'UserData');
+        obj.instrChoiceFromGui(mI(sel))=true;
+        set(obj.gui.instrCbox2,'Value',1)
+        obj.updateInstrGui;
+      else
+        obj.updateInstrGui;
+      end
+    end
+    function FlInstr_selectCuts(obj,~,~)
+      % GUI selection cuts
+      
+      % Create main figure window
+      obj.guiCreateFigure('FlInstr_selectCuts','Select BPM Cuts',[700 150]);
+      border=0.02;
+      psize=[(1-6*border)/5 (1-3*border)/2];
+      csize=[1-border*2 (1-border*3)/2];
+      % min Q panel
+      obj.guiCreatePanel('minqpanel','min Q','FlInstr_selectCuts',[border border+psize(2) psize]) ;
+      obj.guiCreateCheckbox('FlInstr_selectCuts_minq_enable','Enable',~isempty(obj.minq),'minqpanel',[border 1-border-csize(2) csize]);
+      obj.guiCreateEdit('FlInstr_selectCuts_minq_val',num2str(obj.minq),'minqpanel',[border border csize]);
+      % max RMS panel
+      obj.guiCreatePanel('maxrmspanel','max RMS','FlInstr_selectCuts',[border*2+psize(1) border+psize(2) psize]) ;
+      obj.guiCreateCheckbox('FlInstr_selectCuts_maxrms_enable','Enable',~isempty(obj.maxRMS),'maxrmspanel',[border 1-border-csize(2) csize]);
+      obj.guiCreateEdit('FlInstr_selectCuts_maxrms_val',num2str(obj.maxRMS),'maxrmspanel',[border border csize]);
+      % max Val panel
+      obj.guiCreatePanel('maxvalpanel','max Val','FlInstr_selectCuts',[border*3+psize(1)*2 border+psize(2) psize]) ;
+      obj.guiCreateCheckbox('FlInstr_selectCuts_maxval_enable','Enable',~isempty(obj.maxVal),'maxvalpanel',[border 1-border-csize(2) csize]);
+      obj.guiCreateEdit('FlInstr_selectCuts_maxval_val',num2str(obj.maxVal),'maxvalpanel',[border border csize]);
+      % max data gap
+      obj.guiCreatePanel('maxdgappanel','max data gap / s','FlInstr_selectCuts',[border*4+psize(1)*3 border+psize(2) psize]) ;
+      obj.guiCreateCheckbox('FlInstr_selectCuts_maxdgap_enable','Enable',~isempty(obj.maxDataGap),'maxdgappanel',[border 1-border-csize(2) csize]);
+      obj.guiCreateEdit('FlInstr_selectCuts_maxdgap_val',num2str(obj.maxDataGap),'maxdgappanel',[border border csize]);
+      % # BPM ave
+      obj.guiCreatePanel('nbpmpanel','#Pulses','FlInstr_selectCuts',[border*5+psize(1)*4 border+psize(2) psize]) ;
+      obj.guiCreateEdit('FlInstr_selectCuts_nbpm',num2str(obj.ndata),'nbpmpanel',[border border csize]);
+      % commit
+      obj.guiCreatePushbutton('FlInstr_selectCuts_commit','Commit','FlInstr_selectCuts',[border border psize(1) psize(2)*0.5])
+      set(obj.gui.FlInstr_selectCuts_commit,'Callback',@(src,event)guiSelectCuts_Callback(obj,src,event));
+      % cancel
+      obj.guiCreatePushbutton('FlInstr_selectCuts_cancel','Cancel','FlInstr_selectCuts',[border*2+psize(1) border psize(1) psize(2)*0.5]);
+      set(obj.gui.FlInstr_selectCuts_cancel,'Callback',@(src,event)guiSelectCuts_Callback(obj,src,event));
+    end
+    function guiSelectCuts_Callback(obj,src,~)
+      if src==obj.gui.FlInstr_selectCuts_commit
+        if get(obj.gui.FlInstr_selectCuts_minq_enable,'Value')
+          obj.minq=str2double(get(obj.gui.FlInstr_selectCuts_minq_val,'String'));
+        else
+          obj.minq=[];
+        end
+        if get(obj.gui.FlInstr_selectCuts_maxrms_enable,'Value')
+          obj.maxRMS=str2double(get(obj.gui.FlInstr_selectCuts_maxrms_val,'String'));
+        else
+          obj.maxRMS=[];
+        end
+        if get(obj.gui.FlInstr_selectCuts_maxval_enable,'Value')
+          obj.maxVal=str2double(get(obj.gui.FlInstr_selectCuts_maxval_val,'String'));
+        else
+          obj.maxVal=[];
+        end
+        if get(obj.gui.FlInstr_selectCuts_maxdgap_enable,'Value')
+          obj.maxDataGap=str2double(get(obj.gui.FlInstr_selectCuts_maxdgap_val,'String'));
+        else
+          obj.maxDataGap=[];
+        end
+        obj.ndata=str2double(get(obj.gui.FlInstr_selectCuts_nbpm,'String'));
+        delete(obj.gui.FlInstr_selectCuts);
+        obj.gui=rmfield(obj.gui,'FlInstr_selectCuts');
+      elseif obj.gui.FlInstr_selectCuts_cancel
+        delete(obj.gui.FlInstr_selectCuts);
+        obj.gui=rmfield(obj.gui,'FlInstr_selectCuts');
+      end
+    end
+  end
+  
+  %% Internal private methods
+  methods(Access=protected)
     function accum_real(obj,FL,npulse)
+      % accum_real(obj,FL,npulse)
+      % Accumulate data from control system
+      % Supply Floodland object FL and supply npulses to acquire
       persistent moni_set lastpulseID
       
       % form PV lists by protocol type
@@ -697,9 +940,10 @@ classdef FlInstr < handle & FlGui & FlUtils
       end
       
     end
-    
-    %% Simulation - track bunch and fill instrument data array
     function accum_sim(obj,Beam)
+      % accum_sim(obj,Beam)
+      % Simulation - track bunch and fill instrument data array
+      % Provide Lucretia Beam to track
       persistent lastpulseID
       lastele=obj.Index(find(obj.useInstr,1,'last'));
       [~, bo instdata]=TrackThru(1,lastele,Beam,1,1,0);
@@ -746,9 +990,9 @@ classdef FlInstr < handle & FlGui & FlUtils
         obj.pulseID(obj.bufpos)=NaN;
       end
     end
-    
-    %% Convert FlInstrData provided data (last provided pulse) into TrackThru's instdata format
     function instdata_out = get_instdata(obj)
+      % instdata_out = get_instdata(obj)
+      % Convert FlInstrData provided data (last provided pulse) into TrackThru's instdata format
       global BEAMLINE
       data=squeeze(obj.Data(:,obj.bufpos,:));
       for ind=1:length(obj.Index)
@@ -773,50 +1017,8 @@ classdef FlInstr < handle & FlGui & FlUtils
         end
       end
     end
-  end
-  %% GUI
-  methods
-    % Process GUI callbacks
-    function guiInstrCallback(obj,src,~)
-      if src==obj.gui.display_s
-        if get(obj.gui.display_s,'Value')
-          set(obj.gui.display_alpha,'Value',false)
-          obj.updateInstrGui;
-        else
-          set(obj.gui.display_s,'Value',true)
-        end
-      elseif src==obj.gui.display_alpha
-        if get(obj.gui.display_alpha,'Value')
-          set(obj.gui.display_s,'Value',false)
-          obj.updateInstrGui;
-        else
-          set(obj.gui.display_alpha,'Value',true)
-        end
-      elseif src==obj.gui.select_accept
-        delete(obj.gui.guiInstrChoice);
-        obj.gui.guiInstrChoice=[];
-      elseif src==obj.gui.select_cancel || src==obj.gui.guiInstrChoice
-        obj.instrChoiceFromGui=[];
-        delete(obj.gui.guiInstrChoice);
-        obj.gui.guiInstrChoice=[];
-      elseif src==obj.gui.selbutton1
-        sel=get(obj.gui.instrCbox1,'Value');
-        mI=get(obj.gui.instrCbox1,'UserData');
-        obj.instrChoiceFromGui(mI(sel))=false;
-        set(obj.gui.instrCbox1,'Value',1)
-        obj.updateInstrGui;
-      elseif src==obj.gui.selbutton2
-        sel=get(obj.gui.instrCbox2,'Value');
-        mI=get(obj.gui.instrCbox2,'UserData');
-        obj.instrChoiceFromGui(mI(sel))=true;
-        set(obj.gui.instrCbox2,'Value',1)
-        obj.updateInstrGui;
-      else
-        obj.updateInstrGui;
-      end
-    end
-    % Update GUI fields
     function updateInstrGui(obj)
+      % Update GUI fields
       global BEAMLINE
       % Form right display of all available controls that meet with options
       % and not selected in left display
@@ -853,136 +1055,6 @@ classdef FlInstr < handle & FlGui & FlUtils
       set(obj.gui.instrCbox1,'String',displayStr1(I1))
       set(obj.gui.instrCbox1,'UserData',ic1(I1))
       drawnow('expose');
-    end
-    % Setup GUI and display
-    function han=guiInstrChoice(obj)
-      % Create main figure window
-      obj.guiCreateFigure('guiInstrChoice','Choose INSTR',[800 600]);
-      set(obj.gui.guiInstrChoice,'CloseRequestFcn',@(src,event)guiInstrCallback(obj,src,event));
-      han=obj.gui.guiInstrChoice;
-      % Define borders
-      border_top=0.02; 
-      border_bottom=0.02;
-      border_left=0.02;
-      border_right=0.02;
-      % Define element areas
-      area_ver=[80 5 15].*0.01; %
-      area_hor={[45 10 45].*0.01 [22 4 22 4 22 4 22].*0.01};
-      % User Area
-      userSize=[(1-(border_left+border_right)) (1-(border_top+border_bottom))];
-      % Define choice box panels
-      cpanpos{1}=[border_left border_bottom+(area_ver(3)+area_ver(2))*userSize(2)];
-      cpanpos{2}=[border_left+(area_hor{1}(1)+area_hor{1}(2))*userSize(1) ...
-        border_bottom+(area_ver(3)+area_ver(2))*userSize(2)];
-      cpansize(1)=userSize(1)*area_hor{1}(1) ;
-      cpansize(2)=userSize(2)*area_ver(1) ;
-      cpanborder=[0.01 0.01];
-      obj.guiCreatePanel('cbox1_panel','Instr Selection','guiInstrChoice',[cpanpos{1}(1) cpanpos{1}(2) cpansize]);
-      obj.guiCreatePanel('cbox2_panel','Instr Available','guiInstrChoice',[cpanpos{2}(1) cpanpos{2}(2) cpansize]);
-      % Define choice listboxes
-      obj.guiCreateListbox('instrCbox1','','cbox1_panel',[cpanborder 1-2*cpanborder]);
-      obj.guiCreateListbox('instrCbox2','','cbox2_panel',[cpanborder 1-2*cpanborder]);
-      % Define selection buttons
-      selborder=0.01;
-      selsize=[area_hor{1}(2)*userSize(1)*0.9 cpansize(2)*0.1];
-      selpos=[border_left+userSize(1)*(area_hor{1}(1)+area_hor{1}(2)*selborder) ...
-        border_bottom+userSize(2)*(area_ver(3)+area_ver(2))]+[0 cpansize(2)*0.6];
-      obj.guiCreatePushbutton('selbutton1','->','guiInstrChoice',[selpos selsize]);
-      set(obj.gui.selbutton1,'Callback',@(src,event)guiInstrCallback(obj,src,event));
-      selpos=selpos-[0 cpansize(2)*0.2];
-      obj.guiCreatePushbutton('selbutton2','<-','guiInstrChoice',[selpos selsize]);
-      set(obj.gui.selbutton2,'Callback',@(src,event)guiInstrCallback(obj,src,event));
-      % Define option panels
-      oppansize{1}=[area_hor{2}(1).*userSize(1) area_ver(3)*userSize(2)];
-      oppansize{2}=[area_hor{2}(3).*userSize(1) area_ver(3)*userSize(2)];
-      oppansize{3}=[area_hor{2}(5).*userSize(1) area_ver(3)*userSize(2)];
-      oppansize{4}=[area_hor{2}(7).*userSize(1) area_ver(3)*userSize(2)];
-      oppanpos={[border_left border_bottom] ...
-        [border_left+userSize(1)*sum(area_hor{2}(1:2)) border_bottom] ...
-        [border_left+userSize(1)*sum(area_hor{2}(1:4)) border_bottom] ...
-        [border_left+userSize(1)*sum(area_hor{2}(1:6)) border_bottom]};
-      obj.guiCreatePanel('oppan1','Sort by...','guiInstrChoice',[oppanpos{1} oppansize{1}]);
-      obj.guiCreatePanel('oppan4','Make Selection','guiInstrChoice',[oppanpos{4} oppansize{4}]);
-      % List options
-      % - display
-      border=0.02;
-      osize=(1-3*border)/2;
-      obj.guiCreateRadiobutton('display_alpha','Name',0,'oppan1',[border border 1-2*border osize]);
-      set(obj.gui.display_alpha,'Callback',@(src,event)guiInstrCallback(obj,src,event));
-      obj.guiCreateRadiobutton('display_s','S',1,'oppan1',[border border*2+osize 1-2*border osize]);
-      set(obj.gui.display_s,'Callback',@(src,event)guiInstrCallback(obj,src,event));
-      % - make selection
-      obj.guiCreatePushbutton('select_accept','Accept','oppan4',[border border 1-2*border osize]);
-      set(obj.gui.select_accept,'Callback',@(src,event)guiInstrCallback(obj,src,event));
-      set(obj.gui.select_accept,'BackgroundColor','green');
-      obj.guiCreatePushbutton('select_cancel','Cancel','oppan4',[border border*2+osize 1-2*border osize]);
-      set(obj.gui.select_cancel,'Callback',@(src,event)guiInstrCallback(obj,src,event));
-      set(obj.gui.select_cancel,'BackgroundColor','red');
-      % Update fields
-      obj.instrChoiceFromGui=obj.useInstr;
-      obj.updateInstrGui;
-    end
-    function FlInstr_selectCuts(obj,~,~)
-      % Create main figure window
-      obj.guiCreateFigure('FlInstr_selectCuts','Select BPM Cuts',[700 150]);
-      border=0.02;
-      psize=[(1-6*border)/5 (1-3*border)/2];
-      csize=[1-border*2 (1-border*3)/2];
-      % min Q panel
-      obj.guiCreatePanel('minqpanel','min Q','FlInstr_selectCuts',[border border+psize(2) psize]) ;
-      obj.guiCreateCheckbox('FlInstr_selectCuts_minq_enable','Enable',~isempty(obj.minq),'minqpanel',[border 1-border-csize(2) csize]);
-      obj.guiCreateEdit('FlInstr_selectCuts_minq_val',num2str(obj.minq),'minqpanel',[border border csize]);
-      % max RMS panel
-      obj.guiCreatePanel('maxrmspanel','max RMS','FlInstr_selectCuts',[border*2+psize(1) border+psize(2) psize]) ;
-      obj.guiCreateCheckbox('FlInstr_selectCuts_maxrms_enable','Enable',~isempty(obj.maxRMS),'maxrmspanel',[border 1-border-csize(2) csize]);
-      obj.guiCreateEdit('FlInstr_selectCuts_maxrms_val',num2str(obj.maxRMS),'maxrmspanel',[border border csize]);
-      % max Val panel
-      obj.guiCreatePanel('maxvalpanel','max Val','FlInstr_selectCuts',[border*3+psize(1)*2 border+psize(2) psize]) ;
-      obj.guiCreateCheckbox('FlInstr_selectCuts_maxval_enable','Enable',~isempty(obj.maxVal),'maxvalpanel',[border 1-border-csize(2) csize]);
-      obj.guiCreateEdit('FlInstr_selectCuts_maxval_val',num2str(obj.maxVal),'maxvalpanel',[border border csize]);
-      % max data gap
-      obj.guiCreatePanel('maxdgappanel','max data gap / s','FlInstr_selectCuts',[border*4+psize(1)*3 border+psize(2) psize]) ;
-      obj.guiCreateCheckbox('FlInstr_selectCuts_maxdgap_enable','Enable',~isempty(obj.maxDataGap),'maxdgappanel',[border 1-border-csize(2) csize]);
-      obj.guiCreateEdit('FlInstr_selectCuts_maxdgap_val',num2str(obj.maxDataGap),'maxdgappanel',[border border csize]);
-      % # BPM ave
-      obj.guiCreatePanel('nbpmpanel','#Pulses','FlInstr_selectCuts',[border*5+psize(1)*4 border+psize(2) psize]) ;
-      obj.guiCreateEdit('FlInstr_selectCuts_nbpm',num2str(obj.ndata),'nbpmpanel',[border border csize]);
-      % commit
-      obj.guiCreatePushbutton('FlInstr_selectCuts_commit','Commit','FlInstr_selectCuts',[border border psize(1) psize(2)*0.5])
-      set(obj.gui.FlInstr_selectCuts_commit,'Callback',@(src,event)guiSelectCuts_Callback(obj,src,event));
-      % cancel
-      obj.guiCreatePushbutton('FlInstr_selectCuts_cancel','Cancel','FlInstr_selectCuts',[border*2+psize(1) border psize(1) psize(2)*0.5]);
-      set(obj.gui.FlInstr_selectCuts_cancel,'Callback',@(src,event)guiSelectCuts_Callback(obj,src,event));
-    end
-    function guiSelectCuts_Callback(obj,src,~)
-      if src==obj.gui.FlInstr_selectCuts_commit
-        if get(obj.gui.FlInstr_selectCuts_minq_enable,'Value')
-          obj.minq=str2double(get(obj.gui.FlInstr_selectCuts_minq_val,'String'));
-        else
-          obj.minq=[];
-        end
-        if get(obj.gui.FlInstr_selectCuts_maxrms_enable,'Value')
-          obj.maxRMS=str2double(get(obj.gui.FlInstr_selectCuts_maxrms_val,'String'));
-        else
-          obj.maxRMS=[];
-        end
-        if get(obj.gui.FlInstr_selectCuts_maxval_enable,'Value')
-          obj.maxVal=str2double(get(obj.gui.FlInstr_selectCuts_maxval_val,'String'));
-        else
-          obj.maxVal=[];
-        end
-        if get(obj.gui.FlInstr_selectCuts_maxdgap_enable,'Value')
-          obj.maxDataGap=str2double(get(obj.gui.FlInstr_selectCuts_maxdgap_val,'String'));
-        else
-          obj.maxDataGap=[];
-        end
-        obj.ndata=str2double(get(obj.gui.FlInstr_selectCuts_nbpm,'String'));
-        delete(obj.gui.FlInstr_selectCuts);
-        obj.gui=rmfield(obj.gui,'FlInstr_selectCuts');
-      elseif obj.gui.FlInstr_selectCuts_cancel
-        delete(obj.gui.FlInstr_selectCuts);
-        obj.gui=rmfield(obj.gui,'FlInstr_selectCuts');
-      end
     end
   end
 end

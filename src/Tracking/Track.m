@@ -49,6 +49,9 @@ classdef Track < handle
 % Reference page in Help browser for list of accessible properties and
 % methods:
 %   <a href="matlab:doc Track">doc Track</a>
+%
+% Full lucretia documentation available online:
+%   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   properties
     startInd % Finish tracking index
     finishInd % Start tracking index

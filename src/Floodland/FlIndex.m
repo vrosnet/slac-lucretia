@@ -9,6 +9,36 @@ classdef FlIndex < handle & FlGui & FlUtils
   %   Other Floodland objects act upon FlIndex objects, this being the
   %   intended way of passing lists of hardware to the methods that act
   %   upon them.
+  %
+  % Main public methods:
+  % ---
+  %  addChannel: add a new control channel from another FlIndex object
+  %  rmChannel: remove a control channel
+  %  defineIndxHW: add control parameters (pvname etc) to an existing
+  %                FlIndex element
+  %  +/- operators for merging and deleting FlIndex elements
+  % ---
+  % Methods to add elements (use instead of the standard Lucretia
+  %  AssignToPS etc functions)
+  % ---
+  %  addPS: add a power supply element
+  %  addKlystron: add a Klystron element
+  %  addMover: add a Mover (GIRDER) element
+  % ---
+  % Graphical User Interface
+  % ---
+  %  guiIndexChoice - GUI for selecting hardware objects from this list
+  %
+  % See also:
+  %  Floodland FlInstr FlGui FlApp AssignToPS AssignToGirder
+  %  AssignToKlystron
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc FlIndex">doc FlIndex</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   
   properties(Dependent,SetAccess=private)
     PS = []; % PS indexes
@@ -62,7 +92,7 @@ classdef FlIndex < handle & FlGui & FlUtils
     ObjID % unique ID for this generated object
   end
   
-  % Get/Set methods
+  %% Get/Set methods
   methods
     function chans=get.INDXused(obj)
       % List of used channels
@@ -558,7 +588,7 @@ classdef FlIndex < handle & FlGui & FlUtils
     end
   end
   
-  % Main public methods
+  %% Main public methods
   methods
     function obj = FlIndex
       % Constructor, no parameters required
@@ -943,8 +973,8 @@ classdef FlIndex < handle & FlGui & FlUtils
     end
   end
   
-  % Internal methods
-  methods(Access=protected)
+  %% GUI callbacks
+  methods(Hidden)
     function guiIndexCallback(obj,src,~)
       % Process GUI callbacks
       try
@@ -992,6 +1022,64 @@ classdef FlIndex < handle & FlGui & FlUtils
         delete(gcf)
       end
     end
+    function guiChanSelCallback(obj,src,~)
+      sel=get(src,'Value');
+      str=get(src,'String'); tstr=str{sel};
+      csel=get(obj.gui.indexCbox1,'Value');
+      mI=get(obj.gui.indexCbox1,'UserData');
+      if ~get(obj.gui.showchan,'Value')
+        tgl=true;
+      else
+        tgl=false;
+      end
+      for isel=csel
+        if ismember(tstr,{'main' 'ampl'})
+          obj.indexChanChoiceFromGui{mI(isel)}(1)=tgl;
+        elseif strcmp(tstr,{'pha'})
+          obj.indexChanChoiceFromGui{mI(isel)}(2)=tgl;
+        else
+          obj.indexChanChoiceFromGui{mI(isel)}(ismember({'x' 'dx' 'y' 'dy' 'z' 'dz'},tstr))=tgl;
+        end
+      end
+      obj.updateIndexGui;
+    end
+    function guiIndexChanSelCallback(obj,src,~) %#ok<MANU>
+      if get(src,'Value')
+        set(src,'String','UnSelect Channel(s)')
+      else
+        set(src,'String','Select Channel(s)')
+      end
+    end
+    function guiCselCallback(obj,~,~)
+      sel=get(obj.gui.indexCbox1,'Value');
+      mI=get(obj.gui.indexCbox1,'UserData');
+      chnames={{'main'} {'x' 'dx' 'y' 'dy' 'z' 'dz'} {'ampl' 'pha'}};
+      pslist=obj.PS_list; girlist=obj.GIRDER_list;
+      allchans={};
+      hwchans=obj.INDXchannels;
+      for isel=sel
+        for ichan=find(obj.useCntrlChan{mI(isel)})
+          if ismember(ichan,hwchans{1,mI(isel)}) || ismember(ichan,hwchans{2,mI(isel)})
+            if ismember(mI(isel),pslist)
+              allchans{end+1}=chnames{1}{ichan};
+            elseif ismember(mI(isel),girlist)
+              allchans{end+1}=chnames{2}{ichan};
+            else
+              allchans{end+1}=chnames{3}{ichan};
+            end
+          end
+        end
+      end
+      if isempty(allchans)
+        set(obj.gui.chansel,'String','---')
+      else
+        set(obj.gui.chansel,'String',unique(allchans))
+      end
+    end
+  end
+  
+  %% Internal methods
+  methods(Access=protected)
     function updateIndexGui(obj)
       % Update GUI fields
       global PS GIRDER KLYSTRON BEAMLINE %#ok<NUSED>
@@ -1063,60 +1151,6 @@ classdef FlIndex < handle & FlGui & FlUtils
       set(obj.gui.indexCbox1,'String',displayStr1(I1))
       set(obj.gui.indexCbox1,'UserData',mI1(I1))
       drawnow('expose');
-    end
-    function guiChanSelCallback(obj,src,~)
-      sel=get(src,'Value');
-      str=get(src,'String'); tstr=str{sel};
-      csel=get(obj.gui.indexCbox1,'Value');
-      mI=get(obj.gui.indexCbox1,'UserData');
-      if ~get(obj.gui.showchan,'Value')
-        tgl=true;
-      else
-        tgl=false;
-      end
-      for isel=csel
-        if ismember(tstr,{'main' 'ampl'})
-          obj.indexChanChoiceFromGui{mI(isel)}(1)=tgl;
-        elseif strcmp(tstr,{'pha'})
-          obj.indexChanChoiceFromGui{mI(isel)}(2)=tgl;
-        else
-          obj.indexChanChoiceFromGui{mI(isel)}(ismember({'x' 'dx' 'y' 'dy' 'z' 'dz'},tstr))=tgl;
-        end
-      end
-      obj.updateIndexGui;
-    end
-    function guiIndexChanSelCallback(obj,src,~) %#ok<MANU>
-      if get(src,'Value')
-        set(src,'String','UnSelect Channel(s)')
-      else
-        set(src,'String','Select Channel(s)')
-      end
-    end
-    function guiCselCallback(obj,~,~)
-      sel=get(obj.gui.indexCbox1,'Value');
-      mI=get(obj.gui.indexCbox1,'UserData');
-      chnames={{'main'} {'x' 'dx' 'y' 'dy' 'z' 'dz'} {'ampl' 'pha'}};
-      pslist=obj.PS_list; girlist=obj.GIRDER_list;
-      allchans={};
-      hwchans=obj.INDXchannels;
-      for isel=sel
-        for ichan=find(obj.useCntrlChan{mI(isel)})
-          if ismember(ichan,hwchans{1,mI(isel)}) || ismember(ichan,hwchans{2,mI(isel)})
-            if ismember(mI(isel),pslist)
-              allchans{end+1}=chnames{1}{ichan};
-            elseif ismember(mI(isel),girlist)
-              allchans{end+1}=chnames{2}{ichan};
-            else
-              allchans{end+1}=chnames{3}{ichan};
-            end
-          end
-        end
-      end
-      if isempty(allchans)
-        set(obj.gui.chansel,'String','---')
-      else
-        set(obj.gui.chansel,'String',unique(allchans))
-      end
     end
   end
 end

@@ -1,6 +1,8 @@
 classdef FlUtils < handle
   %FLUTILS General utility methods for use with Floodland classes
-  
+  %
+  % getIndex - index referencing for Lucretia lattice arrays and Floodland
+  %            objects
   properties
     Index % index references into BEAMLINE
   end
