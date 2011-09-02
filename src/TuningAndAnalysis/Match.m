@@ -1,5 +1,7 @@
 classdef Match
   %MATCH Lucretia beam matching using GetTwiss and TrackThru
+  %  SOME OPTIONS REQUIRE OPTIMIZATION TOOLBOX AND/OR GLOBAL OPTIMISATION
+  %  TOOLBOX
   %
   %Useage example below (see 'doc Match' for complete list of properties and methods):
   %Create object:
@@ -109,7 +111,7 @@ classdef Match
     optimData % contraint, variable and optimStop values at each iteration step
   end
   properties(Constant)
-    allowedMatchTypes={'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'NEmit_x' 'NEmit_y' 'eta_x' 'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'Sigma' 'T' 'U'};
+    allowedMatchTypes={'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'NEmit_x' 'NEmit_y' 'eta_x' 'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'Sigma' 'T' 'U'};
     allowedVariableTypes={'PS' 'GIRDER' 'KLYSTRON' 'BEAMLINE'};
   end
   
@@ -351,7 +353,7 @@ classdef Match
     end
     function out=get.dotrack(obj)
       % Check for match requirements to see if tracking is required
-      if any(ismember(obj.matchType,{'Sigma' 'T' 'U' 'NEmit_x' 'NEmit_y'}))
+      if any(ismember(obj.matchType,{'Sigma' 'SigmaGauss' 'T' 'U' 'NEmit_x' 'NEmit_y'}))
         out=true;
       else
         out=false;
@@ -550,6 +552,12 @@ classdef Match
                 S=cov(beamout.Bunch.x');
               end
               F(itype)=S(str2double(obj.matchTypeQualifiers{itype}(1)),str2double(obj.matchTypeQualifiers{itype}(2)));
+            case 'SigmaGauss'
+              if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
+                dim=str2double(obj.matchTypeQualifiers{itype}(1));
+                [fitTerm,fitCoef,bsizecor] = beamTerms(dim,beamout);  
+              end
+              F(itype)=bsizecor(end);
             case {'T' 'U'}
               if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
                 dim=str2double(obj.matchTypeQualifiers{itype}(1));
