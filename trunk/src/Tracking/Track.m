@@ -2,6 +2,53 @@ classdef Track < handle
 % TRACK Lucretia beam tracking interface
 %   Perform tracking, either singly or on distributed Lucretia interface
 %   defined by optionally passed distributedLucretia object on construction
+%
+% Supports both asynchronous and synchronous parallel tracking (set in
+% distributedLucretia class passed to this object upon creation)
+%   - Asynchronous is slower to run than synchronous due to extra setup
+%   time but the trackThru command returns immediately which is useful if
+%   you want to process other commands serially whilst the parallel
+%   tracking is being computed
+%
+% Contructor:
+%   T=Track(InputBeam,distributedLucretiaObject)
+%     Omit distributedLucretiaObject if using this object in a non-parallel
+%     environment
+%
+% Main public methods (see doc help for details): 
+%   trackThru - main tracking method
+%
+% Example:
+%  % Create a distributedLucretia object (choose synchronicity with
+%    isasyn=true|false)
+%  DL=distributedLucretia(isasyn)
+%  % Create Track object with a Lucretia InputBeam
+%  T=Track(InputBeam,DL) % Now set track indices, T.startInd,T.finishInd etc as desired
+%  % Make any lattice changes
+%  DL.latticeSyncVals(1).PS(53)=0.85;
+%  DL.latticeSyncVals(2).PS(53)=0.85;
+%  DL.PSTrim(53);
+%  % Issue track command (sends tracking job to parallel worker nodes)
+%  T.trackThru;
+%  % Wait for results (if isasyn=true this is instantaneous and command is
+%                      not necessary)
+%  DL.asynWait
+%  % Get results (the main output arguments from Lucretia's TrackThru
+%  %  function), if there were any tracking errors trying to access these
+%  %  parameters results in an error with the error output messages from the
+%  %  workers shown.
+%  for iw=DL.workers
+%    beamOut(iw)=T.beamOut{iw};
+%    trackStatus{iw}=T.trackStatus{iw};
+%    instrumentData(iw)=T.instrData{iw};
+%  end
+%
+% See also:
+%  TrackThru distributedLucretia
+%
+% Reference page in Help browser for list of accessible properties and
+% methods:
+%   <a href="matlab:doc Track">doc Track</a>
   properties
     startInd % Finish tracking index
     finishInd % Start tracking index
@@ -11,31 +58,55 @@ classdef Track < handle
     beamType=0; % 0=all input beams the same, 1=possibly different beams for each worker
   end
   properties(SetAccess=private)
-    instrData % (distributed) instrument data from tracking
-    trackStatus % (distributed) Lucretia status from tracking
-    beamOut % (distributed) beam object post tracking
     isDistrib % Is this Track object opererating in distributed mode?
     DL % distributedLucretia object reference
   end
   properties(Access=private)
     dBeamIn % distributed input beam
     lBeamIn % local input beam
-    trackJob % distributed job data
+    instr
+    beamout
+    stat
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
   end
   properties(Dependent,SetAccess=private)
-    asynJobStatus='pending' % Job status for asyn jobs= 'pending','runnning','queued','finished','failed','destroyed','unavailable'
+    instrData % (distributed) instrument data from tracking
+    beamOut % (distributed) beam object post tracking
+    trackStatus % (distributed) Lucretia status from tracking
   end
   
-  % Get/Set methods
+  %% Get/Set methods
   methods
-    function status=get.asynJobStatus(obj)
-      try
-        status=obj.trackJob.State;
-      catch
-        status='unknown';
+    function set.trackStatus(obj,val)
+      obj.stat=val;
+    end
+    function val=get.trackStatus(obj)
+      if obj.isDistrib && ~obj.DL.synchronous
+        val=asynGetData(obj.DL,1);
+      else
+        val=obj.stat;
+      end
+    end
+    function set.instrData(obj,val)
+      obj.instr=val;
+    end
+    function val=get.instrData(obj)
+      if obj.isDistrib && ~obj.DL.synchronous
+        val=asynGetData(obj.DL,3);
+      else
+        val=obj.instr;
+      end
+    end
+    function set.beamOut(obj,val)
+      obj.beamout=val;
+    end
+    function val=get.beamOut(obj)
+      if obj.isDistrib && ~obj.DL.synchronous
+        val=asynGetData(obj.DL,2);
+      else
+        val=obj.beamout;
       end
     end
     function set.beamIn(obj,beamStruc)
@@ -48,10 +119,9 @@ classdef Track < handle
         end
         obj.dBeamIn=BeamIn;
       elseif obj.isDistrib % asyn
-        dataFile=fullfile(obj.DL.sched.DataLocation,'distributedLucretiaStartupData.mat');
-        vars=whos('-file',dataFile);
+        vars=whos('-file',obj.DL.asynDataFile);
         if any(ismember({vars.name},'trackBeamIn')) && obj.beamType
-          ld=load(dataFile,'trackBeamIn');
+          ld=load(obj.DL.asynDataFile,'trackBeamIn');
           trackBeamIn=ld.trackBeamIn;
         end
         if obj.beamType
@@ -61,7 +131,7 @@ classdef Track < handle
         else
           trackBeamIn=beamStruc; %#ok<NASGU>
         end
-        save(dataFile,'trackBeamIn','-append')
+        save(obj.DL.asynDataFile,'trackBeamIn','-append')
       else
         if obj.beamType
           obj.lBeamIn=[];
@@ -89,7 +159,7 @@ classdef Track < handle
     end
   end
   
-  % Main public methods
+  %% Main public methods
   methods
     function obj=Track(beamIn,distribObj)
       global BEAMLINE
@@ -109,43 +179,19 @@ classdef Track < handle
       obj.finishInd=length(BEAMLINE);
       obj.beamIn=beamIn;
     end
-    function asynWait(obj,timeout)
-      % asynWait(obj,timeout)
-      %  Wait for asynchronous job to complete
-      %  Optional timeout in seconds
-      if obj.DL.synchronous
-        return
-      end
-      t0=clock;
-      while ~strcmp(obj.asynJobStatus,'finished') && ~strcmp(obj.asynJobStatus,'failed') && ~strcmp(obj.asynJobStatus,'destroyed') ...
-          && ~strcmp(obj.asynJobStatus,'unavailable')
-        pause(1)
-        if exist('timeout','var') && etime(clock,t0)>timeout
-          break
-        else
-          t0=clock;
-        end
-      end
-    end
     function trackThru(obj)
       % tracking in parallel across possibly multiple workers
       if obj.isDistrib
-        % Remove last job if there is one
-        if ~isempty(obj.trackJob)
-          try
-            obj.trackJob.destroy;
-          catch
-          end
-        end
         % If asynchronous, submit jobs and return
         if ~obj.DL.synchronous
-          obj.trackJob=createJob(obj.DL.sched);
-          dataFile=fullfile(obj.DL.sched.DataLocation,'distributedLucretiaStartupData.mat');
+          % Remove last job if there is one
+          obj.DL.clearAsynJob;
+          % Make new asyn job
           for iw=obj.DL.workers
-            obj.trackJob.createTask(@asynTrack,4,{dataFile,iw,obj.startInd,obj.finishInd,...
-              obj.firstBunch,obj.lastBunch,obj.loopFlag,obj.DL.latticeSyncVals(iw)});
+            obj.DL.createAsynTask(@Track.asynTrack,3,{obj.DL.asynDataFile,iw,obj.startInd,obj.finishInd,...
+              obj.firstBunch,obj.lastBunch,obj.loopFlag});
           end
-          obj.trackJob.submit;
+          obj.DL.launchAsynJob();
         else % if sycnchronous, submit tracking tasks to the pool and wait for them to finish
           startInd=obj.startInd;
           finishInd=obj.finishInd;
@@ -173,11 +219,11 @@ classdef Track < handle
     end
   end
   
-  % Static methods (those needing to be called in worker environment)
+  %% Static methods (those needing to be called in worker environment)
   methods(Static)
-    function [stat beamout instdata retVals]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf,syncVals,method)
-      load(dataFile,'BEAMLINE','PS','GIRDER','WF','KLYSTRON','trackBeamIn');
-      [PS,KLYSTRON,GIRDER,retVals]=distributedLucretia.syncLattice(syncVals,PS,KLYSTRON,GIRDER,method); %#ok<NODEF>
+    function [stat beamout instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf)
+      [BEAMLINE PS GIRDER KLYSTRON WF]=distributedLucretia.asynLoadLattice(dataFile,iworker); %#ok<NASGU>
+      load(dataFile,'trackBeamIn')
       if length(trackBeamIn)>1
         beam=trackBeamIn(iworker);
       else
@@ -186,4 +232,5 @@ classdef Track < handle
       [stat beamout instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
     end
   end
+  
 end
