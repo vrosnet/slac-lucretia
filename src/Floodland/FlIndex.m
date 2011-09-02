@@ -1,98 +1,73 @@
 classdef FlIndex < handle & FlGui & FlUtils
-  %FLINDEX Summary of this class goes here
-  %   Detailed explanation goes here
+  %FLINDEX Indexing class for Lucretia-Floodland hardware
+  %   An object of FlIndex class holds a list of power supplies, movers and/or
+  %   klystrons. Methods of this class should be used instead of the
+  %   standard Lucretia functions for creating new PS/GIRDER/KLYSTRON
+  %   instances.
+  %   This class contains a number of utility methods and properties that
+  %   are of general use in manipulating the hardware lists.
+  %   Other Floodland objects act upon FlIndex objects, this being the
+  %   intended way of passing lists of hardware to the methods that act
+  %   upon them.
   
   properties(Dependent,SetAccess=private)
     PS = []; % PS indexes
-    GIRDER = [];
-    KLYSTRON = [];
+    GIRDER = []; % GIRDER (mover) indexes
+    KLYSTRON = []; % KLYSTRON indexes
     PS_names % BEAMLINE names of PS's
     PS_indx % BEAMLINE indexes for PS's
-    PS_list % Internal PS list elements
-    KLYSTRON_names
-    KLYSTRON_indx
-    KLYSTRON_list
-    GIRDER_names
-    GIRDER_indx
-    GIRDER_list
-    NumPars
-    KLYSTRON_VMDL % Accelerating potential / MV
-    KLYSTRON_PHASEMDL
-    PS_BMDL % Ignores PS settings
-    INDXnames
-    INDXchannels
+    PS_list % PS list (list index for this object)
+    KLYSTRON_names % BEAMLINE names of KLYSTRONs
+    KLYSTRON_indx % BEAMLINE indexes for KLYSTRONs
+    KLYSTRON_list % KLYSTRON list (list index for this object)
+    GIRDER_names % BEAMLINE names of GIRDERs
+    GIRDER_indx % BEAMLINE indexes for GIRDERs
+    GIRDER_list % GIRDER list (list index for this object)
+    NumPars % Number of object parameters (total of PS, GIRDER and KLYSTRON instances)
+    KLYSTRON_VMDL % Design Accelerating potential / MV
+    KLYSTRON_PHASEMDL % Design accelerating phase / degrees
+    PS_BMDL % Design integrated magnetic field attached to this power supply
+    INDXnames % BEAMLINE names of all hardware instances in this object
+    INDXchannels % List of active channels (connected hardware)
     INDXbl % BEAMLINE index [upstream middle downstream]
     INDXused % Cell array of names:channels of used controls
   end
   properties(Dependent)
-    PS_B % T.m
-    PS_KICK % radians
-    PS_KMOD % radians / m
-    GIRDER_POS
-    KLYSTRON_V % Accelerating potential / MV
-    KLYSTRON_PHASE % Phase of cavities under this klystron control
-    SetPt
-    Ampl
-    ACT
-    Ampl2ACT % conversion ratios between Ampl and ACT units
+    PS_B % Integrate magnetic field of magnets attached to this power supply [T.m^(n-1)] - quad, n=1
+    PS_KICK % Integrated kick imparted to beam by magnet elements attached to this power supply [radians], only makes sense for XCOR/YCOR classes
+    PS_KMOD % Integrated kmod for magnets attahced to this power supply [radians / m]
+    GIRDER_POS % Positions of movers (x,x',y,y',z,z') [m]
+    KLYSTRON_V % Accelerating potential [MV]
+    KLYSTRON_PHASE % Phase of cavities under this klystron control [degrees]
+    SetPt % Readout of "SetPt's" of all hardware in this object [PS.SetPt for PS's, GIRDER.MoverSetPt for GIRDERs, KLYSTRON.AmplSetPt/PhaseSetPt for KLYSTRONS]
+    Ampl % Readout of "Ampl's", ie the defined hardware readback values [Ampl counterpoints to above]
+    ACT % ACT readback values (in Lucretia (SI) units for any given hardware type)
+    Ampl2ACT % conversion factors between Ampl and ACT units
     limitLow % low control limits
     limitHigh % high control limits
   end
   properties
-    useCntrl=[];
-    useCntrlChan={};
+    useCntrl=[]; % sub-list of object elements to use (use this to make temporary sub-selections of list elements)
+    useCntrlChan={}; % sub-list of channels to use for each element (use this to make temporary sub-selections of list channel elements)
   end
   properties(Access=protected)
-    MasterRef=logical([]);
-    MasterInd=[];
+    MasterRef=logical([]); % Which class of hardware does each element belong to [PS GIRDER KLYSTRON] - used for internal indexing
+    MasterInd=[]; % Which PS/GIRDER/KLYSTRON global array index does each element of this object point to
     refIndx % Pointer to another FlIndex object instance that has superset of available controls
     refInd % Pointer from this MasterInd to the one in the superset
-    indexChoiceFromGui
-    indexChanChoiceFromGui
+    indexChoiceFromGui % Placeholder for index element choices from returning GUI
+    indexChanChoiceFromGui % Channel choices as above
   end
   properties(SetAccess=private)
-    ObjID
-  end
-  properties(Constant)
-    Cb = 3.335640952 ; % T.m / GeV
+    ObjID % unique ID for this generated object
   end
   
+  % Get/Set methods
   methods
-    function obj = FlIndex
-      % Constructor
-      obj.ObjID=now;
-    end
-    function addChannel(obj,refInd)
-      % Add a new channel to this object from the list available referenced
-      % by refIndex
-      if refInd<1 || refInd>length(obj.refIndx.MasterInd)
-        error('required refInd out of range')
-      end
-      obj.MasterInd(end+1)=obj.refIndx.MasterInd(refInd);
-      obj.MasterRef(end+1,:)=obj.refIndx.MasterRef(refInd,:);
-      obj.useCntrl(end+1)=true;
-      obj.useCntrlChan{end+1}=obj.refIndx.useCntrlChan{refInd};
-      obj.refInd(end+1)=refInd;
-      obj.indexChoiceFromGui(end+1)=true;
-      obj.indexChanChoiceFromGui{end+1}=obj.useCntrlChan{end};
-    end
-    function rmChannel(obj,ind)
-      % Remove a channel from this object
-      if any(ind<1) || any(ind>length(obj.MasterInd))
-        error('Required ind out of range')
-      end
-      obj.MasterInd(ind)=[];
-      obj.MasterRef(ind,:)=[];
-      obj.useCntrl(ind)=[];
-      obj.useCntrlChan(ind)=[];
-      obj.refInd(ind)=[];
-      obj.indexChoiceFromGui(ind)=[];
-      obj.indexChanChoiceFromGui(ind)=[];
-    end
-  end
-  methods
-    %% List of used channels
     function chans=get.INDXused(obj)
+      % List of used channels
+      % chans: cell array of indxName:channelName
+      %        length = number of hardware devices * number of channels
       irow=0;
       chans={};
       for indx=find(obj.useCntrl)
@@ -111,8 +86,10 @@ classdef FlIndex < handle & FlGui & FlUtils
         end
       end
     end
-    %% beamline index list
     function indx_out=get.INDXbl(obj)
+      % beamline index list
+      % output is 3*length(MasterInd)
+      %        [<upstream index> <middle index> <downstream index>]
       global BEAMLINE
       indx=[obj.PS_indx obj.GIRDER_indx obj.KLYSTRON_indx];
       inds=[find(obj.MasterRef(:,1)); find(obj.MasterRef(:,2)); find(obj.MasterRef(:,3))];
@@ -131,8 +108,9 @@ classdef FlIndex < handle & FlGui & FlUtils
         end
       end
     end
-    %% names list
     function INDXnames=get.INDXnames(obj)
+      % names list
+      % List of names for each hardware element in this object
       if ~isempty(obj.MasterInd)
         INDXnames=[obj.PS_names obj.GIRDER_names obj.KLYSTRON_names];
         inds=[find(obj.MasterRef(:,1)); find(obj.MasterRef(:,2)); find(obj.MasterRef(:,3))];
@@ -141,44 +119,10 @@ classdef FlIndex < handle & FlGui & FlUtils
         INDXnames={};
       end
     end
-    %% define HW
-    function defineIndxHW(obj,type,id,pvname,protocol,conv,low,high)
-      global PS KLYSTRON GIRDER %#ok<NUSED>
-      if ~exist('type','var')
-        error('Must supply type (PS, GIRDER or KLYSTRON')
-      end
-      if ~exist('id','var') || isempty(find(obj.(type)==id, 1))
-        error('Must supply type id contained in obj.type')
-      end
-      if ~exist('pvname','var') || ~isequal(size(pvname),eval(sprintf('size(%s(%d).pvname)',type,id)))
-        error('Must supply pvname cell of same dimension as global of same type')
-      end
-      if ~exist('protocol','var') || ~ismember(protocol,{'AIDA' 'EPICS'})
-        error('Must supply protocol as either AIDA or EPICS')
-      end
-      if ~exist('conv','var') || ~iscell(conv) || ~isequal(size(conv),size(pvname))
-        error('Must supply conv conversion scalar or lookup as 2*N array in cell array same dim as pvname')
-      end
-      if ~exist('low','var') || ~isequal(size(low),size(pvname))
-        error('Must supply low bounds for this control (same dimensionality as conv)')
-      end
-      if ~exist('high','var') || ~isequal(size(high),size(pvname))
-        error('Must supply high bounds for this control (same dimensionality as conv)')
-      end
-      eval(sprintf('%s(%d).pvname=pvname;',type,id));
-      eval(sprintf('%s(%d).protocol=protocol;',type,id));
-      eval(sprintf('%s(%d).conv=conv;',type,id));
-      eval(sprintf('%s(%d).low=low;',type,id));
-      eval(sprintf('%s(%d).high=high;',type,id));
-      list=obj.(sprintf('%s_list',type));
-      ilist=list(obj.(type)==id);
-      sz=size(pvname);
-      for ipv=1:sz(2)
-        obj.useCntrlChan{ilist}(ipv)=~(isempty(pvname{1,ipv}) && isempty(pvname{2,ipv}));
-      end
-    end
-    %% channels list
     function chans=get.INDXchannels(obj)
+      % channels list
+      % chans: cell array length MasterInd containing channel indices (max
+      % 1:6) showing which channels have a pvname assigned (are live)
       global GIRDER KLYSTRON
       if isempty(obj.MasterInd)
         chans={};
@@ -205,8 +149,8 @@ classdef FlIndex < handle & FlGui & FlUtils
         end
       end
     end
-    %% high/low limits
     function vals=get.limitLow(obj)
+      % get low limits for all hardware in object
       global PS GIRDER KLYSTRON
       pslist=obj.PS_list;
       psind=obj.PS;
@@ -232,6 +176,7 @@ classdef FlIndex < handle & FlGui & FlUtils
       end
     end
     function vals=get.limitHigh(obj)
+      % get high limits for all hardware in object
       global PS GIRDER KLYSTRON
       pslist=obj.PS_list;
       psind=obj.PS;
@@ -276,8 +221,10 @@ classdef FlIndex < handle & FlGui & FlUtils
       end
       obj.Ampl=curAmpl;
     end
-    %% SetPt list
     function vals=get.SetPt(obj)
+      % SetPt list
+      % Get SetPt/MoverSetPt/[AmplSetPt PhaseSetPt] for all controls in
+      % this object
       global PS GIRDER KLYSTRON
       pslist=obj.PS_list;
       psind=obj.PS;
@@ -303,6 +250,9 @@ classdef FlIndex < handle & FlGui & FlUtils
       end
     end
     function set.SetPt(obj,vals)
+      % SetPt list
+      % Set SetPt/MoverSetPt/[AmplSetPt PhaseSetPt] for all controls in
+      % this object
       global PS GIRDER KLYSTRON
       pslist=obj.PS_list;
       psind=obj.PS;
@@ -441,100 +391,101 @@ classdef FlIndex < handle & FlGui & FlUtils
         obj.KLYSTRON_PHASE=kp;
       end
     end
-    %% PS list
     function list=get.PS_list(obj)
+      % Get indices in this object that are of PS type
       list=find(obj.MasterRef(:,1));
     end
-     %% GIRDER list
     function list=get.GIRDER_list(obj)
+      % Get indices in this object that are of GIRDER type
       list=find(obj.MasterRef(:,2));
     end
-     %% KLYSTRON list
     function list=get.KLYSTRON_list(obj)
+      % Get indices in this object that are of KLYSTRON type
       list=find(obj.MasterRef(:,3));
     end
-    %% GIRDER POS get
     function gpos=get.GIRDER_POS(obj)
+      % Get GIRDER (mover) positions (N * 6) double array
       global GIRDER
       gpos=cell2mat(arrayfun(@(x) GIRDER{x}.MoverPos,obj.GIRDER,'UniformOutput',false));
     end
-    %% GIRDER POS set
     function set.GIRDER_POS(obj,value)
+      % Set GIRDER (mover) positions (N * 6) double array
       global GIRDER
       for igir=obj.GIRDER
         GIRDER{igir}.MoverSetPt=value(igir,:);
       end
     end
-    %% PS list
     function pslist=get.PS(obj)
+      % Get list of PS global array indices
       pslist=obj.MasterInd(obj.MasterRef(:,1));
     end
-    %% GIRDER list
     function glist=get.GIRDER(obj)
+      % Get list of GIRDER global array indices
       glist=obj.MasterInd(obj.MasterRef(:,2));
     end
-    %% KLYSTRON list
     function klist=get.KLYSTRON(obj)
+      % Get list of KLYSTRON global array indices
       klist=obj.MasterInd(obj.MasterRef(:,3));
     end
-    %% Get KLYSTRON V
     function v=get.KLYSTRON_V(obj)
+      % Get Voltage value for Klystrons [MV]
       global KLYSTRON BEAMLINE
       for ikly=obj.KLYSTRON
         v(ikly)=KLYSTRON(obj.KLYSTRON(ikly)).Ampl*sum(arrayfun(@(x) BEAMLINE{x}.Volt,KLYSTRON(obj.KLYSTRON(ikly)).Element));
       end
     end
-    %% Set KLYSTRON V
     function set.KLYSTRON_V(obj,value)
+      % Set Voltage value for Klystrons [MV]
       global KLYSTRON BEAMLINE
       for ikly=obj.KLYSTRON
         KLYSTRON(obj.KLYSTRON(ikly)).AmplSetPt=value(ikly)/sum(arrayfun(@(x) BEAMLINE{x}.Volt,KLYSTRON(obj.KLYSTRON(ikly)).Element));
       end
     end
-    %% Get KLYSTRON PHASE
     function ph=get.KLYSTRON_PHASE(obj)
+      % Get klystron phases (degrees)
       global KLYSTRON BEAMLINE
       for ikly=obj.KLYSTRON
         ph(ikly)=KLYSTRON(obj.KLYSTRON(ikly)).Phase+BEAMLINE{KLYSTRON(obj.KLYSTRON(ikly)).Element(1)}.Phase;
       end
     end
-    %% Set KLYSTRON PHASE
     function set.KLYSTRON_PHASE(obj,value)
+      % Set klystron phases (degrees)
       global KLYSTRON BEAMLINE
       for ikly=obj.KLYSTRON
         KLYSTRON(obj.KLYSTRON(ikly)).PhaseSetPt=value(ikly)-BEAMLINE{KLYSTRON(obj.KLYSTRON(ikly)).Element(1)}.Phase;
       end
     end
-     %% Get KLYSTRON V MDL
     function v=get.KLYSTRON_VMDL(obj)
+      % Get Design klystron accelerating voltages [MV]
       global KLYSTRON BEAMLINE
       for ikly=obj.KLYSTRON
         v(ikly)=sum(arrayfun(@(x) BEAMLINE{x}.Volt,KLYSTRON(obj.KLYSTRON(ikly)).Element));
       end
     end
-    %% Get KLYSTRON PHASE MDL
     function ph=get.KLYSTRON_PHASEMDL(obj)
+      % Get Design klystron accelerating phases [degrees]
       global KLYSTRON BEAMLINE
       for ikly=obj.KLYSTRON
         ph(ikly)=BEAMLINE{KLYSTRON(obj.KLYSTRON(ikly)).Element(1)}.Phase;
       end
     end
-    %% Get NumPars
     function numPars=get.NumPars(obj)
+      % length(obj.PS)+length(obj.KLYSTRON)+length(obj.GIRDER)
       numPars=length(obj.PS)+length(obj.KLYSTRON)+length(obj.GIRDER);
     end
-    %% Set corrector KMOD
     function set.PS_KMOD(obj,val)
+      % Set integrated kmod for magnets associated with these PS's [rad/m]
       global BEAMLINE
       obj.PS_KICK=val.*arrayfun(@(x) BEAMLINE{x}.L(1),obj.PS_indx);
     end
-    %% Get corrector KMOD
     function ret = get.PS_KMOD(obj)
+      % Get integrated kmod for magnets associated with these PS's [rad/m]
       global BEAMLINE
       ret=obj.PS_KICK./arrayfun(@(x) BEAMLINE{x}.L(1),obj.PS_indx);
     end
-    %% Set corrector KICK
     function set.PS_KICK(obj,val)
+      % Set integrated kick strength [radians] for magnets associated with
+      % this PS
       global BEAMLINE
       bind=obj.PS_indx;
       corb=zeros(size(obj.PS));
@@ -543,8 +494,9 @@ classdef FlIndex < handle & FlGui & FlUtils
       end
       obj.PS_B=corb;
     end
-    %% Get corrector KICK
     function ret = get.PS_KICK(obj)
+      % Get integrated kick strength [radians] for magnets associated with
+      % this PS
       global BEAMLINE
       bind=obj.PS_indx;
       corb=obj.PS_B;
@@ -554,55 +506,150 @@ classdef FlIndex < handle & FlGui & FlUtils
       end
       ret=kick;
     end
-    %% Get corrector B
     function ret = get.PS_B(obj)
+      % Get integrated magnet field strength for magnets associated with
+      % this PS
       global BEAMLINE PS
       ret=arrayfun(@(x) PS(x).Ampl.*sum(arrayfun(@(xx) BEAMLINE{xx}.B,PS(x).Element)),obj.PS);
     end
-     %% Get corrector B (Model)
-    function ret = get.PS_BMDL(obj)
-      global BEAMLINE PS
-      ret=arrayfun(@(x) sum(arrayfun(@(xx) BEAMLINE{xx}.B,PS(x).Element)),obj.PS);
-    end
-    %% Set corrector B
     function set.PS_B(obj,val)
+      % Set integrated magnet field strength for magnets associated with
+      % this PS
       global BEAMLINE PS
       for ips=obj.PS
         PS(ips).SetPt=val(ips)./sum(arrayfun(@(x) BEAMLINE{x}.B,PS(ips).Element));
       end
     end
-    %% Get Klystron name list
+    function ret = get.PS_BMDL(obj)
+      % Get integrated magnet field strength for magnets associated with
+      % this PS (design value)
+      global BEAMLINE PS
+      ret=arrayfun(@(x) sum(arrayfun(@(xx) BEAMLINE{xx}.B,PS(x).Element)),obj.PS);
+    end
     function names=get.KLYSTRON_names(obj)
+      % List of names of KLSYTRON controls in this object
       global BEAMLINE
       names=arrayfun(@(x) BEAMLINE{x}.Name,obj.KLYSTRON_indx,'UniformOutput',false);
     end
-    %% Get GIRDER name list
     function names=get.GIRDER_names(obj)
+      % List of names of GIRDER controls in this object
       global BEAMLINE
       names=arrayfun(@(x) BEAMLINE{x}.Name,obj.GIRDER_indx,'UniformOutput',false);
     end
-    %% Get PS name list
     function names=get.PS_names(obj)
+      % List of names of PS controls in this object
       global BEAMLINE
       names=arrayfun(@(x) BEAMLINE{x}.Name,obj.PS_indx,'UniformOutput',false);
     end
-    %% Get list of PS by BEAMLINE indices
     function psind=get.PS_indx(obj)
+      % Get list of PSs by BEAMLINE indices
       global PS
       psind=arrayfun(@(x) PS(x).Element(1),obj.PS);
     end
-    %% Get list of KLYS by BEAMLINE indices
-    function klyind=get.KLYSTRON_indx(obj)
-      global KLYSTRON
-      klyind=arrayfun(@(x) KLYSTRON(x).Element(1),obj.KLYSTRON);
-    end
-    %% Get list of GIRDER by BEAMLINE indices
     function girind=get.GIRDER_indx(obj)
+      % Get list of GIRDERs by BEAMLINE indices
       global GIRDER
       girind=arrayfun(@(x) GIRDER{x}.Element(1),obj.GIRDER);
     end
-    %% Display
+    function klyind=get.KLYSTRON_indx(obj)
+      % Get list of KLYSTRONs by BEAMLINE indices
+      global KLYSTRON
+      klyind=arrayfun(@(x) KLYSTRON(x).Element(1),obj.KLYSTRON);
+    end
+  end
+  
+  % Main public methods
+  methods
+    function obj = FlIndex
+      % Constructor, no parameters required
+      obj.ObjID=now;
+    end
+    function addChannel(obj,refInd)
+      % addChannel(obj,refInd)
+      % Add a new channel to this object from the list available referenced
+      % by refIndex
+      
+      if refInd<1 || refInd>length(obj.refIndx.MasterInd)
+        error('required refInd out of range')
+      end
+      obj.MasterInd(end+1)=obj.refIndx.MasterInd(refInd);
+      obj.MasterRef(end+1,:)=obj.refIndx.MasterRef(refInd,:);
+      obj.useCntrl(end+1)=true;
+      obj.useCntrlChan{end+1}=obj.refIndx.useCntrlChan{refInd};
+      obj.refInd(end+1)=refInd;
+      obj.indexChoiceFromGui(end+1)=true;
+      obj.indexChanChoiceFromGui{end+1}=obj.useCntrlChan{end};
+    end
+    function rmChannel(obj,ind)
+      % rmChannel(obj,ind)
+      % Remove a channel from this object referenced by "ind"
+      if any(ind<1) || any(ind>length(obj.MasterInd))
+        error('Required ind out of range')
+      end
+      obj.MasterInd(ind)=[];
+      obj.MasterRef(ind,:)=[];
+      obj.useCntrl(ind)=[];
+      obj.useCntrlChan(ind)=[];
+      obj.refInd(ind)=[];
+      obj.indexChoiceFromGui(ind)=[];
+      obj.indexChanChoiceFromGui(ind)=[];
+    end
+    function defineIndxHW(obj,type,id,pvname,protocol,conv,low,high)
+      % defineIndxHW(obj,type,id,pvname,protocol,conv,low,high)
+      %   Assign hardware controls to an index element
+      %     (Creates new PS/GIRDER/KLYSTRON global array index also)
+      %   type: 'PS', 'GIRDER' or 'KLYSTRON'
+      %   id: PS/GIRDER/KLYSTRON global array element
+      %   pvname: cell array containing process variable name for this
+      %           control.
+      %           PS: {readPV; writePV}
+      %           GIRDER: {xPV x'PV yPV y'PV zPV z'PV; xPV x'PV yPV y'PV
+      %                    zPV z'PV} {1,:} = read {2,:} = write
+      %           KLYSTRON: {VoltPV(read) PhasePV(read); VoltPV(read)
+      %                      PhasePV(write)}
+      %   protocol: 'AIDA' or 'EPICS'
+      %   conv: cell array same dimension as 'pvname'
+      %         each array entry either double scalar or 2*N array
+      %         * array is Ampl (1,:) vs. control val (2,:) lookup
+      %         * scalar is scale factor control:Ampl
+      %   low/high: double array same size as 'pvname' providing low and
+      %   high limits for this control device
+      global PS KLYSTRON GIRDER %#ok<NUSED>
+      if ~exist('type','var')
+        error('Must supply type (PS, GIRDER or KLYSTRON')
+      end
+      if ~exist('id','var') || isempty(find(obj.(type)==id, 1))
+        error('Must supply type id contained in obj.type')
+      end
+      if ~exist('pvname','var') || ~isequal(size(pvname),eval(sprintf('size(%s(%d).pvname)',type,id)))
+        error('Must supply pvname cell of same dimension as global of same type')
+      end
+      if ~exist('protocol','var') || ~ismember(protocol,{'AIDA' 'EPICS'})
+        error('Must supply protocol as either AIDA or EPICS')
+      end
+      if ~exist('conv','var') || ~iscell(conv) || ~isequal(size(conv),size(pvname))
+        error('Must supply conv conversion scalar or lookup as 2*N array in cell array same dim as pvname')
+      end
+      if ~exist('low','var') || ~isequal(size(low),size(pvname))
+        error('Must supply low bounds for this control (same dimensionality as conv)')
+      end
+      if ~exist('high','var') || ~isequal(size(high),size(pvname))
+        error('Must supply high bounds for this control (same dimensionality as conv)')
+      end
+      eval(sprintf('%s(%d).pvname=pvname;',type,id));
+      eval(sprintf('%s(%d).protocol=protocol;',type,id));
+      eval(sprintf('%s(%d).conv=conv;',type,id));
+      eval(sprintf('%s(%d).low=low;',type,id));
+      eval(sprintf('%s(%d).high=high;',type,id));
+      list=obj.(sprintf('%s_list',type));
+      ilist=list(obj.(type)==id);
+      sz=size(pvname);
+      for ipv=1:sz(2)
+        obj.useCntrlChan{ilist}(ipv)=~(isempty(pvname{1,ipv}) && isempty(pvname{2,ipv}));
+      end
+    end
     function display(obj)
+      % Object display output
       global BEAMLINE KLYSTRON PS GIRDER %#ok<NUSED>
        fprintf('====================================\n')
        fprintf('   ID        Type          Name\n')
@@ -625,8 +672,10 @@ classdef FlIndex < handle & FlGui & FlUtils
          end
        end
     end
-    %% +
     function plus(obj,A)
+      % + operator
+      % Add together contents of 2 objects of FlIndex class (or inherit
+      % from this class)
       mc=metaclass(A);
       isFlIndex=strcmp(class(A),'FlIndex');
       if ~isempty(mc.SuperclassList) && ~isFlIndex
@@ -651,8 +700,10 @@ classdef FlIndex < handle & FlGui & FlUtils
       obj.useCntrl=[obj.useCntrl A.useCntrl(aref)];
       obj.useCntrlChan(end+1:end+sum(aref))=A.useCntrlChan(aref);
     end
-    %% -
     function minus(obj,A)
+      % - operator
+      % Subtract contents of objects of FlIndex class (or inherit
+      % from this class)
       mc=metaclass(A);
       isFlIndex=strcmp(class(A),'FlIndex');
       if ~isempty(mc.SuperclassList) && ~isFlIndex
@@ -673,28 +724,10 @@ classdef FlIndex < handle & FlGui & FlUtils
         end
       end
     end
-    %% ( ... )
-%     function subsref(obj,S)
-%       switch S(1).type
-%         case '.'
-%           builtin('subsref',obj,S)
-%         case '()'
-%           B=FlIndex;
-%           if length(S)>1 && strcmp(S(2).type,'.') && ismember(S(2).subs,{'PS','GIRDER','KLYSTRON'})
-%             t={'PS' 'GIRDER' 'KLYSTRON'};
-%             tind=ismember(obj.MasterInd(obj.MasterRef(:,ismember(t,S(2).subs{1}))),S(1).subs{1});
-%             B.MasterRef=obj.MasterRef(tind,:);
-%             B.MasterInd=obj.MasterInd(tind,:);
-%           else
-%             B.MasterRef=obj.MasterRef(S(1).subs{1},:);
-%             B.MasterInd=obj.MasterInd(S(1).subs{1});
-%           end
-%         case '{}'
-%           error('FlIndex:subsref','Not a supported subscripted reference')
-%       end
-%     end
-    %% Add PS
-    function obj = addPS(obj, blList)
+    function addPS(obj, blList)
+      % addPS(obj, blList)
+      %   Add a PS control into this object
+      %   blList: vector of BEAMLINE elements to assign to this PS
       global BEAMLINE PS
       if ~iscell(blList); blList={blList}; end;
       % If no PS exist for this index, first make it
@@ -731,8 +764,10 @@ classdef FlIndex < handle & FlGui & FlUtils
         end
       end
     end
-    %% Add Klystrons
-    function obj = addKlystron(obj, kList)
+    function addKlystron(obj, kList)
+      % addKlystron(obj, kList)
+      %   Add a klystron control to this object
+      %   kList: vector of BEAMLINE indices to assign to this KLYSTRON
       global BEAMLINE KLYSTRON
       if ~iscell(kList); kList={kList}; end;
       % If no KLYSTRON exist for this index, first make it
@@ -765,8 +800,10 @@ classdef FlIndex < handle & FlGui & FlUtils
         obj.indexChanChoiceFromGui{end+1}=obj.useCntrlChan{end};
       end
     end
-    %% Add Movers
-    function obj = addMover(obj, mList)
+    function addMover(obj, mList)
+      % addMover(obj, mList)
+      %   Add a new mover (GIRDER) control element to this object
+      %   mList: List of BEAMLINE elements to assign to this GIRDER
       global BEAMLINE GIRDER
       % If no GIRDER exist for this index, first make it
       for im=1:length(mList)
@@ -797,130 +834,12 @@ classdef FlIndex < handle & FlGui & FlUtils
         obj.indexChanChoiceFromGui{end+1}=obj.useCntrlChan{end};
       end
     end
-  end
-  %% GUI
-  methods
-    % Process GUI callbacks
-    function guiIndexCallback(obj,src,~)
-      try
-        if src==obj.gui.display_s
-          if get(obj.gui.display_s,'Value')
-            set(obj.gui.display_alpha,'Value',false)
-            obj.updateIndexGui;
-          else
-            set(obj.gui.display_s,'Value',true)
-          end
-        elseif src==obj.gui.display_alpha
-          if get(obj.gui.display_alpha,'Value')
-            set(obj.gui.display_s,'Value',false)
-            obj.updateIndexGui;
-          else
-            set(obj.gui.display_alpha,'Value',true)
-          end
-        elseif src==obj.gui.select_accept
-          delete(obj.gui.guiIndexChoice);
-          obj.gui.guiIndexChoice=[];
-        elseif src==obj.gui.select_cancel || src==obj.gui.guiIndexChoice
-          obj.indexChoiceFromGui=[];
-          obj.indexChanChoiceFromGui=[];
-          delete(obj.gui.guiIndexChoice);
-          obj.gui.guiIndexChoice=[];
-        elseif src==obj.gui.selbutton1
-          sel=get(obj.gui.indexCbox1,'Value');
-          mI=get(obj.gui.indexCbox1,'UserData');
-          obj.indexChoiceFromGui(mI(sel))=false;
-          obj.indexChanChoiceFromGui(mI(sel))=obj.useCntrlChan(mI(sel));
-          set(obj.gui.indexCbox1,'Value',1)
-          obj.updateIndexGui;
-        elseif src==obj.gui.selbutton2
-          sel=get(obj.gui.indexCbox2,'Value');
-          mI=get(obj.gui.indexCbox2,'UserData');
-          obj.indexChoiceFromGui(mI(sel))=true;
-          obj.indexChanChoiceFromGui(mI(sel))=obj.useCntrlChan(mI(sel));
-          set(obj.gui.indexCbox2,'Value',1)
-          obj.updateIndexGui;
-        else
-          obj.updateIndexGui;
-        end
-      catch ME
-        disp(ME.message)
-        delete(gcf)
-      end
-    end
-    % Update GUI fields
-    function updateIndexGui(obj)
-      global PS GIRDER KLYSTRON BEAMLINE %#ok<NUSED>
-      % Get display options
-      cname={'PS' 'GIRDER' 'KLYSTRON'};
-      showControls=[isfield(obj.gui,'controls_PS')&&get(obj.gui.controls_PS,'Value') ...
-                    isfield(obj.gui,'controls_GIRDER')&&get(obj.gui.controls_GIRDER,'Value') ...
-                    isfield(obj.gui,'controls_KLYSTRON')&&get(obj.gui.controls_KLYSTRON,'Value')];
-      if ~any(showControls); return; end;
-      alltypes={'QUAD' 'SEXT' 'MULT' 'COR'};
-      types=alltypes(logical([get(obj.gui.type_QUAD,'Value') get(obj.gui.type_SEXT,'Value') get(obj.gui.type_MULT,'Value') get(obj.gui.type_COR,'Value')]));
-      if ismember('COR',types); types{end}='XCOR'; types{end+1}='YCOR'; end;
-      % Form right display
-      displayStr2={}; s2=[]; name2={}; mI=[];
-      chnames={{'main'} {'x' 'dx' 'y' 'dy' 'z' 'dz'} {'ampl' 'pha'}};
-      allchans={};
-      chansWithHW=obj.INDXchannels;
-      for ic=find(showControls)
-        if isfield(obj.gui,sprintf('controls_%s',cname{ic})) && ~isempty(obj.(cname{ic}))
-          blInd=obj.([cname{ic} '_indx']);
-          typeInd=obj.(cname{ic});
-          masterInd=obj.([cname{ic} '_list']);
-          for ibl=1:length(blInd)
-            if ismember(BEAMLINE{blInd(ibl)}.Class,types) || ~isempty(regexp(BEAMLINE{blInd(ibl)}.Class,'CAV$', 'once'))
-              thisChanStr='(';
-              chans=find(obj.indexChanChoiceFromGui{masterInd(ibl)});
-              if ~isempty(chans)
-                for ichan=chans
-                  if ismember(ichan,chansWithHW{1,masterInd(ibl)}) || ismember(ichan,chansWithHW{2,masterInd(ibl)})
-                    thisChanStr=[thisChanStr chnames{ic}{ichan} ','];
-                    allchans{end+1}=chnames{ic}{ichan};
-                  end
-                end
-              end
-              thisChanStr=[thisChanStr ')']; thisChanStr=regexprep(thisChanStr,',)',')');
-              displayStr2{end+1}=sprintf('%d: %s [%s(%d)] %s',blInd(ibl),BEAMLINE{blInd(ibl)}.Name,cname{ic},typeInd(ibl),thisChanStr) ;
-              s2(end+1)=blInd(ibl);
-              name2{end+1}=BEAMLINE{blInd(ibl)}.Name;
-              mI(end+1)=masterInd(ibl);
-            end
-          end
-        end
-      end
-      sel=get(obj.gui.indexCbox2,'Value');
-      % Set channel selection list with options
-      set(obj.gui.chansel,'Value',1);
-      set(obj.gui.chansel,'String',unique(allchans));
-      % - put in required sort order
-      if max(sel)>length(displayStr2)
-        set(obj.gui.indexCbox2,'Value',1)
-      end
-      name1=name2(ismember(mI,find(obj.indexChoiceFromGui)));
-      s1=s2(ismember(mI,find(obj.indexChoiceFromGui)));
-      name2=name2(~ismember(mI,find(obj.indexChoiceFromGui)));
-      s2=s2(~ismember(mI,find(obj.indexChoiceFromGui)));
-      displayStr1=displayStr2(ismember(mI,find(obj.indexChoiceFromGui)));
-      mI1=mI(ismember(mI,find(obj.indexChoiceFromGui)));
-      displayStr2=displayStr2(~ismember(mI,find(obj.indexChoiceFromGui)));
-      mI2=mI(~ismember(mI,find(obj.indexChoiceFromGui)));
-      if get(obj.gui.display_alpha,'Value')
-        [Y I]=sort(name2);
-        [Y I1]=sort(name1);
-      else
-        [Y I]=sort(s2);
-        [Y I1]=sort(s1);
-      end
-      set(obj.gui.indexCbox2,'String',displayStr2(I))
-      set(obj.gui.indexCbox2,'UserData',mI2(I))
-      set(obj.gui.indexCbox1,'String',displayStr1(I1))
-      set(obj.gui.indexCbox1,'UserData',mI1(I1))
-      drawnow('expose');
-    end
-    % Setup GUI and display
     function han=guiIndexChoice(obj)
+      % han=guiIndexChoice(obj)
+      %   GUI for element selection
+      %   Returns GUI handle (han)
+      %   GUI elements contained in obj.gui field
+      
       % If nothing defined just exit
       if isempty(obj.MasterInd)
         han=[];
@@ -1021,6 +940,129 @@ classdef FlIndex < handle & FlGui & FlUtils
       obj.indexChoiceFromGui=obj.useCntrl;
       obj.indexChanChoiceFromGui=obj.useCntrlChan;
       obj.updateIndexGui;
+    end
+  end
+  
+  % Internal methods
+  methods(Access=protected)
+    function guiIndexCallback(obj,src,~)
+      % Process GUI callbacks
+      try
+        if src==obj.gui.display_s
+          if get(obj.gui.display_s,'Value')
+            set(obj.gui.display_alpha,'Value',false)
+            obj.updateIndexGui;
+          else
+            set(obj.gui.display_s,'Value',true)
+          end
+        elseif src==obj.gui.display_alpha
+          if get(obj.gui.display_alpha,'Value')
+            set(obj.gui.display_s,'Value',false)
+            obj.updateIndexGui;
+          else
+            set(obj.gui.display_alpha,'Value',true)
+          end
+        elseif src==obj.gui.select_accept
+          delete(obj.gui.guiIndexChoice);
+          obj.gui.guiIndexChoice=[];
+        elseif src==obj.gui.select_cancel || src==obj.gui.guiIndexChoice
+          obj.indexChoiceFromGui=[];
+          obj.indexChanChoiceFromGui=[];
+          delete(obj.gui.guiIndexChoice);
+          obj.gui.guiIndexChoice=[];
+        elseif src==obj.gui.selbutton1
+          sel=get(obj.gui.indexCbox1,'Value');
+          mI=get(obj.gui.indexCbox1,'UserData');
+          obj.indexChoiceFromGui(mI(sel))=false;
+          obj.indexChanChoiceFromGui(mI(sel))=obj.useCntrlChan(mI(sel));
+          set(obj.gui.indexCbox1,'Value',1)
+          obj.updateIndexGui;
+        elseif src==obj.gui.selbutton2
+          sel=get(obj.gui.indexCbox2,'Value');
+          mI=get(obj.gui.indexCbox2,'UserData');
+          obj.indexChoiceFromGui(mI(sel))=true;
+          obj.indexChanChoiceFromGui(mI(sel))=obj.useCntrlChan(mI(sel));
+          set(obj.gui.indexCbox2,'Value',1)
+          obj.updateIndexGui;
+        else
+          obj.updateIndexGui;
+        end
+      catch ME
+        disp(ME.message)
+        delete(gcf)
+      end
+    end
+    function updateIndexGui(obj)
+      % Update GUI fields
+      global PS GIRDER KLYSTRON BEAMLINE %#ok<NUSED>
+      % Get display options
+      cname={'PS' 'GIRDER' 'KLYSTRON'};
+      showControls=[isfield(obj.gui,'controls_PS')&&get(obj.gui.controls_PS,'Value') ...
+                    isfield(obj.gui,'controls_GIRDER')&&get(obj.gui.controls_GIRDER,'Value') ...
+                    isfield(obj.gui,'controls_KLYSTRON')&&get(obj.gui.controls_KLYSTRON,'Value')];
+      if ~any(showControls); return; end;
+      alltypes={'QUAD' 'SEXT' 'MULT' 'COR'};
+      types=alltypes(logical([get(obj.gui.type_QUAD,'Value') get(obj.gui.type_SEXT,'Value') get(obj.gui.type_MULT,'Value') get(obj.gui.type_COR,'Value')]));
+      if ismember('COR',types); types{end}='XCOR'; types{end+1}='YCOR'; end;
+      % Form right display
+      displayStr2={}; s2=[]; name2={}; mI=[];
+      chnames={{'main'} {'x' 'dx' 'y' 'dy' 'z' 'dz'} {'ampl' 'pha'}};
+      allchans={};
+      chansWithHW=obj.INDXchannels;
+      for ic=find(showControls)
+        if isfield(obj.gui,sprintf('controls_%s',cname{ic})) && ~isempty(obj.(cname{ic}))
+          blInd=obj.([cname{ic} '_indx']);
+          typeInd=obj.(cname{ic});
+          masterInd=obj.([cname{ic} '_list']);
+          for ibl=1:length(blInd)
+            if ismember(BEAMLINE{blInd(ibl)}.Class,types) || ~isempty(regexp(BEAMLINE{blInd(ibl)}.Class,'CAV$', 'once'))
+              thisChanStr='(';
+              chans=find(obj.indexChanChoiceFromGui{masterInd(ibl)});
+              if ~isempty(chans)
+                for ichan=chans
+                  if ismember(ichan,chansWithHW{1,masterInd(ibl)}) || ismember(ichan,chansWithHW{2,masterInd(ibl)})
+                    thisChanStr=[thisChanStr chnames{ic}{ichan} ','];
+                    allchans{end+1}=chnames{ic}{ichan};
+                  end
+                end
+              end
+              thisChanStr=[thisChanStr ')']; thisChanStr=regexprep(thisChanStr,',)',')');
+              displayStr2{end+1}=sprintf('%d: %s [%s(%d)] %s',blInd(ibl),BEAMLINE{blInd(ibl)}.Name,cname{ic},typeInd(ibl),thisChanStr) ;
+              s2(end+1)=blInd(ibl);
+              name2{end+1}=BEAMLINE{blInd(ibl)}.Name;
+              mI(end+1)=masterInd(ibl);
+            end
+          end
+        end
+      end
+      sel=get(obj.gui.indexCbox2,'Value');
+      % Set channel selection list with options
+      set(obj.gui.chansel,'Value',1);
+      set(obj.gui.chansel,'String',unique(allchans));
+      % - put in required sort order
+      if max(sel)>length(displayStr2)
+        set(obj.gui.indexCbox2,'Value',1)
+      end
+      name1=name2(ismember(mI,find(obj.indexChoiceFromGui)));
+      s1=s2(ismember(mI,find(obj.indexChoiceFromGui)));
+      name2=name2(~ismember(mI,find(obj.indexChoiceFromGui)));
+      s2=s2(~ismember(mI,find(obj.indexChoiceFromGui)));
+      displayStr1=displayStr2(ismember(mI,find(obj.indexChoiceFromGui)));
+      mI1=mI(ismember(mI,find(obj.indexChoiceFromGui)));
+      displayStr2=displayStr2(~ismember(mI,find(obj.indexChoiceFromGui)));
+      mI2=mI(~ismember(mI,find(obj.indexChoiceFromGui)));
+      if get(obj.gui.display_alpha,'Value')
+        [Y I]=sort(name2);
+        [Y I1]=sort(name1);
+      else
+        [Y I]=sort(s2);
+        [Y I1]=sort(s1);
+      end
+      set(obj.gui.indexCbox2,'String',displayStr2(I))
+      set(obj.gui.indexCbox2,'UserData',mI2(I))
+      set(obj.gui.indexCbox1,'String',displayStr1(I1))
+      set(obj.gui.indexCbox1,'UserData',mI1(I1))
+      drawnow('expose');
     end
     function guiChanSelCallback(obj,src,~)
       sel=get(src,'Value');
