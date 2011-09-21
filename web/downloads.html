@@ -5,6 +5,14 @@
  content="text/html; charset=ISO-8859-1">
   <title>Lucretia: Downloads</title>
   <meta name="author" content="Peter Tenenbaum">
+  <style type="text/css">
+.auto-style1 {
+	font-weight: bold;
+}
+.auto-style2 {
+	text-align: center;
+}
+</style>
 </head>
 <body>
 <div style="text-align: center;"><a
@@ -19,14 +27,42 @@ The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
 Project</span><br>
 </div>
 <span style="font-size: 24pt;"><br>
-<small>Downloads<br>
+<small>Downloads / Source code description<br>
 <br>
 </small></span></div>
-The Lucretia code is entirely open-source:&nbsp; anyone can freely
-download any or all of the source, examples, binaries, etc.&nbsp; Links
-to facilitate downloading are below.&nbsp; This is also the place to
-look for
-downloads of the mex-ed XSIF parsing tools.<br>
+The Lucretia code is open-source:&nbsp; anyone can freely download any or all of the 
+source, examples, binaries, etc.&nbsp; Links to facilitate downloading are below.&nbsp; 
+The philosophy of the Lucretia maintainers is to keep binaries (mex files) for 
+the CURRENT version of Matlab only in the download package and file repository. 
+All development and bugfixes/maintainance etc is done using the current Matlab 
+release. Although most m-files and to a lesser extent the mexfiles will probably 
+work for several versions back from the current, we cannot guarantee this, 
+supported functions and the Matlab build environment change over time.<br><br>
+<div style="text-align: center;"><span class="auto-style1">Supported 
+	Environments</span><br>
+</div>
+In theory, any environment supported by Matlab should be OK for running Lucretia. 
+Mathworks product support information for all Matlab versions can be found
+<a href="http://www.mathworks.com/support/product/sys_requirements.html?product=ML">
+here</a>. We supply build files and the source code for compiling all included 
+mexfiles, if the supplied mexfiles do not work for you in your environment, see 
+the section below and try building your own versions.<br>Lucretia is developed, 
+and mexfiles built, under the following list of environments:
+<blockquote>
+	Red Hat Linux (Enterprise Linux 5 32-bit and 64-bit)</blockquote>
+<blockquote>
+	Windows 7 (64-bit only)</blockquote>
+<blockquote>
+	Mac OSX (10.7, 64-bit only).</blockquote>
+For now, we also include some older 32-bit windows mexfiles (.mexw32) extensions 
+that were built for Matlab R2009a under Windows XP which we will leave in the 
+repository as long as they continue to work.<br>Note: the mexfiles for the 
+different environments all have their own unique extensions so all are kept in 
+the various Lucretia function directories, your Matlab session will 
+automatically use the correct one for your environment.<br>Note: Mathworks will 
+discontinue support for 32-bit architectures in the future, they maintain a 
+support roadmap <a href="http://www.mathworks.com/support/sysreq/roadmap.html">
+here</a>.<br>
 <br>
 <div style="text-align: center;"><span style="font-weight: bold;">Lucretia
 Downloads</span><br>
@@ -34,36 +70,48 @@ Downloads</span><br>
 <span style="font-weight: bold;"><br>
 </span>
 <div style="text-align: center;">
-<div style="text-align: left;">The complete Lucretia directory tree
-(source files, mexfile binaries, examples, m-files) is available as a
-Zip'ed archive.&nbsp; The archive is available in <a
- href="ftp://ftp.slac.stanford.edu/software/lucretia/zipfiles/LucretiaWin.ZIP">WinXP</a>
-or <a
- href="ftp://ftp.slac.stanford.edu/software/lucretia/zipfiles/LucretiaUnix.zip">Unix</a>
-flavor (the difference being the end-of-line termination of the flat
-text files; otherwise the contents of the 2 Zip files are the
-same).&nbsp; Alternately the file tree can be browsed <a
- href="http://www.slac.stanford.edu/cgi-wrap/cvsweb/Lucretia/src/?cvsroot=ILC-main">here</a>.<br>
-<br>
-The Lucretia website web pages are available as a Zip'ed archive as
-well.&nbsp; Download the archive <a
- href="ftp://ftp.slac.stanford.edu/software/lucretia/zipfiles/LucretiaWebDocs.ZIP">here</a>.<br>
-<br>
+<div style="text-align: left;">The complete source code and all mexfile binaries 
+	can be downloaded from googlecode which performs code hosting for the 
+	Lucretia project. The project home page is:<a href="http://code.google.com/p/slac-lucretia/">
+	</a><br>
+	<blockquote>
+		<a href="http://code.google.com/p/slac-lucretia/">http://code.google.com/p/slac-lucretia/</a>
+	</blockquote>
+	<br>Here you can download zipped packages (zip or bzipped tar formats) of 
+	Lucretia and browse the source code. The source code is under subversion 
+	control. You can directly download the most recent version of Lucretia using 
+	subversion: <br>
+	<blockquote>
+		svn co https://slac-lucretia.googlecode.com/svn/trunk Lucretia</blockquote>
+	<br>will download all to a directory &quot;Lucretia&quot; for example (linux 
+	command-line example), other subversion client programs for all major 
+	operating systems are available.<br>
 </div>
-<span style="font-weight: bold;">XSIF</span><br>
-<br>
 </div>
-The XSIF source is available in zip'ed form for <a
- href="http://www.slac.stanford.edu/accel/ilc/codes/xsif/mex/xsifsrc_win.zip">WinXP</a>
-or <a
- href="http://www.slac.stanford.edu/accel/ilc/codes/xsif/mex/xsifsrc_unix.zip">unix/Linux</a>,
-and the source can be browsed <a
- href="http://www.slac.stanford.edu/accel/ilc/codes/xsif/src/">here</a>.&nbsp;
-The dll/mexsol/mexglx files are available in zip'ed form <a
- href="http://www.slac.stanford.edu/accel/ilc/codes/xsif/mex/xsifbin.zip">here</a>.<br>
+<div class="auto-style2">
+	<strong>mexfile Source</strong></div>
+<br>The source code for Lucretia exists as several c or fortran files all 
+contained in the Lucretia/src/mexsrc directory and subdirectories therein. The 
+&quot;core&quot; Lucretia binaries are built in the mexsrc directory itself from c source 
+files. See <a href="mexfiles.html">here</a> for a description of these mexfiles. 
+There is a Makefile included in the mexsrc directory for building. The Makefile 
+has some built-in documentation with descriptions of which environment variables 
+to alter to build the mexfiles for your environment.<br>There are also separate 
+directories containing the source code for the XSIF parser (mexsrc/xsif) and for 
+the Ground Motion code (mexsrc/matgm). These source files are fortran77 and 
+fortran90 based. Once again there are self-describing Makefiles in each of these 
+build directories.<br>The only known fortran compiler which works with current 
+versions of Matlab and these source files is the Intel fortran compiler.<br>
+Run-time libraries for the Intel compiler and other required shared object 
+libraries are kept in the Lucretia/src/Libs directory (each environment has a 
+sub-directory). You should add the relevant Libs directory to your shared object 
+search path (LD_LIBRARY_PATH environment variable for Linux-based operating 
+systems, PATH for windows or DYLD_LIBRARY_PATH for Mac) before starting Matlab 
+to successfully run all mexfiles.<br>
 <br>
-<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a><br>
-21-Feb-2008<br>
+<a
+ href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
+20-Sept-2011<br>
 <a href="http://www.slac.stanford.edu/detailed.html"><img
  src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
  alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"

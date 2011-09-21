@@ -56,7 +56,7 @@ classdef Track < handle
     startInd % Finish tracking index
     finishInd % Start tracking index
     firstBunch=1; % first bunch to track (if multibunch)
-    lastBunch=1; % last buncg to track (if multibuncgh
+    lastBunch=1; % last bunch to track (if multibunch)
     loopFlag=0; % loop over elements (0) or over bunches (1)
     beamType=0; % 0=all input beams the same, 1=possibly different beams for each worker
   end

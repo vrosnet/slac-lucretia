@@ -25,7 +25,7 @@ Project</span><br>
 <div style="text-align: center;">
 <div style="text-align: left;">
 <div style="text-align: center;">
-<div style="text-align: left;">Lucretia is "A Matlab (or Octave) based
+<div style="text-align: left;">Lucretia is &quot;A Matlab based
 toolkit for the modelling and simulation of single-pass electron
 transport lines."<br>
 <br>
@@ -156,17 +156,16 @@ form of scripts and functions).&nbsp; Wherever possible, we have used
 the scripting and function capabilities for Lucretia's programming
 needs.<br>
 <br>
-The main place where this breaks down is in tracking.&nbsp; Tracking
-rays through a beamline is the most compute-intensive operation in most
-accelerator codes, and some simple tests quickly made
-it clear that the tracking operation would need to be relegated to a
-compiled kernel.&nbsp; Fortunately, Matlab and Octave have a
+	The main place where this breaks down is in tracking.&nbsp; Tracking rays through 
+	a beamline is the most compute-intensive operation in most accelerator 
+	codes, and some simple tests quickly made it clear that the tracking 
+	operation would need to be relegated to a compiled kernel.&nbsp; Fortunately, 
+	Matlab has a
 straightforward method to build a compiled program unit and give it the
 "look and feel" of a conventional Matlab function interface (a
-"mexfile" in Matlab or an "octfile" for octave).&nbsp; The tracking
-function <a href="tracking.html#TrackThru">TrackThru</a> is
-implemented as a
-"mexfile"/"octfile."<br>
+"mexfile" ).&nbsp; The tracking
+function <a href="tracking.html#TrackThru">TrackThru</a> is implemented as a 
+	&quot;mexfile&quot;.<br>
 <br>
 In principle, it might have been acceptable from the point of view of
 execution speed to implement R-matrix operations (including Twiss
@@ -180,17 +179,16 @@ that the
 lattice is free of errors and internally consistent) was implemented as
 a mexfile, <a href="lattice_verification.html#VerifyLattice">VerifyLattice</a>.<br>
 <br>
-At this time, operations other than tracking, R-matrix propagation,
-Twiss propagation, and lattice verification are implemented as standard
-Matlab/Octave interpreted
+	At this time, operations other than tracking, R-matrix propagation, Twiss 
+	propagation, and lattice verification are implemented as standard Matlab interpreted
 functions.<br>
 <br>
 <div style="text-align: center;"><font size="+1">Lucretia is Case
 Sensitive!<br>
 <br>
 </font>
-<div style="text-align: left;">The vast majority of the "working parts"
-of Lucretia are Matlab/Octave scripts and functions, and Matlab is by
+<div style="text-align: left;">The vast majority of the &quot;working parts&quot; of 
+	Lucretia are Matlab scripts and functions, and Matlab is by
 default case sensitive.&nbsp; The DLLs for tracking, matrix operations,
 and verification are written in C, and are also case-sensitive.&nbsp;
 In general, the user should assume that anything documented here is
