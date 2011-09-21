@@ -5,6 +5,11 @@
  content="text/html; charset=ISO-8859-1">
   <title>The Lucretia Project: Home Page</title>
   <meta name="author" content="Peter Tenenbaum">
+  <style type="text/css">
+.auto-style1 {
+	color: #FF0000;
+}
+</style>
 </head>
 <body>
 <div style="text-align: center;"><a
@@ -36,76 +41,10 @@ linac-driven free electron lasers.<br>
 At this time, Lucretia is only available to run under <a
  href="http://www.mathworks.com">Matlab</a>.&nbsp;<br>
 <br>
-Current version dates for mexfunctions (to see these, execute the
-function with 'version' as the only argument):&nbsp; <br>
-<br>
-<table style="width: 100%; text-align: left;" border="1" cellpadding="2"
- cellspacing="2">
-  <tbody>
-    <tr>
-      <td
- style="vertical-align: top; font-weight: bold; text-align: center; width: 35%;">Component
-name<br>
-      </td>
-      <td
- style="vertical-align: top; font-weight: bold; text-align: center;">Version
-date<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">GetRmats<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">18-Apr-2005<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">GetTwiss<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">08-Mar-2006<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">RmatAtoB<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">18-Apr-2005<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">TrackThru<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">05-Oct-2005<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">VerifyLattice<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">18-Apr-2005<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">LucretiaCommon<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">02-Aug-2007<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">LucretiaPhysics<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">24-May-2007<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top; width: 35%;">LucretiaMatlab<br>
-      </td>
-      <td style="vertical-align: top; text-align: center;">08-Oct-2010<br>
-      </td>
-    </tr>
-  </tbody>
-</table>
-<br>
 <span style="font-weight: bold;">Lucretia Author List:</span>&nbsp;
-The original Lucretia code was written by P. Tenenbaum (PT) at SLAC.
-The current authors and maintenance crew for Lucretia are:<br>
+The original Lucretia code was written by 
+	<a href="http://www.slac.stanford.edu/owner/quarkpt">P. Tenenbaum</a> (PT) 
+	at SLAC. The current maintenance crew for Lucretia are:<br>
 <br>
 &nbsp;&nbsp;&nbsp; &nbsp;&nbsp; <a
  href="mailto:whitegr@slac.stanford.edu">Glen White</a>, SLAC National Accelerator Laboratory, CA, USA<br>
@@ -120,6 +59,9 @@ the last laugh.<br>
 <br>
 <a href="web/whatsnew.html">What's new!</a>&nbsp; Last updated
 08-Oct-2010<br>
+	<br><strong><span class="auto-style1"><a href="web/downloads.html">Downloads 
+	&amp; Source description</a></span></strong><br><br><a href="web/setup.html">
+	Setup instructions</a><br>
 <br>
 <a href="web/overview.html">How it works, philosophy, etc.</a><br>
 <a href="web/data_elements.html">Matlab accelerator data elements</a><br>
@@ -148,7 +90,9 @@ Between BEAMLINE and other arrays</a><br>
 and
 error message handling</a><br>
 &nbsp;&nbsp;&nbsp; <a href="web/tracking.html">Tracking</a>:&nbsp; <a
- href="web/tracking.html#TrackThru">TrackThru</a><br>
+ href="web/tracking.html#TrackThru">TrackThru</a>
+	and
+	<a href="web/tracking.html#Track">Track</a><br>
 &nbsp;&nbsp;&nbsp; <a href="web/rmat.html">R-matrices</a>:&nbsp; <a
  href="web/rmat.html#GetRmats">GetRmats</a> and <a
  href="web/rmat.html#RmatAtoB">RmatAtoB</a><br>
@@ -166,21 +110,21 @@ management</a><br>
 Misalignments</a><br>
 &nbsp;&nbsp;&nbsp; <a href="web/tuning_analysis.html">Tuning and
 Analysis</a><br>
-&nbsp;&nbsp;&nbsp; <a href="web/gui.html">Graphical User Interface</a><br>
+&nbsp;&nbsp;&nbsp; <a href="web/gui.html">Graphical User Interface</a><br>&nbsp;&nbsp;&nbsp; 
+	Ground Motion<br>&nbsp;&nbsp;&nbsp; Distributed (parallel Lucretia 
+	operations)<br>&nbsp;&nbsp;&nbsp; Floodland (handling of EPICS or AIDA 
+	control system interfaces for real-world accelerator control)<br>
 <a href="web/mexfiles.html">Internal arrangement of mexfile code</a><br>
-<a href="web/platforms.html">Supported platforms and Configurations</a><br>
-<a href="web/pLucretia.html">Parallel and/or Compiled use of Lucretia</a><br>
 <a href="web/deck_parsing.html">Other useful stuff:&nbsp; deck parsing</a><br>
 <a href="web/documentation.html">Other useful stuff:&nbsp; documentation</a><br>
 <a href="web/examples.html">Examples</a><br>
-<a href="web/SourceBrowse.html">Browse the Source!</a><br>
 <a href="web/bmarking_example.html">Benchmarking with TESLA TDR linac</a><br>
 <a href="web/bugs.html">Known bugs</a><br>
-<a href="web/downloads.html">Downloads</a><br>
+	<br>
 <br>
-<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a> <a
+	<a
  href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
-13-Mar-2008<a href="http://www.slac.stanford.edu/detailed.html"><img
+	20-Sept-2011<a href="http://www.slac.stanford.edu/detailed.html"><img
  src="web/SLAC_whitebkgd.jpg" title="Return to SLAC detailed home page"
  alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
  align="right"></a><br>

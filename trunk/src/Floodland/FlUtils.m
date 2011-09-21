@@ -6,10 +6,24 @@ classdef FlUtils < handle
   properties
     Index % index references into BEAMLINE
   end
+  properties(Constant)
+    Cb = 3.335640952 ; % T.m / GeV
+    clight = 299792458 ; % speed of light [m/s]
+  end
   
   methods
     function ret=getIndex(obj,prop,propval,propval2)
-      % Search for properties and property values in Floodland objects
+      % ret=getIndex(obj,prop,propval,propval2)
+      %   Search for properties and property values in Floodland objects
+      %   e.g.
+      %   FlUtilsObj.getIndex(Index,123)
+      %     - Get the object index which points to the BEAMLINE index 123
+      %   FlUtilsObj.getIndex(BEAMLINE,'Name','SomeBeamlineElementName')
+      %     - Find BEAMLINE index with requested name
+      %   FlUtilsObj.getIndex(KLYSTRON,'V',3)
+      %     - Find FlIndex KLSTRON index with 3V
+      %
+      % Note, PS,GIRDER,KLSYTON searches only work with FlIndex objects
       global BEAMLINE PS KLYSTRON GIRDER
       if isprop(obj,prop)
         if exist('propval2','var') && strcmp(prop,'PS')

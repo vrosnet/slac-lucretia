@@ -22,7 +22,17 @@ Project</span><br>
 <small>What's New<br>
 <br>
 </small></span><span style="font-size: 24pt;"></span></div>
-<span style="font-weight: bold;"><span style="font-weight: bold;">08-Oct-2010:</span></span><br>
+<strong>21-Sept-</strong><span style="font-weight: bold;">2011:<br><br>* </span>
+Changed layout of mexfiles, new code hosting at googlecode. See new download and 
+setup instructions.<br><span style="font-weight: bold;">* </span>Matching 
+routine in TuningAndAnalysis (Match class)<br>
+* Distributed parallel operations 
+with distributedLucretia class in src/Distributed.<br>
+* Parallel tracking  supported by Track class in src/Tracking<br>
+* Ground Motion simulation with matgm mexfile<br>* Floodland module- (src/Floodland 
+directory) for real-world controls communication<br>* Various undocumented 
+useful scripts and functions included &quot;as-is&quot; in src/utils<br><br>
+<strong>08-Oct-2010:</strong><br>
 <br>
 Changed the way mex files handle Lucretia global arrays (BEAMLINE, PS etc). Now they don't have to be global, it is possible to just define them in the local 'caller' scope. This is needed for parallel operations of Lucretia within the context of the Matlab Distributed Computing Toolbox where you cannot define a global variable on a worker node. NOTE: where BEAMLINE etc is declared both locally and globally, the locally defined version is taken in preference. It is left to the user to ensure that there doesn't exist non-compatible PS/GIDER/WF/KLYSTRON globals elsewhere.<br>
 <br>
@@ -484,8 +494,10 @@ their scale factor</a> (dScale).<br>
   </li>
 </ul>
 <br>
-<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a><br>
-13-Mar-2008<br>
+<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a>
+<a
+ href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
+21-Sept-2011<br>
 <a href="http://www.slac.stanford.edu/detailed.html"><img
  src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
  alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
