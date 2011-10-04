@@ -4,10 +4,6 @@ function [dx,dy] = matgm( s_coords, time, gm_model, TF_xList, TF_yList, nTF)
 % Requires input data files with A,B,C,K and ATFA/B ground motion models
 % Produce dx, dy (m) vectors of ground motion at given s co-ordinates (m)
 % gm_model should be 'A', 'B', 'C', 'K', 'ATFA' or 'ATFB'
-% random seed seed should be any positive integer for first call of this
-% routine to set up harmonics and reset random seed generator- further
-% calls should pass 0 for seed
-% time is the period to generate the motion over in seconds (absolute)
 % Set time=0 to generate new seed and harmonics etc, also happens on change
 % of gm_model from previous call and with first call
 % ------------------------------------
