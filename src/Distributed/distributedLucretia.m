@@ -316,7 +316,7 @@ classdef distributedLucretia < handle
       end
     end
     function latticeCopy(obj,doSync)
-      %latticeCopy(obj,doTrim)
+      %latticeCopy(obj,doSync)
       % Copy current in-local-memory Lucretia lattice to all workers
       % (Copy takes affect next sync event)
       % doSync (optional), if true then also sync all workers with Trim
