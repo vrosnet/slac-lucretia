@@ -18,7 +18,7 @@ function [stat emitData] = emit2dOTR(otruse,dointrinsic,printData)
 %            [energy emitx demitx emitxn demitxn embmxn dembmxn bmagx dbmagx bcosx dbcosx bsinx dbsinx betax dbetax bx0 alphx dalphx ax0 chi2x ...
 %                    emity demity emityn demityn embmyn dembmyn bmagy dbmagy bcosy dbcosy bsiny dbsiny betay dbetay by0 alphy dalphy ay0 chi2y ...
 %                    ido length(id) id length(S) S sigxf sigx dsigx sigyf sigy dsigy];
-global BEAMLINE INSTR FL
+global BEAMLINE INSTR FL PS %#ok<NUSED>
 stat{1}=1;
 emitData=[];
 
@@ -54,7 +54,7 @@ end
 
 % Get OTR data from PVs
 if (debug)
-  load userData/emit2dOTRtest
+  load userData/emit2dOTRtest %#ok<*UNRCH>
   id=find(otruse);
   for n=1:notr
     if dointrinsic
@@ -78,15 +78,16 @@ else
   for n=1:notr
     otrNum=str2double(oname{n}(4))+1;
     [stat,data]=getOTRsize(otrNum);
+    ictdata=data.ict; icterrdata=data.icterr; %#ok<NASGU>
     if (stat{1}~=1)
       stat{1}=-1;
       stat{2}=sprintf('Failed to get data for OTR%dX',n-1);
       return
     end
-    rawotrdata=data; %#ok<NASGU>
+    rawotrdata{n}=data; %#ok<NASGU>
     if dointrinsic
-      sigx(n)=1e-6*sqrt(data.sig11);dsigx(n)=1e-6*sqrt(data.sig11err); % m
-      sigy(n)=1e-6*sqrt(data.sig33);dsigy(n)=1e-6*sqrt(data.sig33err); % m
+      sigx(n)=1e-6*sqrt(data.sig11);dsigx(n)=1e-6*sqrt(0.5^2/data.sig11err); % m
+      sigy(n)=1e-6*sqrt(data.sig33);dsigy(n)=1e-6*sqrt(0.5^2/data.sig33err); % m
     else
       sigx(n)=1e-6*data.projx;dsigx(n)=1e-6*data.projxerr; % m
       sigy(n)=1e-6*data.projy;dsigy(n)=1e-6*data.projyerr; % m
@@ -106,8 +107,8 @@ end
 dp=8e-4; % nominal energy spread
 
 % correct measured spot sizes for dispersion
-sigxt=sigx;sigxd=abs(dp*DX);sigx2=sigxt.^2-sigxd.^2;
-sigyt=sigy;sigyd=abs(dp*DY);sigy2=sigyt.^2-sigyd.^2;
+sigxt=sigx;sigxd=abs(dp*DX);sigx2=sigxt.^2-sigxd.^2; dsigxd=dDX.*dp;
+sigyt=sigy;sigyd=abs(dp*DY);sigy2=sigyt.^2-sigyd.^2; dsigyd=dDY.*dp;
 if (any(sigx2<0)||any(sigy2<0))
   stat{1}=-1;
   stat{2}='Negative sigx2 or sigy2 values after dispersion correction';
@@ -145,8 +146,8 @@ by0=FL.SimModel.Design.Twiss.betay(ido(1));
 ay0=FL.SimModel.Design.Twiss.alphay(ido(1));
 
 % load analysis variables
-x=sigx.^2;dx=2*sigx.*dsigx; % m^2
-y=sigy.^2;dy=2*sigy.*dsigy; % m^2
+x=sigx.^2;dx=sqrt(2.*sigx.^2.*dsigx.^2 + 2.*sigxd.^2.*dsigxd.^2); % m^2
+y=sigy.^2;dy=sqrt(2.*sigy.^2.*dsigy.^2 + 2.*sigyd.^2.*dsigyd.^2); % m^2
 x=x';dx=dx';y=y';dy=dy'; % columns
 
 % compute least squares solution
@@ -166,8 +167,8 @@ for n=1:notr
   By(n,:)=My(n,:)/dy(n);
 end
 Tx=inv(Bx'*Bx);Ty=inv(By'*By);
-u=Tx*Bx'*zx;chi2x=zx'*zx-zx'*Bx*Tx*Bx'*zx;du=sqrt(diag(Tx));
-v=Ty*By'*zy;chi2y=zy'*zy-zy'*By*Ty*By'*zy;dv=sqrt(diag(Ty));
+u=Tx*Bx'*zx;chi2x=zx'*zx-zx'*Bx*Tx*Bx'*zx;du=sqrt(diag(Tx)); %#ok<NASGU,MINV>
+v=Ty*By'*zy;chi2y=zy'*zy-zy'*By*Ty*By'*zy;dv=sqrt(diag(Ty)); %#ok<NASGU,MINV>
 
 % convert fitted input sigma matrix elements to emittance, BMAG, ...
 egamma=energy/0.51099906e-3;
@@ -265,13 +266,13 @@ id2=findcells(BEAMLINE,'Name','BEGFF');
 [stat,Rab]=RmatAtoB(id1,ido(1));
 if (stat{1}~=1),error(stat{2}),end
 Rx=Rab(1:2,1:2);Ry=Rab(3:4,3:4);
-sigx0=inv(Rx)*sigx1*inv(Rx');sigy0=inv(Ry)*sigy1*inv(Ry');
+sigx0=inv(Rx)*sigx1*inv(Rx');sigy0=inv(Ry)*sigy1*inv(Ry'); %#ok<MINV>
 
 % forward propagate through diagnostic section ...
 S=FL.SimModel.Design.Twiss.S';
 id=(id1:id2)';
 idt=find([1;diff(S(id))]~=0); % unique S values
-id=id(idt);
+id=id(idt); %#ok<FNDSB>
 sigxf=zeros(size(id));sigyf=zeros(size(id));
 for n=1:length(id)
   [stat,Rab]=RmatAtoB(id1,id(n));
@@ -308,5 +309,7 @@ else
   emitData=[energy emitx demitx emitxn demitxn embmxn dembmxn bmagx dbmagx bcosx dbcosx bsinx dbsinx betax dbetax bx0 alphx dalphx ax0 chi2x ...
                    emity demity emityn demityn embmyn dembmyn bmagy dbmagy bcosy dbcosy bsiny dbsiny betay dbetay by0 alphy dalphy ay0 chi2y ...
                    ido length(id) id' length(S) S' sigxf' sigx dsigx sigyf' sigy dsigy xf' yf'];
-  save(sprintf('userData/emit2dOTR_%s',datestr(now,30)),'rawotrdata','emitData');
+  if dointrinsic
+    save(sprintf('userData/emit2dOTR_%s',datestr(now,30)),'rawotrdata','emitData','otruse','BEAMLINE','PS','DX','DPX','DY','DPY','dDX','dDPX','dDY','dDPY','ictdata','icterrdata');
+  end
 end

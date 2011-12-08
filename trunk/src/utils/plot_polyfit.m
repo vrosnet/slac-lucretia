@@ -64,6 +64,7 @@ if nargin==1
   else
     axhan=[];
   end
+  return
 elseif ~isempty(axhan)
   if ~ishandle(axhan)
     axhan=[];
@@ -162,7 +163,7 @@ if (res==1)
 end
 if ~isempty(axhan)
   if (bars)
-     plot_bars(axhan,x,y,dy,'o')
+     plot_bars(x,y,dy,'o','k',axhan)
   else
      plot(axhan,x,y,'o')
   end
