@@ -86,14 +86,15 @@ else
     end
     rawotrdata{n}=data; %#ok<NASGU>
     if dointrinsic
-      sigx(n)=1e-6*sqrt(data.sig11);dsigx(n)=1e-6*sqrt(0.5^2/data.sig11err); % m
-      sigy(n)=1e-6*sqrt(data.sig33);dsigy(n)=1e-6*sqrt(0.5^2/data.sig33err); % m
+      sigx(n)=1e-6*sqrt(data.sig11);dsigx(n)=1e-6*data.sig11err*0.5; % m
+      sigy(n)=1e-6*sqrt(data.sig33);dsigy(n)=1e-6*data.sig33err*0.5; % m
     else
       sigx(n)=1e-6*data.projx;dsigx(n)=1e-6*data.projxerr; % m
       sigy(n)=1e-6*data.projy;dsigy(n)=1e-6*data.projyerr; % m
       %sigx(n)=1e-6*data.sigx;dsigx(n)=1e-6*data.projxerr; % m
       %sigy(n)=1e-6*data.sigy;dsigy(n)=1e-6*data.projyerr; % m
     end
+    dsig
     theta(n)=data.theta; % deg
   end
   % get dispersion data
@@ -107,8 +108,8 @@ end
 dp=8e-4; % nominal energy spread
 
 % correct measured spot sizes for dispersion
-sigxt=sigx;sigxd=abs(dp*DX);sigx2=sigxt.^2-sigxd.^2; dsigxd=dDX.*dp;
-sigyt=sigy;sigyd=abs(dp*DY);sigy2=sigyt.^2-sigyd.^2; dsigyd=dDY.*dp;
+sigxt=sigx;sigxd=abs(dp*DX);sigx2=sigxt.^2-sigxd.^2;
+sigyt=sigy;sigyd=abs(dp*DY);sigy2=sigyt.^2-sigyd.^2;
 if (any(sigx2<0)||any(sigy2<0))
   stat{1}=-1;
   stat{2}='Negative sigx2 or sigy2 values after dispersion correction';
@@ -146,8 +147,12 @@ by0=FL.SimModel.Design.Twiss.betay(ido(1));
 ay0=FL.SimModel.Design.Twiss.alphay(ido(1));
 
 % load analysis variables
-x=sigx.^2;dx=sqrt(2.*sigx.^2.*dsigx.^2 + 2.*sigxd.^2.*dsigxd.^2); % m^2
-y=sigy.^2;dy=sqrt(2.*sigy.^2.*dsigy.^2 + 2.*sigyd.^2.*dsigyd.^2); % m^2
+dsigxd2=sqrt(dDX.^2.*4.*dp.^2.*DX.^2);
+dsigyd2=sqrt(dDY.^2.*4.*dp.^2.*DY.^2);
+dsigx=dsigx.*2;
+dsigy=dsigy.*2;
+x=sigx.^2;dx=sqrt(dsigx.^2+dsigxd2.^2); % m^2
+y=sigy.^2;dy=sqrt(dsigy.^2+dsigyd2.^2); % m^2
 x=x';dx=dx';y=y';dy=dy'; % columns
 
 % compute least squares solution
