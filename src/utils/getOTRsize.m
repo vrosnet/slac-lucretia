@@ -29,6 +29,8 @@ pvlist={ ...
   sprintf('mOTR:procData%d:projxerr',otrNum); ...    % rms horizontal projection (um^2)
   sprintf('mOTR:procData%d:projy',otrNum); ...       % mean vertical projection (um^2)
   sprintf('mOTR:procData%d:projyerr',otrNum); ...    % rms vertical projection (um^2)
+  sprintf('mOTR:procData%d:ict',otrNum); ...         % mean ict reading during measurements (1e10)
+  sprintf('mOTR:procData%d:icterr',otrNum); ...      % std ict reading during measurements (1e10)
 };
 
 try
@@ -38,6 +40,7 @@ try
   sig13=d(5);sig13err=d(6);
   projx=d(7);projxerr=d(8);
   projy=d(9);projyerr=d(10);
+  ict=d(11);icterr=d(12);
 catch
   stat{1}=-1;stat{2}='getOTRsize: lcaGet failed';
   return
@@ -69,6 +72,8 @@ data.projyerr=projyerr;
 data.theta=theta;
 data.sigx=sigx;
 data.sigy=sigy;
+data.ict=ict;
+data.icterr=icterr;
 
 stat{1}=1;
 
