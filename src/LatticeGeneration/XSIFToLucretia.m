@@ -174,7 +174,7 @@ function [stat,Initial] = XSIFToLucretia( filename, varargin )
               etable{count} = SolenoidStruc( P(edp).value, P(edp+1).value, ...
                                              P(edp+4).value, ename ) ;
           case { 12, 36 } % roll
-              etable{count} = CoordStruc( 0, 0, 0, 0, 0, P(edp).value ) ;
+              etable{count} = CoordStruc( 0, 0, 0, 0, 0, P(edp).value, ename ) ;
           case { 13, 35 } % rotation about y axis
               etable{count} = CoordStruc( 0, P(edp).value, 0, 0, 0, 0, ename ) ;
           case 14  % xcor

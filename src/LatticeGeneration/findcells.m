@@ -72,7 +72,7 @@ else
 end
 if verInfo(1).Version > 7
   if nargin==2 || isempty(varargin{1})
-    index=find(cellfun(@(x) isfield(x,field), CELLARRAY(istart:iend), 'UniformOutput', true)); index=index+istart-1;
+    index=find(cellfun(@(x) isfield(x,field), {CELLARRAY{istart:iend}}, 'UniformOutput', true)); index=index+istart-1;
   else
     if isempty(strfind(varargin{1},'*')) || isnumeric(varargin{1})
       index=find(cellfun(@(x) isfield(x,field) && isequal(x.(field),varargin{1}), ...
