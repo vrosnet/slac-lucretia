@@ -166,7 +166,7 @@ classdef Track < handle
   methods
     function obj=Track(beamIn,distribObj)
       global BEAMLINE
-      if exist('distribObj','var')
+      if exist('distribObj','var') && ~isempty(distribObj)
         if ~strcmp(class(distribObj),'distributedLucretia')
           error('Can only pass a distributedLucretia object to Track')
         end

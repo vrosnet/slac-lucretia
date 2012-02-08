@@ -12,9 +12,9 @@ function [fitTerm,fitCoef,bsize_corrected,bsize,p] = beamTerms(dim,beam)
 %
 % OUTPUTS:
 % --------
-% fitTerm(35,4) = Beam correlation (e.g. if dim=3 [1 0 0 0] = SIGMA(3,1)
-%                                                 [1 0 0 1] = T314
-%                                                 [2 1 0 0] = U3112 etc... )
+% fitTerm(35,6) = Beam correlation (e.g. if dim=3 [1 0 0 0 0 0] = SIGMA(3,1)
+%                                                 [1 0 0 1 0 0] = T314
+%                                                 [2 1 0 0 0 0] = U3112 etc... )
 % fitCoef(1,35) = coefficient related to corresponding beam correlation
 % bsize_corrected(1,3) = RMS beam size in dimension dim when all 1st-3rd order
 %                        correlations are subtracted
@@ -40,13 +40,19 @@ for iorder=1:3
   p=polyfitn(xfit,yfit,iorder);
   bsize_corrected(iorder)=std(yfit-polyvaln(p,xfit));
 end
-
+xfit=beam.Bunch.x';
+p=polyfitn(xfit,yfit,iorder);
 % Get contribution of beamsize to each fit term
+[Y I]=sort(sum(p.ModelTerms,2));
 bsize=zeros(length(p.Coefficients),1);
 for iterm=1:length(p.Coefficients)
-  p2=polyfitn(xfit,yfit,p.ModelTerms(iterm,:));
-  bsize(iterm)=bsize_initial-std(yfit-polyvaln(p2,xfit));
-  fitTerm(iterm,:)=p.ModelTerms(iterm,:);
+  p2=polyfitn(xfit,yfit,p.ModelTerms(I(iterm),:));
+  if Y(iterm)>0 && ~(length(find(p.ModelTerms(I(iterm),:)))==1 && find(p.ModelTerms(I(iterm),:))==dim)
+    yfit=yfit-polyvaln(p2,xfit);
+    bsize(iterm)=abs(bsize_initial-std(yfit));
+    bsize_initial=std(yfit);
+  end
+  fitTerm(iterm,:)=p.ModelTerms(I(iterm),:);
   fitCoef(iterm)=p2.Coefficients;
 end
 
