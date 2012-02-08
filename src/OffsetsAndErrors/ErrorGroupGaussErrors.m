@@ -53,7 +53,9 @@ function [stat,errdat] = ErrorGroupGaussErrors( group, meanval, rmsval, ...
   stat = InitializeMessageStack( ) ;
 
 % first make sure the arguments are consistent with one another
-
+  if ~isfield(group,'error')
+    error('Incorrectly formatted error group')
+  end
   statarg = EGGEVerifyArgs( group.error, meanval, rmsval, keepold ) ;
   stat = AddStackToStack( stat, statarg ) ;
   if (statarg{1} ~= 1)
