@@ -21,6 +21,7 @@ disp('Split lattice + CSR:')
 fprintf('sigma_z: %g sigma_E: %g <E>: %g\n',...
   std(B.Bunch.x(5,:)),std(B.Bunch.x(6,:)),mean(B.Bunch.x(6,:)))
 
+
 % function doplot(ibl,bsplit,bo,dE,me,me1,s,se,z)
 % figure(1)
 % if ibl<=bsplit
