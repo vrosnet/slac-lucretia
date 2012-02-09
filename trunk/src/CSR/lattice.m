@@ -1,6 +1,7 @@
 function Beam=lattice
 global BEAMLINE
 
+
 % ==========
 % Setup simple SBEN + DRIFT lattice
 % ==========
