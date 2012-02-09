@@ -1,6 +1,7 @@
 function eleSplitCSR(bsplit,dsplit,bunchLength)
 global BEAMLINE
 
+
 iele=1;
 while iele<=length(BEAMLINE)
   
