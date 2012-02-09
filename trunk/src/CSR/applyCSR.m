@@ -66,8 +66,9 @@ if strcmp(BEAMLINE{ind}.Class,'SBEN')
     [Y I1]=min(abs(z-(z(is)-((R*PHI^3)/6))));
     [Y I2]=min(abs(z-(z(is)-((R*PHI^3)/24))));
     W(is)=W(is) - (4/(R*PHI))*q(I1) + (4/(R*PHI))*q(I2) + (2/((3*R^2)^(1/3)))*ZINT;
+    W(is)=W(is).*q(is).*Q;
   end
-  dE=(W.*Q.*BEAMLINE{ind}.L)./(1e9*qe); % GeV
+  dE=(W.*BEAMLINE{ind}.L)./(1e9*qe); % GeV
 else % DRIFT or other element following bend
   % Get parameters for wake calculation
   % -- find bend elements upstream
@@ -111,8 +112,9 @@ else % DRIFT or other element following bend
     [Y I]=min(abs(z-(z(is)-(R/6)*phi^2*(phi+3*X))));
     [Y I1]=min(abs(z-(z(is)-dsmax)));
     W(is)=W(is) + (4/R)*( (q(I1)/(phi+2*X)) + ZINT ) - (4/R)*(1/(phi+2*X))*q(I) ;
-    dE=(W.*Q.*BEAMLINE{ind}.L)./(1e9*qe); % GeV
+    W(is)=W(is).*q(is).*Q;
   end
+  dE=(W.*BEAMLINE{ind}.L)./(1e9*qe); % GeV
 end
 % Apply energy loss for all particles in each bin
 for ibin=1:nbin
