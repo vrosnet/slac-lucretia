@@ -63,7 +63,6 @@ classdef Track < handle
     csrNbins=600; % number of histogram bins to use for CSR calculations
     verbose=0; % verbosity level (0= don't print anything, 1=print at each CSR integration step)
     csrData
-    csrSmoothVal=3;
   end
   properties(SetAccess=private)
     isDistrib % Is this Track object opererating in distributed mode?

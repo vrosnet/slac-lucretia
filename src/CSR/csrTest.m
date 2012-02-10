@@ -13,7 +13,7 @@ T.csrStoreData=true;
 % ===========
 % Number of bins to use when histogramming for CSR
 % ===========
-T.csrNbins=3000;
+T.csrNbins=600;
 
 % Beam tracking
 T.trackThru;
