@@ -1,4 +1,5 @@
 function eleSplitCSR(bsplitIn,dsplit,bunchLength)
+%
 global BEAMLINE
 
 

@@ -9,7 +9,7 @@ function [beam W dE z]=applyCSR(beam,ind,nbin,smoothVal)
 global BEAMLINE
 W=[]; dE=[]; z=[];
 
-% If zero length element just return
+%- If zero length element just return
 if ~isfield(BEAMLINE{ind},'L') || BEAMLINE{ind}.L==0
   return
 end
