@@ -12,7 +12,7 @@ T.verbose=1;
 % ===========
 % Number of bins to use when histogramming for CSR
 % ===========
-T.csrNbins=600;
+T.csrNbins=300;
 
 % Beam tracking
 T.trackThru;
