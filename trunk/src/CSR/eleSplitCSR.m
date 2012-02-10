@@ -1,4 +1,4 @@
-function eleSplitCSR(bsplit,dsplit,bunchLength)
+function eleSplitCSR(bsplitIn,dsplit,bunchLength)
 global BEAMLINE
 
 
@@ -21,10 +21,10 @@ while iele<=length(BEAMLINE)
     end
     
     % Split up all bends elements part of this physical magnet
-    bsplit=floor(bsplit/length(magInd));
+    bsplit=floor(bsplitIn/length(magInd));
     magid=0; Angle=0; L=0;
     for imag=1:length(magInd)
-      B=BEAMLINE{magInd(imag)};
+      B=BEAMLINE{magInd(imag)+magid};
       Angle=Angle+B.Angle;
       L=L+B.L;
       Bs=B;
@@ -51,17 +51,17 @@ while iele<=length(BEAMLINE)
         newBL{end+1}=Bs;
       end
       newBL{end+1}=B2;
-      if magInd(imag)>1 && (magnInd(imag)+1+magid)<length(BEAMLINE)
-        BEAMLINE=[BEAMLINE(1:magInd(imag)+magid-1); newBL'; BEAMLINE(magInd(imag)+1+magid:end)];
+      if magInd(imag)>1 && (magInd(imag)+1+magid)<length(BEAMLINE)
+        BEAMLINE=[BEAMLINE(1:magInd(imag)+magid-1); newBL'; BEAMLINE(magInd(imag)+magid+1:end)];
       elseif magInd(imag)==1
         BEAMLINE=[newBL'; BEAMLINE(2:end)];
       elseif (magnInd(imag)+1+magid)==length(BEAMLINE)
         BEAMLINE=[BEAMLINE(1:magInd(imag)+magid-1); newBL'];
       end
-      magid=magid+length(newBL);
+      magid=magid+length(newBL)-1;
     end
     SetSPositions( 1, length(BEAMLINE), 0 );
-    lastEle=magInd(imag)+magid-1;
+    lastEle=magInd(imag)+magid;
     
     % How far downstream to consider CSR effects?
     R=L/(2*sin(Angle/2));
@@ -73,10 +73,10 @@ while iele<=length(BEAMLINE)
     ind1=lastEle+1;
     if ind1<=length(BEAMLINE)
       for ibl=ind1:length(BEAMLINE)
-        if (BEAMLINE{ibl}.S-BEAMLINE{ind1}.S)>lDecay
+        if (BEAMLINE{ibl}.S-BEAMLINE{ind1}.S)>lDecay || strcmp(BEAMLINE{ibl}.Class,'SBEN')
           break
         end
-        if isfield(BEAMLINE{ibl},'L') && BEAMLINE{ibl}.L>0 && ~strcmp(BEAMLINE{ibl}.Class,'SBEN')
+        if isfield(BEAMLINE{ibl},'L') && BEAMLINE{ibl}.L>0
           splitInd(end+1)=ibl;
           splitBL{end+1}=BEAMLINE{ibl};
           splitDS(end+1)=BEAMLINE{ibl}.S-BEAMLINE{ind1}.S+BEAMLINE{ibl}.L;
@@ -86,27 +86,33 @@ while iele<=length(BEAMLINE)
     if isempty(splitInd); iele=lastEle+1; continue; end;
     dl=logspace(-3,0,dsplit).*lDecay;
 %     dl=linspace(0,lDecay,dsplit);
-    newBL={}; llen=0;
     blGrowInd=0;
     for isele=1:length(splitInd)
-      BL=splitBL{isele}; olen=BL.L;
-      ndl=find(dl<=splitDS(isele));
+      BL=splitBL{isele}; olen=BL.L; BLorig=BL;
+      if isele==1
+        ndl=find(dl<=splitDS(isele));
+      else
+        ndl=find(dl>splitDS(isele-1) & dl<=splitDS(isele));
+      end
+      if isempty(ndl) || length(ndl)<2; continue; end;
+      newBL={};
       for idl=1:length(ndl)
-        if idl==length(ndl)
-          BL.L=olen-dl(idl-1)-llen;
+        if idl==1 && isele==1
+          BL.L=dl(ndl(idl));
         elseif idl==1
-          BL.L=dl(idl)-llen;
+          BL.L=dl(ndl(idl))-splitDS(isele-1);
+        elseif idl==length(ndl)
+          BL.L=splitDS(isele)-dl(ndl(idl-1));
         else
-          BL.L=dl(idl)-llen-dl(idl-1);
+          BL.L=dl(ndl(idl))-dl(ndl(idl)-1);
         end
         BL.TrackFlag.doCSR=true;
         if isfield(BL,'B')
-          BL.B=BL.B.*(BL.L/olen);
+          BL.B=BLorig.B.*(BL.L/olen);
         end
         newBL{end+1}=BL;
       end
-      llen=llen+olen;
-      if splitInd(isele)<length(BEAMLINE)
+      if (splitInd(isele)+blGrowInd)<length(BEAMLINE)
         BEAMLINE=[BEAMLINE(1:splitInd(isele)+blGrowInd-1); newBL'; BEAMLINE(splitInd(isele)+1+blGrowInd:end)];
       else
         BEAMLINE=[BEAMLINE(1:splitInd(isele)+blGrowInd-1); newBL'];
