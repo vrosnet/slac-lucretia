@@ -63,7 +63,7 @@ classdef Track < handle
     csrNbins=600; % number of histogram bins to use for CSR calculations
     verbose=0; % verbosity level (0= don't print anything, 1=print at each CSR integration step)
     csrData
-    csrSmoothVal=3;
+    csrSmoothVal='robust';
   end
   properties(SetAccess=private)
     isDistrib % Is this Track object opererating in distributed mode?
@@ -229,18 +229,29 @@ classdef Track < handle
         end
         % If wanting CSR treatment, stop at each CSR calculation point and
         % perturn BEAM energy before continuing (else just track)
+        t0=clock;
         if ~isempty(indcsr)
           t1=obj.startInd;
           tempBeam=obj.beamIn;
           idataAccum=cell(1,3);
           obj.csrData=[];
           istep=0; nsteps=length(indcsr(indcsr>=obj.startInd & indcsr<=obj.finishInd));
+          firstPrint=true;
           for itrack=indcsr(indcsr>=obj.startInd & indcsr<=obj.finishInd)
             [stat tempBeam instdata]=TrackThru(t1,itrack,tempBeam,obj.firstBunch,obj.lastBunch,obj.loopFlag);
             if stat{1}~=1; break; end;
             if obj.verbose
               istep=istep+1;
-              fprintf('CSR Tracking: %g%% complete...\n',(istep/nsteps)*100)
+              if etime(clock,t0)>1.5
+                if ~firstPrint
+                  fprintf('\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b')
+                else
+                  fprintf('\n')
+                end
+                firstPrint=false;
+                fprintf('CSR Tracking: %3d%% complete...',round((istep/nsteps)*100))
+                t0=clock;
+              end
             end
             if obj.csrStoreData
               [tempBeam W dE z]=applyCSR(tempBeam,itrack,obj.csrNbins,obj.csrSmoothVal);
@@ -250,7 +261,7 @@ classdef Track < handle
               obj.csrData(end).beam=tempBeam;
               obj.csrData(end).index=itrack;
             else
-              tempBeam=applyCSR(tempBeam,itrack,obj.csrNbins,obj,csrSmoothVal);
+              tempBeam=applyCSR(tempBeam,itrack,obj.csrNbins,obj.csrSmoothVal);
             end
             t1=itrack+1;
             for id=1:length(instdata)
@@ -272,6 +283,9 @@ classdef Track < handle
         obj.trackStatus=stat;
         obj.beamOut=beamout;
         obj.instrData=instdata;
+        if obj.verbose
+          fprintf('\n')
+        end
       end
     end
   end
