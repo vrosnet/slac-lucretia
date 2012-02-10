@@ -62,6 +62,8 @@ classdef Track < handle
     csrStoreData=false; % true: store Wakefield etc data at each CSR calculation point 
     csrNbins=600; % number of histogram bins to use for CSR calculations
     verbose=0; % verbosity level (0= don't print anything, 1=print at each CSR integration step)
+    csrData
+    csrSmoothVal=3;
   end
   properties(SetAccess=private)
     isDistrib % Is this Track object opererating in distributed mode?
@@ -73,7 +75,6 @@ classdef Track < handle
     instr
     beamout
     stat
-    csrData
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
@@ -242,14 +243,14 @@ classdef Track < handle
               fprintf('CSR Tracking: %g%% complete...\n',(istep/nsteps)*100)
             end
             if obj.csrStoreData
-              [tempBeam W dE z]=applyCSR(tempBeam,itrack,obj.csrNbins);
+              [tempBeam W dE z]=applyCSR(tempBeam,itrack,obj.csrNbins,obj.csrSmoothVal);
               obj.csrData(end+1).W=W;
               obj.csrData(end).dE=dE;
               obj.csrData(end).z=z;
               obj.csrData(end).beam=tempBeam;
               obj.csrData(end).index=itrack;
             else
-              tempBeam=applyCSR(tempBeam,itrack,obj.csrNbins);
+              tempBeam=applyCSR(tempBeam,itrack,obj.csrNbins,obj,csrSmoothVal);
             end
             t1=itrack+1;
             for id=1:length(instdata)
