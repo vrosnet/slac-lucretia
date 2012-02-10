@@ -3,7 +3,7 @@ function IPdat = getIPTwiss(wip,sdata,dsdata,etadata,detadata,psqd0,dim,dE)
 % IPdat = getIPTwiss(wip,sdata,dsdata,etadata,detadata,psqd0,dim,dE)
 %   Uses 2 methods to get IP twiss and dispersion given QD0FF scan data and
 %   corresponding dispersion measurements
-%     IPdat.mfit data uses linear fit base on Model
+%     IPdat.mfit data uses linear fit based on Model
 %     IPdat.pfit uses parabolic fit to data based on thin-lens analytical
 %     model
 %
@@ -15,7 +15,7 @@ function IPdat = getIPTwiss(wip,sdata,dsdata,etadata,detadata,psqd0,dim,dE)
 %             point
 %    detadata: error on above for each QD0FF scan point
 %    psqd0: Lucretia PS setting for each QD0FF scan point
-%    dim: 1= horizontal data suuplied; 2=vertical data supplied
+%    dim: 1= horizontal data supplied; 2=vertical data supplied
 %    dE: Energy spread of beam (dE/E)
 %
 % Output:

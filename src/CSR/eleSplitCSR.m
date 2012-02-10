@@ -84,7 +84,8 @@ while iele<=length(BEAMLINE)
       end
     end
     if isempty(splitInd); iele=lastEle+1; continue; end;
-    dl=logspace(-1,0,dsplit).*lDecay;
+    dl=logspace(-3,0,dsplit).*lDecay;
+%     dl=linspace(0,lDecay,dsplit);
     newBL={}; llen=0;
     blGrowInd=0;
     for isele=1:length(splitInd)
