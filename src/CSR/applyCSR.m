@@ -22,7 +22,7 @@ z=z-mean(z);
 bw=abs(z(2)-z(1));
 Q=sum(q);
 q=q./bw; %(q./Q)./bw;
-q=smoothn(q,'robust');
+q=smoothn(q,2);
 dq=[diff(q)./bw 0];
 
 % Electron charge
