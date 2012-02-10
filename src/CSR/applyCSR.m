@@ -18,8 +18,8 @@ z=linspace(zmin,zmax,nbin);
 % q=beam.Bunch.Q(bsxfun(@gt, beam.Bunch.x(5,:),bins(1:nbin)') & bsxfun(@lt, beam.Bunch.x(5,:),bins(1:nbin)'+1));
 [count,bininds] = histc(beam.Bunch.x(5,:),z);
 q = accumarray(bininds',beam.Bunch.Q')';
-bw=abs(z(2)-z(1));
 z=z-mean(z);
+bw=abs(z(2)-z(1));
 Q=sum(q);
 q=q./bw; %(q./Q)./bw;
 q=smoothn(q,'robust');
@@ -57,17 +57,17 @@ if strcmp(BEAMLINE{ind}.Class,'SBEN')
   SL=(R*PHI^3)/24;
   % Loop over particle distribution and form wakefield function and
   % calculate energy loss for each bin
-  W=zeros(1,nbin);
-  for is=1:nbin
-    ZINT=0;
-    for isp=find(z>(z(is)-SL),1,'first'):is-1
-      ZINT=ZINT + (1/(z(is)-z(isp))^(1/3))*dq(isp)*bw;
-    end
-    [Y I1]=min(abs(z-(z(is)-((R*PHI^3)/6))));
-    [Y I2]=min(abs(z-(z(is)-((R*PHI^3)/24))));
-    W(is)=W(is) - (4/(R*PHI))*q(I1) + (4/(R*PHI))*q(I2) + (2/((3*R^2)^(1/3)))*ZINT;
-  end
-%   W=arrayfun(@(x) csrInt1(x,z,SL,bw,dq,R,PHI,q),1:nbin);
+%   W=zeros(1,nbin);
+%   for is=1:nbin
+%     ZINT=0;
+%     for isp=find(z>(z(is)-SL),1,'first'):is-1
+%       ZINT=ZINT + (1/(z(is)-z(isp))^(1/3))*dq(isp)*bw;
+%     end
+%     [Y I1]=min(abs(z-(z(is)-((R*PHI^3)/6))));
+%     [Y I2]=min(abs(z-(z(is)-((R*PHI^3)/24))));
+%     W(is)=W(is) - (4/(R*PHI))*q(I1) + (4/(R*PHI))*q(I2) + (2/((3*R^2)^(1/3)))*ZINT;
+%   end
+  W=arrayfun(@(x) csrInt1(x,z,SL,bw,dq,R,PHI,q),1:nbin);
   dE=(W.*Q.*BEAMLINE{ind}.L)./(1e9*qe); % GeV
 else % DRIFT or other element following bend
   % Get parameters for wake calculation
@@ -107,12 +107,7 @@ else % DRIFT or other element following bend
   dE=(W.*Q.*BEAMLINE{ind}.L)./(1e9*qe); % GeV
 end
 % Apply energy loss for all particles in each bin
-% beam.Bunch.x(6,bininds)=beam.Bunch.x(6,bininds)+dE(bininds);
-for ibin=1:nbin-1
-  bininds=beam.Bunch.x(5,:)>z(ibin) & beam.Bunch.x(5,:)<z(ibin+1);
-  beam.Bunch.x(6,bininds)=beam.Bunch.x(6,bininds)+dE(ibin);
-end
-% Flip z definition back again
+beam.Bunch.x(6,:)=beam.Bunch.x(6,:)+dE(bininds);
 beam.Bunch.x(5,:)=-beam.Bunch.x(5,:);
 
 function W=csrInt1(is,z,SL,bw,dq,R,PHI,q)

@@ -7,7 +7,7 @@ Beam=lattice;
 % Generate Track object
 % ============
 T=Track(Beam);
-T.verbose=1;
+T.verbose=0;
 
 % ===========
 % Number of bins to use when histogramming for CSR
