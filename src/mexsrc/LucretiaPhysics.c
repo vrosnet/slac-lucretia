@@ -643,7 +643,7 @@ void PropagateRayThruMult( double L, double* Bvec, double* Tvec,
 						   double* PIvec, int nTerms, double* Angle,
 						   double dB, double Tilt, 
 						   double* xi, double* xf, int zmotion,
-							int SRFlag, double Lrad, struct Bunch* ThisBunch,
+							int SRFlag, double Lrad, double* bstop, int* bngoodray,double* bx,double* by,
 							int elemno, int ray )
 {
 
@@ -722,7 +722,7 @@ void PropagateRayThruMult( double L, double* Bvec, double* Tvec,
 	{
 			SR_dP = ComputeSRMomentumLoss( P0,sqrt(BxL*BxL+ByL*ByL), Lrad, SRFlag ) ;
 			*(xf+5) = P0 - SR_dP ;
-			Stop = CheckP0StopPart( ThisBunch,elemno,ray,P0-SR_dP, UPSTREAM ) ;
+			Stop = CheckP0StopPart( bstop,bngoodray,bx,by,elemno,ray,P0-SR_dP, UPSTREAM ) ;
 			if (Stop == 1)
 				goto egress ;
 			P0 -= SR_dP / 2;

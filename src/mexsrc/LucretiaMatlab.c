@@ -45,6 +45,7 @@
 		GammaLog
 		GetMatrixNormalizer
 		IsEmpty
+    GetCsrEloss
 
 /* AUTH: PT, 03-aug-2004 */
 /* MOD:
@@ -1816,4 +1817,33 @@ bool IsEmpty(const mxArray* pa)
 	if (mxIsEmpty(pa))
 		return true ;
 	return false ;
+}
+
+
+/*==================================================================*/
+
+/* Get Energy loss profile due to Coherent Synchrotron Radiation */
+
+/* RET:    none.
+/* ABORT:  never.
+/* FAIL:   never */
+
+void GetCsrEloss(struct Bunch* ThisBunch, int nbin, int smoothVal, int elementNo )
+{
+  mxArray *lhs, *rhs[5] ;
+  
+  /* Allocate RHS entries */
+  rhs[0] =  mxCreateDoubleMatrix(6, ThisBunch->nray, mxREAL) ;
+  memcpy(mxGetPr(rhs[0]),ThisBunch->x,sizeof(double)*ThisBunch->nray*6) ;
+  rhs[1] =  mxCreateDoubleMatrix(1, ThisBunch->nray, mxREAL) ;
+  memcpy(mxGetPr(rhs[1]),ThisBunch->Q,sizeof(double)*ThisBunch->nray) ;
+  rhs[2] = mxCreateDoubleScalar(double(nbin));
+  rhs[3] = mxCreateDoubleScalar(double(smoothVal));
+  rhs[4] = mxCreateDoubleScalar(double(elementNo));
+  
+  /* Call applyCSR function to calculate E loss for this element just tracked through */
+  /* beamP=applyCSR(beamZ,beamP,beamQ,nbin,smoothVal,itrack) */
+  mexCallMATLAB(1, &lhs, 5, rhs, "applyCSR") ;
+  memcpy(ThisBunch->x,mxGetPr(lhs),sizeof(double)*ThisBunch->nray*6);
+  
 }

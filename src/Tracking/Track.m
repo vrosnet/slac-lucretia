@@ -1,57 +1,57 @@
 classdef Track < handle
-% TRACK Lucretia beam tracking interface
-%   Perform tracking, either singly or on distributed Lucretia interface
-%   defined by optionally passed distributedLucretia object on construction
-%
-% Supports both asynchronous and synchronous parallel tracking (set in
-% distributedLucretia class passed to this object upon creation)
-%   - Asynchronous is slower to run than synchronous due to extra setup
-%   time but the trackThru command returns immediately which is useful if
-%   you want to process other commands serially whilst the parallel
-%   tracking is being computed
-%
-% Contructor:
-%   T=Track(InputBeam,distributedLucretiaObject)
-%     Omit distributedLucretiaObject if using this object in a non-parallel
-%     environment
-%
-% Main public methods (see doc help for details): 
-%   trackThru - main tracking method
-%
-% Example:
-%  % Create a distributedLucretia object (choose synchronicity with
-%    isasyn=true|false)
-%  DL=distributedLucretia(isasyn)
-%  % Create Track object with a Lucretia InputBeam
-%  T=Track(InputBeam,DL) % Now set track indices, T.startInd,T.finishInd etc as desired
-%  % Make any lattice changes
-%  DL.latticeSyncVals(1).PS(53)=0.85;
-%  DL.latticeSyncVals(2).PS(53)=0.85;
-%  DL.PSTrim(53);
-%  % Issue track command (sends tracking job to parallel worker nodes)
-%  T.trackThru;
-%  % Wait for results (if isasyn=true this is instantaneous and command is
-%                      not necessary)
-%  DL.asynWait
-%  % Get results (the main output arguments from Lucretia's TrackThru
-%  %  function), if there were any tracking errors trying to access these
-%  %  parameters results in an error with the error output messages from the
-%  %  workers shown.
-%  for iw=DL.workers
-%    beamOut(iw)=T.beamOut{iw};
-%    trackStatus{iw}=T.trackStatus{iw};
-%    instrumentData(iw)=T.instrData{iw};
-%  end
-%
-% See also:
-%  TrackThru distributedLucretia
-%
-% Reference page in Help browser for list of accessible properties and
-% methods:
-%   <a href="matlab:doc Track">doc Track</a>
-%
-% Full lucretia documentation available online:
-%   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
+  % TRACK Lucretia beam tracking interface
+  %   Perform tracking, either singly or on distributed Lucretia interface
+  %   defined by optionally passed distributedLucretia object on construction
+  %
+  % Supports both asynchronous and synchronous parallel tracking (set in
+  % distributedLucretia class passed to this object upon creation)
+  %   - Asynchronous is slower to run than synchronous due to extra setup
+  %   time but the trackThru command returns immediately which is useful if
+  %   you want to process other commands serially whilst the parallel
+  %   tracking is being computed
+  %
+  % Contructor:
+  %   T=Track(InputBeam,distributedLucretiaObject)
+  %     Omit distributedLucretiaObject if using this object in a non-parallel
+  %     environment
+  %
+  % Main public methods (see doc help for details):
+  %   trackThru - main tracking method
+  %
+  % Example:
+  %  % Create a distributedLucretia object (choose synchronicity with
+  %    isasyn=true|false)
+  %  DL=distributedLucretia(isasyn)
+  %  % Create Track object with a Lucretia InputBeam
+  %  T=Track(InputBeam,DL) % Now set track indices, T.startInd,T.finishInd etc as desired
+  %  % Make any lattice changes
+  %  DL.latticeSyncVals(1).PS(53)=0.85;
+  %  DL.latticeSyncVals(2).PS(53)=0.85;
+  %  DL.PSTrim(53);
+  %  % Issue track command (sends tracking job to parallel worker nodes)
+  %  T.trackThru;
+  %  % Wait for results (if isasyn=true this is instantaneous and command is
+  %                      not necessary)
+  %  DL.asynWait
+  %  % Get results (the main output arguments from Lucretia's TrackThru
+  %  %  function), if there were any tracking errors trying to access these
+  %  %  parameters results in an error with the error output messages from the
+  %  %  workers shown.
+  %  for iw=DL.workers
+  %    beamOut(iw)=T.beamOut{iw};
+  %    trackStatus{iw}=T.trackStatus{iw};
+  %    instrumentData(iw)=T.instrData{iw};
+  %  end
+  %
+  % See also:
+  %  TrackThru distributedLucretia
+  %
+  % Reference page in Help browser for list of accessible properties and
+  % methods:
+  %   <a href="matlab:doc Track">doc Track</a>
+  %
+  % Full lucretia documentation available online:
+  %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
   properties
     startInd % Finish tracking index
     finishInd % Start tracking index
@@ -59,11 +59,11 @@ classdef Track < handle
     lastBunch=1; % last bunch to track (if multibunch)
     loopFlag=0; % loop over elements (0) or over bunches (1)
     beamType=0; % 0=all input beams the same, 1=possibly different beams for each worker
-    csrStoreData=false; % true: store Wakefield etc data at each CSR calculation point 
+    csrStoreData=false; % true: store Wakefield etc data at each CSR calculation point
     csrNbins=600; % number of histogram bins to use for CSR calculations
     verbose=0; % verbosity level (0= don't print anything, 1=print at each CSR integration step)
-    csrData
-    csrSmoothVal='robust';
+    csrData % Contains CSR data at each track point requiring CSR calculation if csrStoreData set true
+    csrSmoothVal=3; % Amount of smoothing to apply to charge distribution for CSR calculation (integer >=1)
   end
   properties(SetAccess=private)
     isDistrib % Is this Track object opererating in distributed mode?
@@ -218,7 +218,7 @@ classdef Track < handle
           obj.trackStatus=stat;
           obj.beamOut=beamout;
           obj.instrData=instdata;
-        end 
+        end
       else % local tracking
         % Check for CSR track flags
         indcsr=[];
@@ -230,7 +230,7 @@ classdef Track < handle
         % If wanting CSR treatment, stop at each CSR calculation point and
         % perturn BEAM energy before continuing (else just track)
         t0=clock;
-        if ~isempty(indcsr)
+        if ~isempty(indcsr) && length(obj.beamIn.Bunch.Q)>1000
           t1=obj.startInd;
           tempBeam=obj.beamIn;
           idataAccum=cell(1,3);
@@ -253,15 +253,14 @@ classdef Track < handle
                 t0=clock;
               end
             end
+            [pOut W dE z]=applyCSR(tempBeam.Bunch.x,tempBeam.Bunch.Q,obj.csrNbins,obj.csrSmoothVal,itrack,1);
+            tempBeam.Bunch.x(6,:)=pOut;
             if obj.csrStoreData
-              [tempBeam W dE z]=applyCSR(tempBeam,itrack,obj.csrNbins,obj.csrSmoothVal);
-              obj.csrData(end+1).W=W;
-              obj.csrData(end).dE=dE;
-              obj.csrData(end).z=z;
-              obj.csrData(end).beam=tempBeam;
-              obj.csrData(end).index=itrack;
-            else
-              tempBeam=applyCSR(tempBeam,itrack,obj.csrNbins,obj.csrSmoothVal);
+              obj.csrData(1+itrack-obj.startInd).W=W;
+              obj.csrData(1+itrack-obj.startInd).dE=dE;
+              obj.csrData(1+itrack-obj.startInd).z=z;
+              obj.csrData(1+itrack-obj.startInd).beam=tempBeam;
+              obj.csrData(1+itrack-obj.startInd).index=itrack;
             end
             t1=itrack+1;
             for id=1:length(instdata)
@@ -301,6 +300,20 @@ classdef Track < handle
         beam=trackBeamIn;
       end
       [stat beamout instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
+    end
+  end
+  
+  methods(Access=private)
+    function [bininds z Z ZSP]=doBinning(beamZ,nbin)
+      zmin=min(-beamZ);
+      zmax=max(-beamZ);
+      if zmin==zmax
+        error('Need some spread in z-distribution of bunch to compute CSR!')
+      end
+      z=linspace(zmin,zmax,nbin);
+      z=z-mean(z);
+      [count,bininds] = histc(-beamZ,z);
+      [Z ZSP]=meshgrid(z,z);
     end
   end
   

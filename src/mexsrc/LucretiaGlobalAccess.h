@@ -72,7 +72,7 @@ int GetnPS( ) ;
 
 /* return the total number of track flags an element has */
 
-int GetNumTrackFlags( elemno ) ;
+int GetNumTrackFlags( int elemno ) ;
 
 /* return the name and value of one tracking flag */
 
@@ -151,6 +151,8 @@ double GammaLog( double ) ;
 
 double GetMatrixNormalizer( double* ) ;
 
+/* Calculation and application of CSR wake */
 
+void GetCsrEloss(struct Bunch*, int, int, int )
 
 

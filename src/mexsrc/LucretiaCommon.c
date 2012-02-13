@@ -77,6 +77,8 @@
 	  ComputeTSRKicks
 	  AccumulateWFBinPositions
 	  ClearOldLRWFFreqKicks
+    XGPU2CPU
+    XCPU2GPU
 
 /* AUTH:  PT, 03-aug-2004 */
 /* MOD:
@@ -140,7 +142,7 @@
 /* File-scoped variables: */
 
 char LucretiaCommonVers[] = "LucretiaCommon Version = 02-August-2007" ;
-const Rmat Identity ={ 
+Rmat Identity ={ 
 						{1,0,0,0,0,0},
 						{0,1,0,0,0,0},
 						{0,0,1,0,0,0},
@@ -843,7 +845,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
 
       if (ReturnEach == 1)
 	  {
-		 RmatCopy(Relem,Reach.matrix+36*(count2-1) )  ;
+		  RmatCopy(Relem,Reach.matrix+36*(count2-1) )  ;
 	  }
 	  else if (PropagateTwiss == 0)
          RmatProduct(Relem,Rtot,Rtot) ;
@@ -1044,22 +1046,15 @@ egress:
 	int FirstSBPMElemno ;
 	int SBPMElemnoLastCall ;
 
-/* Here's some data which needs to be available to more than one
-   procedure, so to give it larger scope we put it here */
-
-/* pointers to coordinates of a given particle */
-
-	double *x, *px, *y, *py, *z, *p0 ;
-
-/* here's a vector of double** so that I can "pass" the entire particle
-   coord vector (as pointers) with a single argument */
-
-	double **PartAddress[6] ;
-
 /* here is a variable which needs to be seen by several functions, so 
    it has to have file scope */
 
 	int StoppedParticles ;
+/* if CUDA, then also make a copy of this variable on device memory */  
+#ifdef __CUDA_ARCH__  
+  int* StoppedParticles_gpu ;
+  cudaMalloc(&StoppedParticles_gpu, sizeof(int)) ;
+#endif  
 
 /*=====================================================================*/
 
@@ -1088,15 +1083,18 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 	int TrackStatus ;     /* status returned from functions */
 	int GlobalStatus = 1; /* overall status of this function */
 	int NewStopped = 0 ;
+  int trackIter*, iter, csrSmoothFactor* ;
 
 /* initialize the pointers to freq-domain wakefield data */
-
 	TLRFreqData    = NULL ;
 	TLRErrFreqData = NULL ;
 
 /* initialize StoppedParticles to the "none stopped" state */
 
 	StoppedParticles = 0 ;
+#ifdef __CUDA_ARCH__ 
+  cudaMemcpy(StoppedParticles_gpu, &StoppedParticles, sizeof(int), cudaMemcpyHostToDevice);
+#endif
 
 /* If the total number of elements in the beamline has not changed from
    the last call, AND the total number of bunches in the beam has not
@@ -1158,15 +1156,6 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 	TrackArgs->nINST = 0 ;
 	TrackArgs->nSBPM = 0 ;
 	maxNmode = 0 ;
-
-/* initialize the address vector */
-
-	PartAddress[0] = &x ;
-	PartAddress[1] = &px ;
-	PartAddress[2] = &y ;
-	PartAddress[3] = &py ;
-	PartAddress[4] = &z ; 
-	PartAddress[5] = &p0 ;
 
 	dS = 1 ;
 
@@ -1252,6 +1241,11 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 		goto egress ;
 	}
 
+/* Copy bunch data over to GPU */
+#ifdef __CUDA_ARCH__
+  XCPU2GPU( TrackArgs ) ;
+#endif  
+  
 /* without further ado, begin the two loops */
 
 	OuterLoop = OuterStart ;
@@ -1269,17 +1263,24 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
    variable (so that the message is only issued once).  Also update global
    status */
 
+#ifdef __CUDA_ARCH__ 
+      if (NewStopped != 1)
+        cudaMemcpy(&StoppedParticles, StoppedParticles_gpu, sizeof(int), cudaMemcpyDeviceToHost);
+#endif     
 			if (NewStopped != StoppedParticles)
 			{
 				GlobalStatus = -1 ;
 				AddMessage("Particles stopped during tracking",0) ;
 				NewStopped = StoppedParticles ;
 			}
-		
+
 /* if the bunch is out of good particles, issue a message, set a warning,
    and set a flag on the bunch indicating that the appropriate authorities
 	have been notified. */
-
+#ifdef __CUDA_ARCH__ 
+      cudaMemcpy(&TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray,
+        TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray_gpu, sizeof(int), cudaMemcpyDeviceToHost);
+#endif
 			if (TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray <=0)
 			{
 				if (TrackArgs->TheBeam->bunches[*BunchLoop]->StillTracking==1)
@@ -1321,7 +1322,6 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 									      changed from last loop execution */
 
 /* track this bunch through this element */
-
 			if (strcmp(ElemClass,"QUAD")==0)
 			{
 				TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop,
@@ -1349,8 +1349,41 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 			}
 			else if (strcmp(ElemClass,"SBEN")==0)
 			{
-				TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-					                     TrackArgs, TFlag ) ;
+        
+        /* If CSR track flag set:
+             If no Split flag, iterate through 50 times, else iterate the number of
+                times specified by the Split flag
+             The value of the CSR flag if >0 determines number of computation bins to use (min 10) */
+        GetCsrTrackFlags( TFlag, &trackIter, &csrSmoothFactor, 1 ) ;
+          
+        /* Track first split element with just upstream edge effects allowed */
+        if ( TFlag[Split]>0 || TFlag[CSR]>0 ) {
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
+					                     TrackArgs, TFlag, 1, 0, 1/( *trackIter + 2 )  ) ; 
+          /* Apply CSR if requested */
+          if (TFlag[CSR] > 0)
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], *csrSmoothFactor, *ElemLoop ) ;
+        }
+        /* Now track rest, if any, of the splits with neither edge effects allowed */
+        if ( trackIter > 0 ) {
+          for (iter = 0; iter < trackIter; i++) {
+            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
+					                     TrackArgs, TFlag, 0, 0, 1/( *trackIter + 2 )  ) ; 
+          /* Apply CSR if requested */
+          if (TFlag[CSR] > 0)
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], *csrSmoothFactor, *ElemLoop ) ;
+          
+        } /* If no splits or CSR requested, just track once as normal */
+        else if ( TFlag[Split]==0 && TFlag[CSR]==0 )
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
+					                     TrackArgs, TFlag, 1, 1, 1  ) ; 
+        /* If tracking split then track last split with downstream edge allowed only now */
+        if ( TFlag[Split]>0 || TFlag[CSR]>0 )
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
+					                     TrackArgs, TFlag, 0, 1, 1/( *trackIter + 2 )  ) ;
+        /* Apply CSR if requested */
+        if (TFlag[CSR] > 0)
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], *csrSmoothFactor, *ElemLoop ) ;
 
 /* since the SBend has momentum compaction, clear the wakefields
    which are available to the just-tracked bunch */
@@ -1425,12 +1458,25 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
    does the right thing */
 
 			{
-				XYExchange( TrackArgs->TheBeam->bunches[*BunchLoop] ) ;
+#ifdef __CUDA_ARCH__        
+				XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#else
+				XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif        
 				TrackStatus = 1 ; 
 			}
 			else /* default = drift */
 			{
-				TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag ) ;
+          
+        /* If CSR track flag set:
+             If no Split flag, iterate through 50 times, else iterate the number of
+                times specified by the Split flag
+             The value of the CSR flag if >0 determines number of computation bins to use (min 10) */
+        GetCsrTrackFlags( TFlag, &trackIter, &csrSmoothFactor, 2 ) ;
+          
+				TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1 / *trackIter ) ;
 			}
 
 /* latch non-unity status from the tracking procedures.  If a fatal
@@ -1447,7 +1493,13 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 /* the results of tracking are stored in the y data vector, whereas the
    original bunch is in the x data vector.  Exchange those now. */
 
-			XYExchange( TrackArgs->TheBeam->bunches[*BunchLoop] ) ;
+#ifdef __CUDA_ARCH__        
+		  XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+              TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#else
+			XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+              TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif    
 
 /* increment the inner loop counter and close the do loop */
 
@@ -1459,9 +1511,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 		OuterLoop += OuterStep ;
 
 	} while (OuterLoop != OuterStop+OuterStep) ;
+  
 
 egress:
 
+/* Copy GPU data over to CPU */
+#ifdef __CUDA_ARCH__
+  XGPU2CPU( TrackArgs ) ;
+#endif  
+  
 /* put the latched status back into TrackArgs */
 
 	TrackArgs->Status = GlobalStatus ;
@@ -1505,6 +1563,11 @@ egress:
 /* clear out the existing pascal matrix and factorial vector */
 
 	ClearMaxMultipoleStuff( ) ;
+  
+/* Clear GPU allocated memory */
+#ifdef __CUDA_ARCH__
+  cudaFree(StoppedParticles_gpu) ;
+#endif
 
 	return ;
 }
@@ -1523,14 +1586,13 @@ egress:
 
 int TrackBunchThruDrift( int elemno, int bunchno, 
 								 struct TrackArgsStruc* ArgStruc,
-								 int* TrackFlag )
+								 int* TrackFlag, double splitScale )
 {
 	double* L ;                  /* drift has only 2 pars of any */
 	int rayloop ;    
 	double dZmod ;               /* lorentz delay for P = Pmod */
 	double Lfull ;
 	struct Bunch* ThisBunch ;    /* a shortcut */
-	double dZdL ; 
 	double* Pmod ;
 
 /* get the length of the drift space */
@@ -1539,7 +1601,7 @@ int TrackBunchThruDrift( int elemno, int bunchno,
    if (L==NULL)
 	   Lfull = 0. ;
    else
-	   Lfull = *L ;
+	   Lfull = *L * splitScale ;
 
 /* get the design Lorentz delay */
 
@@ -1553,46 +1615,63 @@ int TrackBunchThruDrift( int elemno, int bunchno,
 /* since about half of the coordinate data in the "output" bunch
    is the same as the "input" bunch (px, py, p0), start by simply
 	exchanging the pointers of the input and output bunches */
+#ifdef __CUDA_ARCH__
+	XYExchange( &ThisBunch->x_gpu, &ThisBunch->y, ThisBunch->nray ) ;
+#else
+	XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
+#endif  
 
-	XYExchange( ThisBunch ) ;
-
-/* loop over rays */
-
-  for ( rayloop=0 ; 
-        rayloop<ThisBunch->nray ; 
-		  rayloop++ )
-	{
-
-/* if the bunch was previously stopped on an aperture, loop */
-
-		if (ThisBunch->stop[rayloop] != 0.) 
-			continue ;
-
-/* initialize the dZdL to zero */
-		
-		dZdL = 0. ;
-
-		if (TrackFlag[LorentzDelay] == 1)
-			dZdL += LORENTZ_DELAY(ThisBunch->y[6*rayloop+5]) - dZmod ;
-
-		if (TrackFlag[ZMotion] == 1)
-			dZdL += 0.5*(ThisBunch->y[6*rayloop+1] * ThisBunch->y[6*rayloop+1] +
-			             ThisBunch->y[6*rayloop+3] * ThisBunch->y[6*rayloop+3]   ) ;
-
-
-/* otherwise put in the change in x, y, z positions */
-
-		ThisBunch->y[6*rayloop]   += ThisBunch->y[6*rayloop+1] * Lfull ;
-		ThisBunch->y[6*rayloop+2] += ThisBunch->y[6*rayloop+3] * Lfull ;
-		ThisBunch->y[6*rayloop+4] += Lfull * dZdL ;
-
-	}
-
-/* and that's all there is to it. */
-
+/* execute ray tracking kernel (loop over rays) */
+#ifdef __CUDA_ARCH__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
+  TrackBunchThruDrift_kernel<<blocksPerGrid, threadsPerBlock>>(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop_gpu, TrackFlag, ThisBunch->nray);
+#else
+  for ( rayloop=0 ; rayloop<ThisBunch->nray ; rayloop++ )
+    TrackBunchThruDrift_kernel(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop, TrackFlag, rayloop);
+#endif
+  
    return 1;
 
 }
+
+/* The DRIFT tracking Kernels */
+
+#ifdef __CUDA_ARCH__
+__global__ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N)
+#else
+void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N)
+#endif
+{
+  
+  double dZdL=0 ; 
+  int i;
+          
+#ifdef __CUDA_ARCH__
+  i = blockDim.x * blockIdx.x + threadIdx.x ;
+  if ( i >= N ) return;
+#else
+  i = N;
+#endif
+  
+/* if the bunch was previously stopped on an aperture, loop */
+  if (stop[i] != 0.) return ;
+
+  if (TrackFlag[LorentzDelay] == 1)
+			dZdL += LORENTZ_DELAY(yb[6*i+5]) - *dZmod ;
+		
+  if (TrackFlag[ZMotion] == 1)
+			dZdL += 0.5*(yb[6*i+1] * yb[6*i+1] +
+			             yb[6*i+3] * yb[6*i+3]   ) ;
+
+/* otherwise put in the change in x, y, z positions */
+
+		yb[6*i]   += yb[6*i+1] * *Lfull ;
+		yb[6*i+2] += yb[6*i+3] * *Lfull ;
+		yb[6*i+4] += *Lfull * dZdL ;
+
+}
+
 
 /*=====================================================================*/
 
@@ -1619,26 +1698,16 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
 												 offset values */
 	double dZmod ;                 /* lorentz delay @ design momentum */
 	int PS ;
-	int ray,coord ;
-	int raystart ;               /* shortcut for 6*ray */
+	int ray ;              /* shortcut for 6*ray */
 	struct Bunch* ThisBunch ;    /* a shortcut */
-	Rmat Rquad ;                 /* quad linear map */
 	int Stop ;                   /* did the ray stop? */
-	double LastRayP = 0. ;
 	int stat = 1 ;
 	int skew ;
-	int icount ;
-	double TijkTransv[4][10] ;
-	double AngVecOctu[2] = {0,0} ;
-	double nPoleOctu = 3. ;
-	double SR_dP = 0. ;
-	double r ;
 	struct LucretiaParameter *ElemPar ;
 	int nPar ;
 
 /* get the element parameters from BEAMLINE; exit with bad status if
    parameters are missing or corrupted. */
-
 	if ( nPoleFlag != 0)
 	{
 		ElemPar = QuadPar ;
@@ -1755,222 +1824,264 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
    
 	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
 
-/* loop over rays in the bunch */
-
-	for (ray=0 ;ray<ThisBunch->nray ; ray++)
-	{
-		raystart = 6*ray ;
-
-/* if the ray was previously stopped copy it over */
-
-		if (ThisBunch->stop[ray] > 0.) 
-		{
-			for (coord=0 ; coord<6 ; coord++)
-				ThisBunch->y[raystart+coord] = ThisBunch->x[raystart+coord] ;
-
-			continue ;
-		}
-
-/* make ray coordinates into local ones, including offsets etc which
-   are demanded by the transformation structure. */
-
-	   GetLocalCoordPtrs(ThisBunch->x, raystart) ;
-
-		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ) ;
-		ThisBunch->y[raystart+4] = *z ;
-
-/* entrance-face aperture test, if requested */
-
-		if (TrackFlag[Aper] == 1)
-		{
-			Stop = CheckAperStopPart( ThisBunch,elemno,&aper2,ray,UPSTREAM,
-				                      NULL, 0 ) ;
-			if (Stop == 1)
-				continue ;
-		}
-
-/* Compute the SR momentum loss, if required, and apply 1/2 of the
-	loss here at the entry face of the element; as long as we're here,
-	check to see whether the particle has lost all of its momentum,
-	and if so stop it. */
-
-		if (TrackFlag[SynRad] > SR_None)
-		{
-			double rpow ;
-			r = sqrt(*x * *x + *y * *y) ;
-			rpow = r ;
-			if ( nPoleFlag >= 3 )
-				rpow *= r / 2 ; 
-			if ( nPoleFlag >= 4 ) 
-				rpow *= r / 3 ;
-			SR_dP = ComputeSRMomentumLoss( *p0,
-													 rpow*fabs(B), L, TrackFlag[SynRad] ) ;
-			ThisBunch->y[raystart+5] = *p0 - SR_dP ;
-			Stop = CheckP0StopPart( ThisBunch,elemno,ray,*p0-SR_dP, UPSTREAM ) ;
-			if (Stop == 1) 
-				continue ;
-			*p0 -= SR_dP / 2 ;
-		}
-		else
-			ThisBunch->y[raystart+5] = *p0 ; 
-
-/* now we switch on the element class which is being tracked through */
-
-		switch ( nPoleFlag ) 
-		{
-		case 0 : case 2 : /* solenoid or quadrupole */
-
-/* get the quad map */
-
-		  if (*p0 != LastRayP)
-		  {
-		   if (nPoleFlag == 2) 
-		    GetQuadMap( L, B, Tilt, ThisBunch->x[raystart+5], Rquad, T5xxQuad ) ;
-			else
-		    GetSolenoidMap( L, B, ThisBunch->x[raystart+5], Rquad, T5xxQuad ) ;
-		  }
-		  LastRayP = *p0 ;
-
-/* perform the matrix transformation; since we know that the quad has
-   no 5j or 6j terms, just do the 4x4 multiplication */
-
-
-		  ThisBunch->y[raystart]   = *x*Rquad[0][0] + *px * Rquad[0][1] ;
-		  ThisBunch->y[raystart+1] = *x*Rquad[1][0] + *px * Rquad[1][1] ; 
-		  ThisBunch->y[raystart+2] = *y*Rquad[2][2] + *py * Rquad[2][3] ;
-		  ThisBunch->y[raystart+3] = *y*Rquad[3][2] + *py * Rquad[3][3] ;
-
-		  if (skew==1)
-		  {
-			  ThisBunch->y[raystart]   += *y*Rquad[0][2] + *py * Rquad[0][3] ;
-			  ThisBunch->y[raystart+1] += *y*Rquad[1][2] + *py * Rquad[1][3] ;
-			  ThisBunch->y[raystart+2] += *x*Rquad[2][0] + *px * Rquad[2][1] ;
-			  ThisBunch->y[raystart+3] += *x*Rquad[3][0] + *px * Rquad[3][1] ;
-		  }
-
-
-/* now for the 5xx terms */
-	      if (TrackFlag[ZMotion] == 1)
-		    ThisBunch->y[raystart+4] += 
-	 	     T5xxQuad[0] * ThisBunch->x[raystart+0] * ThisBunch->x[raystart+0]
-	+	     T5xxQuad[1] * ThisBunch->x[raystart+0] * ThisBunch->x[raystart+1]
-	+	     T5xxQuad[2] * ThisBunch->x[raystart+0] * ThisBunch->x[raystart+2]
-	+	     T5xxQuad[3] * ThisBunch->x[raystart+0] * ThisBunch->x[raystart+3]
-	+	     T5xxQuad[4] * ThisBunch->x[raystart+1] * ThisBunch->x[raystart+1]
-	+	     T5xxQuad[5] * ThisBunch->x[raystart+1] * ThisBunch->x[raystart+2]
-	+	     T5xxQuad[6] * ThisBunch->x[raystart+1] * ThisBunch->x[raystart+3]
-	+	     T5xxQuad[7] * ThisBunch->x[raystart+2] * ThisBunch->x[raystart+2]
-	+	     T5xxQuad[8] * ThisBunch->x[raystart+2] * ThisBunch->x[raystart+3]
-	+	     T5xxQuad[9] * ThisBunch->x[raystart+3] * ThisBunch->x[raystart+3]
-	;
-
-
-		  break ; /* end of quad operations */
-
-		case 3:   /* sextupole */
-
-		  if (*p0 != LastRayP)
-		    GetSextMap( L, B, Tilt, ThisBunch->x[raystart+5], 
-			 TijkTransv ) ;
-		  LastRayP = *p0 ;
-
-/* perform transverse propagation */
-
-		  ThisBunch->y[raystart  ] = *x + L * *px ;
-		  ThisBunch->y[raystart+1] = *px ;
-		  ThisBunch->y[raystart+2] = *y + L * *py ;
-		  ThisBunch->y[raystart+3] = *py ;
-
-		  for (icount=0 ; icount<2 ; icount++)
-		  {
-			  ThisBunch->y[raystart+icount] +=
-				 TijkTransv[icount][0] * *x  * *x  + 
-				 TijkTransv[icount][1] * *x  * *px + 
-				 TijkTransv[icount][4] * *px * *px + 
-				 TijkTransv[icount][7] * *y  * *y  + 
-				 TijkTransv[icount][8] * *y  * *py + 
-				 TijkTransv[icount][9] * *py * *py   ;
-
-			  ThisBunch->y[raystart+icount+2] +=
-				 TijkTransv[icount+2][2] * *x  * *y  + 
-				 TijkTransv[icount+2][3] * *x  * *py + 
-				 TijkTransv[icount+2][5] * *px * *y  + 
-				 TijkTransv[icount+2][6] * *px * *py   ;
-
-			  if (skew == 1)
-			  {
-			    ThisBunch->y[raystart+icount] +=
-				  TijkTransv[icount][2] * *x  * *y  + 
-				  TijkTransv[icount][3] * *x  * *py + 
-				  TijkTransv[icount][5] * *px * *y  + 
-				  TijkTransv[icount][6] * *px * *py   ;
-
-			    ThisBunch->y[raystart+icount+2] +=
-				  TijkTransv[icount+2][0] * *x  * *x  + 
-				  TijkTransv[icount+2][1] * *x  * *px + 
-				  TijkTransv[icount+2][4] * *px * *px + 
-				  TijkTransv[icount+2][7] * *y  * *y  + 
-				  TijkTransv[icount+2][8] * *y  * *py + 
-				  TijkTransv[icount+2][9] * *py * *py   ;
-			  }
-		  }
-
-
-				  
-/* longitudinal propagation */
-
-	      if (TrackFlag[ZMotion] == 1)
-		    ThisBunch->y[raystart+4] += 0.5*L*( *px * *px + *py * *py ) ;
-		  
-/*		  ThisBunch->y[raystart+5] = ThisBunch->x[raystart+5] ; */
-
-		  break ;
-
-		case 4: /* octupole -- handled as a special case of the thin-lens
-				   multipole, with SR disabled */
-
-		  PropagateRayThruMult( L, &B, &Tilt, &nPoleOctu, 1, AngVecOctu, 
-			                    1.0, 0.0, 
-									  &(ThisBunch->x[raystart]), 
-									  &(ThisBunch->y[raystart]), 
-									  TrackFlag[ZMotion], SR_None, 0,
-									  ThisBunch, elemno, ray ) ;
-		  break ;
-		}
-
-/* no matter what kind of element, perform Lorentz delay if requested */
-
-/*		ThisBunch->y[raystart+5] = ThisBunch->x[raystart+5] ; */
-		if (TrackFlag[LorentzDelay] == 1)
-		  ThisBunch->y[raystart+4] += L*(LORENTZ_DELAY(LastRayP) - dZmod) ;
-		    
-/* exit-face aperture test, if requested */
-
-		if (TrackFlag[Aper] == 1)
-		{
-			Stop = CheckAperStopPart( ThisBunch,elemno,&aper2,ray,DOWNSTREAM,
-				                      NULL, 0 ) ;
-			if (Stop == 1)
-				continue ;
-		}
-
-/* undo the coordinate transformations */
-
-	   GetLocalCoordPtrs(ThisBunch->y, raystart) ;
-
-		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, dZmod ) ;
-
-/* check amplitude of outgoing angular momentum */
-
-		Stop = CheckPperpStopPart( ThisBunch, elemno, ray, 
-			                        px, py ) ;
-
-	}
+/* execute ray tracking kernel (loop over rays) */
+#ifdef __CUDA_ARCH__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
+  TrackBunchThruQSOS_kernel<<blocksPerGrid, threadsPerBlock>>(ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->y, ThisBunch->x_gpu, TrackFlag,
+         ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms, dZmod ) ;
+#else
+  for (ray=0 ;ray<ThisBunch->nray ; ray++)
+    TrackBunchThruQSOS_kernel(ray, ThisBunch->stop, ThisBunch->y, ThisBunch->x, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, nPoleFlag,
+            B, L, Tilt, skew, Xfrms, dZmod) ;
+#endif  
 
 egress:
 
 	return stat;
  
+}
+
+
+/* Quad, Sext, Octu, Solenoid Tracking kernel */
+#ifdef __CUDA_ARCH__
+__global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod)
+#else
+void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,
+        double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod)
+#endif
+{
+  int ray,coord,raystart,doStop,icount ;
+  double *x, *px, *y, *py, *z, *p0 ;
+  double SR_dP = 0. ;
+  Rmat Rquad ;                 /* quad linear map */
+  double T5xx[10] ;
+#ifndef __CUDA_ARCH__  
+  double LastRayP = 0. ;
+#endif
+  double TijkTransv[4][10] ;
+  double nPoleOctu = 3. ;
+  double AngVecOctu[2] = {0,0} ;
+  double r ;
+          
+  #ifdef __CUDA_ARCH__
+    ray = blockDim.x * blockIdx.x + threadIdx.x ;
+    if ( ray >= nray ) return;
+  #else
+    ray = nray;
+  #endif
+  raystart = 6*ray ;
+  
+/* if the ray was previously stopped just copy it over */
+
+  if (stop[ray] > 0.) 
+  {
+    for (coord=0 ; coord<6 ; coord++) {
+      yb[raystart+coord] = xb[raystart+coord] ;
+      return ; }
+  }
+
+/* make ray coordinates into local ones, including offsets etc which
+ are demanded by the transformation structure. */
+ 
+  GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
+  ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
+  
+  yb[raystart+4] = *z ;
+
+/* entrance-face aperture test, if requested */
+
+  if (TrackFlag[Aper] == 1)
+  {
+    doStop = CheckAperStopPart( xb, yb, stop, ngoodray,elemno,&aper2,ray,UPSTREAM,
+                            NULL, 0 ) ;
+    if (doStop == 1)
+      return ;
+  }
+
+/* Compute the SR momentum loss, if required, and apply 1/2 of the
+loss here at the entry face of the element; as long as we're here,
+check to see whether the particle has lost all of its momentum,
+and if so stop it. */
+
+  if (TrackFlag[SynRad] > SR_None)
+  {
+    double rpow ;
+    r = sqrt(*x * *x + *y * *y) ;
+    rpow = r ;
+    if ( nPoleFlag >= 3 )
+      rpow *= r / 2 ; 
+    if ( nPoleFlag >= 4 ) 
+      rpow *= r / 3 ;
+    SR_dP = ComputeSRMomentumLoss( *p0,
+                         rpow*fabs(B), L, TrackFlag[SynRad] ) ;
+    yb[raystart+5] = *p0 - SR_dP ;
+    doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM ) ;
+    if (doStop == 1) 
+      return ;
+    *p0 -= SR_dP / 2 ;
+  }
+  else
+    yb[raystart+5] = *p0 ; 
+
+/* now we switch on the element class which is being tracked through */
+
+  switch ( nPoleFlag ) 
+  {
+  case 0 : case 2 : /* solenoid or quadrupole */
+
+/* get the quad map */
+#ifndef __CUDA_ARCH__
+    if (*p0 != LastRayP)
+    {
+#endif  
+     if (nPoleFlag == 2) 
+      GetQuadMap( L, B, Tilt, xb[raystart+5], Rquad, T5xx ) ;
+    else
+      GetSolenoidMap( L, B, xb[raystart+5], Rquad, T5xx ) ;
+#ifndef __CUDA_ARCH     
+    }
+    LastRayP = *p0 ;
+#endif    
+
+/* perform the matrix transformation; since we know that the quad has
+ no 5j or 6j terms, just do the 4x4 multiplication */
+
+
+    yb[raystart]   = *x*Rquad[0][0] + *px * Rquad[0][1] ;
+    yb[raystart+1] = *x*Rquad[1][0] + *px * Rquad[1][1] ; 
+    yb[raystart+2] = *y*Rquad[2][2] + *py * Rquad[2][3] ;
+    yb[raystart+3] = *y*Rquad[3][2] + *py * Rquad[3][3] ;
+
+    if (skew==1)
+    {
+      yb[raystart]   += *y*Rquad[0][2] + *py * Rquad[0][3] ;
+      yb[raystart+1] += *y*Rquad[1][2] + *py * Rquad[1][3] ;
+      yb[raystart+2] += *x*Rquad[2][0] + *px * Rquad[2][1] ;
+      yb[raystart+3] += *x*Rquad[3][0] + *px * Rquad[3][1] ;
+    }
+
+
+/* now for the 5xx terms */
+      if (TrackFlag[ZMotion] == 1)
+      yb[raystart+4] += 
+       T5xx[0] * xb[raystart+0] * xb[raystart+0]
++	     T5xx[1] * xb[raystart+0] * xb[raystart+1]
++	     T5xx[2] * xb[raystart+0] * xb[raystart+2]
++	     T5xx[3] * xb[raystart+0] * xb[raystart+3]
++	     T5xx[4] * xb[raystart+1] * xb[raystart+1]
++	     T5xx[5] * xb[raystart+1] * xb[raystart+2]
++	     T5xx[6] * xb[raystart+1] * xb[raystart+3]
++	     T5xx[7] * xb[raystart+2] * xb[raystart+2]
++	     T5xx[8] * xb[raystart+2] * xb[raystart+3]
++	     T5xx[9] * xb[raystart+3] * xb[raystart+3]
+;
+
+
+    break ; /* end of quad operations */
+
+  case 3:   /* sextupole */
+#ifndef __CUDA_ARCH__
+    if (*p0 != LastRayP)
+#endif      
+      GetSextMap( L, B, Tilt, xb[raystart+5], 
+     TijkTransv ) ;
+#ifndef __CUDA_ARCH__
+    LastRayP = *p0 ;
+#endif
+
+/* perform transverse propagation */
+
+    yb[raystart  ] = *x + L * *px ;
+    yb[raystart+1] = *px ;
+    yb[raystart+2] = *y + L * *py ;
+    yb[raystart+3] = *py ;
+
+    for (icount=0 ; icount<2 ; icount++)
+    {
+      yb[raystart+icount] +=
+       TijkTransv[icount][0] * *x  * *x  + 
+       TijkTransv[icount][1] * *x  * *px + 
+       TijkTransv[icount][4] * *px * *px + 
+       TijkTransv[icount][7] * *y  * *y  + 
+       TijkTransv[icount][8] * *y  * *py + 
+       TijkTransv[icount][9] * *py * *py   ;
+
+      yb[raystart+icount+2] +=
+       TijkTransv[icount+2][2] * *x  * *y  + 
+       TijkTransv[icount+2][3] * *x  * *py + 
+       TijkTransv[icount+2][5] * *px * *y  + 
+       TijkTransv[icount+2][6] * *px * *py   ;
+
+      if (skew == 1)
+      {
+        yb[raystart+icount] +=
+        TijkTransv[icount][2] * *x  * *y  + 
+        TijkTransv[icount][3] * *x  * *py + 
+        TijkTransv[icount][5] * *px * *y  + 
+        TijkTransv[icount][6] * *px * *py   ;
+
+        yb[raystart+icount+2] +=
+        TijkTransv[icount+2][0] * *x  * *x  + 
+        TijkTransv[icount+2][1] * *x  * *px + 
+        TijkTransv[icount+2][4] * *px * *px + 
+        TijkTransv[icount+2][7] * *y  * *y  + 
+        TijkTransv[icount+2][8] * *y  * *py + 
+        TijkTransv[icount+2][9] * *py * *py   ;
+      }
+    }
+
+
+
+/* longitudinal propagation */
+
+      if (TrackFlag[ZMotion] == 1)
+      yb[raystart+4] += 0.5*L*( *px * *px + *py * *py ) ;
+
+/*		  yb[raystart+5] = xb[raystart+5] ; */
+
+    break ;
+
+  case 4: /* octupole -- handled as a special case of the thin-lens
+         multipole, with SR disabled */
+
+    PropagateRayThruMult( L, &B, &Tilt, &nPoleOctu, 1, AngVecOctu, 
+                        1.0, 0.0, 
+                  &(xb[raystart]), 
+                  &(yb[raystart]), 
+                  TrackFlag[ZMotion], SR_None, 0,
+                  stop,ngoodray,xb,yb, elemno, ray ) ;
+    break ;
+  }
+
+/* no matter what kind of element, perform Lorentz delay if requested */
+
+/*		yb[raystart+5] = xb[raystart+5] ; */
+  if (TrackFlag[LorentzDelay] == 1)
+    yb[raystart+4] += L*(LORENTZ_DELAY(*p0) - dZmod) ;
+
+/* exit-face aperture test, if requested */
+
+  if (TrackFlag[Aper] == 1)
+  {
+    doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,DOWNSTREAM,
+                            NULL, 0 ) ;
+    if (doStop == 1)
+      return ;
+  }
+
+/* undo the coordinate transformations */
+
+   GetLocalCoordPtrs(yb, raystart,&x,&px,&y,&py,&z,&p0) ;
+
+  ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, dZmod,x,px,y,py,z,p0 ) ;
+
+/* check amplitude of outgoing angular momentum */
+
+  doStop = CheckPperpStopPart( stop, ngoodray , elemno, ray, 
+                            px, py ) ;
+
 }
 
 /*=====================================================================*/
@@ -1997,8 +2108,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
 												 offset values */
 	double dZmod ;                 /* lorentz delay @ design momentum */
 	int PS ;
-	int ray,coord ;
-	int raystart ;               /* shortcut for 6*ray */
+	int ray ;                    /* shortcut for 6*ray */
 	struct Bunch* ThisBunch ;    /* a shortcut */
 	int Stop ;                   /* did the ray stop? */
 	int pole ;
@@ -2130,41 +2240,73 @@ int TrackBunchThruMult( int elemno, int bunchno,
 /* make a shortcut to get to the bunch of interest */
    
 	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  
+/* execute ray tracking kernel (loop over rays) */
+#ifdef __CUDA_ARCH__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
+  TrackBunchThruMult_kernel<<blocksPerGrid, threadsPerBlock>>( ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->x_gpu, ThisBunch->y, TrackFlag,
+          ThisBunch->ngoodray_gpu, elmno, aper2, L, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
+            MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod) ;
+#else
+  for (ray=0 ;ray<ThisBunch->nray ; ray++)
+    TrackBunchThruMult_kernel( ray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, L,
+            MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
+            MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod) ;
+#endif  
 
-/* loop over rays in the bunch */
+egress:
 
-	for (ray=0 ;ray<ThisBunch->nray ; ray++)
-	{
-		raystart = 6*ray ;
+	return stat;
+ 
+}
+#ifdef __CUDA_ARCH__
+__global__ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double MultBValue, double MultTiltValue, double MultPoleIndex, int MultPoleIndexLength,
+        double MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod)
+#else
+void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray, int elemno, double aper2,
+        double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength, double* MultAngleValue,
+        double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod)
+#endif
+{   
+    int ray, raystart, coord, doStop ;
+    double *x, *px, *y, *py, *z, *p0 ;
+#ifdef __CUDA_ARCH__
+    ray = blockDim.x * blockIdx.x + threadIdx.x ;
+    if ( ray >= nray ) return;
+#else
+    ray = nray;
+#endif
+    raystart = 6*ray ;
 
 /* if the ray was previously stopped copy it over */
 
-		if (ThisBunch->stop[ray] > 0.) 
+		if (stop[ray] > 0.) 
 		{
 			for (coord=0 ; coord<6 ; coord++)
-				ThisBunch->y[raystart+coord] = ThisBunch->x[raystart+coord] ;
-
-			continue ;
+				yb[raystart+coord] = xb[raystart+coord] ;
+			return ;
 		}
 
 /* make ray coordinates into local ones, including offsets etc which
    are demanded by the transformation structure. */
 
-	   GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+	  GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
+    
+		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
 
-		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ) ;
-
-		ThisBunch->y[raystart+4] = *z ;
-		ThisBunch->y[raystart+5] = *p0 ;
+		yb[raystart+4] = *z ;
+		yb[raystart+5] = *p0 ;
 
 /* entrance-face aperture test, if requested */
 
 		if (TrackFlag[Aper] == 1)
 		{
-			Stop = CheckAperStopPart( ThisBunch,elemno,&aper2,ray,UPSTREAM,
+			doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,UPSTREAM,
 				                      NULL, 0 ) ;
-			if (Stop == 1)
-				continue ;
+			if (doStop == 1)
+				return ;
 		}
 
 /* Propagate through, and perform SR energy loss within the multipole
@@ -2173,50 +2315,43 @@ int TrackBunchThruMult( int elemno, int bunchno,
 
 /*		ThisBunch->y[raystart+4] = ThisBunch->x[raystart+4] ; */
 		PropagateRayThruMult( L,
-			                  MultPar[MultB].ValuePtr, 
-						      MultPar[MultTilt].ValuePtr,
-							  MultPar[MultPoleIndex].ValuePtr,
-							  MultPar[MultPoleIndex].Length,
-							  MultPar[MultAngle].ValuePtr,
+			                  MultBValue, 
+						      MultTiltValue,
+							  MultPoleIndex,
+							  MultPoleIndexLength,
+							  MultAngleValue,
 							  dB, Tilt, 
-							  &(ThisBunch->x[raystart]), 
-							  &(ThisBunch->y[raystart]),
+							  &(xb[raystart]), 
+							  &(yb[raystart]),
 							  TrackFlag[ZMotion], 
-							  TrackFlag[SynRad], Lrad, ThisBunch,
+							  TrackFlag[SynRad], Lrad,stop,ngoodray,xb,yb,
 							  elemno, ray ) ;
+    
 		if (TrackFlag[LorentzDelay] == 1)
-		  ThisBunch->y[raystart+4] += L*(LORENTZ_DELAY((*p0)) - dZmod) ;
-/*		ThisBunch->y[raystart+5] = ThisBunch->x[raystart+5] ; */
-
+		  yb[raystart+4] += L*(LORENTZ_DELAY((*p0)) - dZmod) ;
+  		/*yb[raystart+5] = xb[raystart+5] ;*/
 
 /* exit-face aperture test, if requested */
 
 		if (TrackFlag[Aper] == 1)
 		{
-			Stop = CheckAperStopPart( ThisBunch,elemno,&aper2,ray,DOWNSTREAM,
+			doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,DOWNSTREAM,
 				                      NULL, 0 ) ;
-			if (Stop == 1)
-				continue ;
+			if (doStop == 1)
+				return ;
 		}
 
 /* undo the coordinate transformations */
 
-	   GetLocalCoordPtrs(ThisBunch->y, raystart) ;
+	   GetLocalCoordPtrs(yb, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, dZmod ) ;
+		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, dZmod,x,px,y,py,z,p0 ) ;
 
 /* check amplitude of outgoing angular momentum */
-
-		Stop = CheckPperpStopPart( ThisBunch, elemno, ray, 
-			                        px, py ) ;
-
-	}
-
-egress:
-
-	return stat;
- 
+    
+		doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py ) ;
 }
+
 
 /*=====================================================================*/
 
@@ -2235,7 +2370,7 @@ egress:
 
 int TrackBunchThruSBend( int elemno, int bunchno, 
 								 struct TrackArgsStruc* ArgStruc,
-								 int* TrackFlag )
+								 int* TrackFlag, double splitScale, int supEdgeEffect1, int supEdgeEffect2 )
 {
 
 	double L,Tilt ;                /* some basic parameters */
@@ -2253,21 +2388,19 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 												 offset values */
 	double dZmod ;                 /* lorentz delay @ design momentum */
 	int PS, PS2 ;
-	int ray,coord ;
-	int raystart ;               /* shortcut for 6*ray */
+	int ray ;              /* shortcut for 6*ray */
 	struct Bunch* ThisBunch ;    /* a shortcut */
-	Rmat Rface1, Rface2, Rbody ; /* linear maps */
-	double T5xx1[10], T5xx2[10], T5xxbody[10] ; /* 2nd order maps */
 	int Stop ;                   /* did the ray stop? */
-	double LastRayP = 0. ;
-	double ctemp ;
+	
+	
 	int QuadLoopCount ;
 	int stat = 1 ;
 	int FirstCall = 1 ;
 	double TijkTransv[4][10] ;
 	double OffsetFromTiltError ;
 	double AngleFromTiltError ;
-	double SR_dP = 0 ;
+	
+  
 
 /* get the element parameters from BEAMLINE; exit with bad status if
 	parameters are missing or corrupted. */
@@ -2280,7 +2413,7 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 		goto egress ;
 	}
 
-	L = GetDBValue(SBendPar+SBendL) ;
+	L = GetDBValue(SBendPar+SBendL) * splitScale ;
 	if (L<=0)
 	{
 		BadElementMessage( elemno+1 ) ;
@@ -2288,14 +2421,14 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 		goto egress ;
 	}
 
-	intB = GetDBValue(SBendPar+SBendB) ;
+	intB = GetDBValue(SBendPar+SBendB) * splitScale ;
 	if (SBendPar[SBendB].Length > 1)
-		intG = *(SBendPar[SBendB].ValuePtr+1) ;
+		intG = *(SBendPar[SBendB].ValuePtr+1) * splitScale ;
 	else
 		intG = 0. ;
 
-	Theta = GetDBValue(SBendPar+SBendAngle) ;
-	dZmod = GetDesignLorentzDelay( SBendPar[SBendP].ValuePtr ) ; 
+	Theta = GetDBValue(SBendPar+SBendAngle) * splitScale ;
+	dZmod = GetDesignLorentzDelay( SBendPar[SBendP].ValuePtr ) * splitScale ; 
 	Tilt = GetDBValue(SBendPar+SBendTilt) ;
 
 	E1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),0) ;
@@ -2313,8 +2446,8 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 	hgap  = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),0) ;
 	hgapx = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),1) ;
 
-	fint  = GetSpecialSBendPar(&(SBendPar[SBendFINT]),0) ;
-	fintx = GetSpecialSBendPar(&(SBendPar[SBendFINT]),1) ;
+	fint  = GetSpecialSBendPar(&(SBendPar[SBendFINT]),0) * supEdgeEffect1 ;
+	fintx = GetSpecialSBendPar(&(SBendPar[SBendFINT]),1) * supEdgeEffect2 ;
 	hgap2 = hgap * hgap ;
 	hgapx2 = hgapx * hgapx ;
 	
@@ -2424,29 +2557,73 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 /* make a shortcut to get to the bunch of interest */
    
 	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  
+/* execute ray tracking kernel (loop over rays) */
+#ifdef __CUDA_ARCH__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
+  TrackBunchThruSBend_kernel<<blocksPerGrid, threadsPerBlock>>( ThisBunch->nray, ThisBunch->x_gpu, ThisBunch->y, ThisBunch->stop_gpu,
+          TrackFlag, Xfrms, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
+          elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2) ;
+#else
+  for (ray=0 ;ray<ThisBunch->nray ; ray++)
+    TrackBunchThruSBend_kernel(ray, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, Xfrms, cTT, sTT, Tx, Ty, 
+            OffsetFromTiltError, AngleFromTiltError, &ThisBunch->ngoodray, hgap2, intB, intG, L, elemno, E1, H1, hgap, fint, Theta,
+            E2, H2, hgapx, fintx, hgapx2) ;
+#endif  
 
-/* loop over rays in the bunch */
+egress:
 
-	for (ray=0 ;ray<ThisBunch->nray ; ray++)
-	{
+	return stat;
+ 
+}
 
-		raystart = 6*ray ;
+#ifdef __CUDA_ARCH__
+__global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
+        double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
+        double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
+        double H2, double hgapx, double fintx, double hgapx2)
+#else
+void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
+        double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
+        double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
+        double H2, double hgapx, double fintx, double hgapx2)
+#endif
+{
+    int ray, coord, doStop, raystart ;
+    double ctemp ;
+    double SR_dP = 0 ;
+    double *x, *px, *y, *py, *z, *p0 ;
+#ifndef __CUDA_ARCH__    
+    double LastRayP = 0. ;
+#endif
+    Rmat Rface1, Rface2, Rbody ; /* linear maps */
+    double T5xx1[10], T5xx2[10], T5xxbody[10] ; /* 2nd order maps */
+    
+#ifdef __CUDA_ARCH__
+    ray = blockDim.x * blockIdx.x + threadIdx.x ;
+    if ( ray >= nray ) return;
+#else
+    ray = nray;
+#endif
+    
+    raystart = 6*ray ;
 
 /* if the ray was previously stopped copy it over */
 
-		if (ThisBunch->stop[ray] > 0.) 
+		if (stop[ray] > 0.) 
 		{
 			for (coord=0 ; coord<6 ; coord++)
-				ThisBunch->y[raystart+coord] = ThisBunch->x[raystart+coord] ;
-			continue ;
+				yb[raystart+coord] = xb[raystart+coord] ;
+			return ;
 		}
 
 /* make ray coordinates into local ones, including offsets etc which
    are demanded by the transformation structure. */
 
-	   GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+	   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ) ;
+		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
 
 /* rotate particles into the coordinate frame of the magnet.  Note that the
    offsets are performed first, indicating that both rotation and translation
@@ -2464,13 +2641,13 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 
 		if (TrackFlag[Aper] == 1)
 		{
-			Stop = CheckAperStopPart( ThisBunch,elemno,&hgap2,ray,UPSTREAM,
+			doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&hgap2,ray,UPSTREAM,
 				                      NULL, 0 ) ;
-			if (Stop == 1)
-				continue ;
+			if (doStop == 1)
+				return ;
 		}
 
-		ThisBunch->y[raystart+5] = *p0 ;
+		yb[raystart+5] = *p0 ;
 
 /* Compute the SR momentum loss, if required, and apply 1/2 of the
 	loss here at the entry face of the element; as long as we're here,
@@ -2485,59 +2662,58 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 			Beff = sqrt(Bx*Bx + By*By) ;
 			SR_dP = ComputeSRMomentumLoss( *p0,
 													 Beff, L, TrackFlag[SynRad] ) ;
-			Stop = CheckP0StopPart( ThisBunch,elemno,ray,*p0-SR_dP, UPSTREAM ) ;
-			if (Stop == 1) 
-				continue ;
+			doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM ) ;
+			if (doStop == 1) 
+				return ;
 			*p0 -= SR_dP / 2 ;
 		}
 
 /* entrance face transformation : */
-
+#ifndef __CUDA_ARCH__
 		if (*p0 != LastRayP)
+#endif      
 			GetBendFringeMap( L, intB, intG, *p0, E1, H1, 
 			                  hgap, fint, 1., Rface1, T5xx1 ) ;
 
 /* make use of the fact that the map is rather sparse */
 
-		ThisBunch->y[raystart] = (*x) + T5xx1[0] * (*x) * (*x) 
+		yb[raystart] = (*x) + T5xx1[0] * (*x) * (*x) 
 			                          + T5xx1[1] * (*y) * (*y) ;
-		ThisBunch->y[raystart+1] = Rface1[1][0] * (*x) + (*px) 
+		yb[raystart+1] = Rface1[1][0] * (*x) + (*px) 
 			                          + T5xx1[2] * (*x) * (*x) 
 									  + T5xx1[3] * (*x) * (*px)
 									  + T5xx1[4] * (*y) * (*y) 
 									  + T5xx1[5] * (*y) * (*py) ;
-		ThisBunch->y[raystart+2] = (*y) + T5xx1[6] * (*x) * (*y) ;
-		ThisBunch->y[raystart+3] = Rface1[3][2] * (*y) + (*py) 
+		yb[raystart+2] = (*y) + T5xx1[6] * (*x) * (*y) ;
+		yb[raystart+3] = Rface1[3][2] * (*y) + (*py) 
 			                          + T5xx1[7] * (*x) * (*y) 
 									  + T5xx1[8] * (*x) * (*py)
 									  + T5xx1[9] * (*px) * (*y) ;
-		ThisBunch->y[raystart+4] = *z ;
-		ThisBunch->y[raystart+5] = *p0 ;
+		yb[raystart+4] = *z ;
+		yb[raystart+5] = *p0 ;
 
 /* exchange x and y */
-
-		XYExchange( ThisBunch ) ;
+		XYExchange( &xb, &yb, nray ) ;
 
 /* reassign the pointers to the "new" x  */
-
-	   GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+    GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
 
 /* now for the body:   */
-
+#ifndef __CUDA_ARCH__
 		if (*p0 != LastRayP)
-
+#endif
 			GetLucretiaSBendMap( L, Theta, intB, intG, *p0, Rbody, T5xxbody ) ; 
 
 /* apply the map; since we rotated the coordinates, we know that the cross-plane 
    terms of the map are zero and can be neglected */
 
-		ThisBunch->y[raystart] = *x*Rbody[0][0] + *px * Rbody[0][1]  
+		yb[raystart] = *x*Rbody[0][0] + *px * Rbody[0][1]  
 							   + Rbody[0][5] ;
-		ThisBunch->y[raystart+1] = *x*Rbody[1][0] + *px * Rbody[1][1] 
+		yb[raystart+1] = *x*Rbody[1][0] + *px * Rbody[1][1] 
 								 + Rbody[1][5] ;
-		ThisBunch->y[raystart+2] = *y*Rbody[2][2] + *py * Rbody[2][3] ; 
-		ThisBunch->y[raystart+3] = *y*Rbody[3][2] + *py * Rbody[3][3] ;
-		ThisBunch->y[raystart+4] = *z + *x * Rbody[4][0] + *px * Rbody[4][1] 
+		yb[raystart+2] = *y*Rbody[2][2] + *py * Rbody[2][3] ; 
+		yb[raystart+3] = *y*Rbody[3][2] + *py * Rbody[3][3] ;
+		yb[raystart+4] = *z + *x * Rbody[4][0] + *px * Rbody[4][1] 
 				                 + Rbody[4][5] 
 								 + (*x) * (*x) * T5xxbody[0]
 								 + (*x) * (*px) * T5xxbody[1]
@@ -2545,93 +2721,88 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 								 + (*y) * (*y) * T5xxbody[3]
 								 + (*y) * (*py) * T5xxbody[4]
 								 + (*py) * (*py) * T5xxbody[5] ;
-		ThisBunch->y[raystart+5] = *p0 ;
+		yb[raystart+5] = *p0 ;
 
 /* now we have to do the coordinate exchange again */
-
-		XYExchange( ThisBunch ) ;
-		GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+		XYExchange( &xb, &yb, nray ) ;
+		GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
 
 /* exit-face map */
-
+#ifndef __CUDA_ARCH__
 		if (*p0 != LastRayP)
+#endif      
 			GetBendFringeMap( L, intB, intG, *p0, E2, H2, 
 			                  hgapx, fintx, -1., Rface2, T5xx2 ) ;
 
 /* make use of the fact that the map is rather sparse */
 
-		ThisBunch->y[raystart] = (*x) + T5xx2[0] * (*x) * (*x) 
+		yb[raystart] = (*x) + T5xx2[0] * (*x) * (*x) 
 			                          + T5xx2[1] * (*y) * (*y) ;
-		ThisBunch->y[raystart+1] = Rface2[1][0] * (*x) + (*px) 
+		yb[raystart+1] = Rface2[1][0] * (*x) + (*px) 
 			                          + T5xx2[2] * (*x) * (*x) 
 									  + T5xx2[3] * (*x) * (*px)
 									  + T5xx2[4] * (*y) * (*y) 
 									  + T5xx2[5] * (*y) * (*py) ;
-		ThisBunch->y[raystart+2] = (*y) + T5xx2[6] * (*x) * (*y) ;
-		ThisBunch->y[raystart+3] = Rface2[3][2] * (*y) + (*py) 
+		yb[raystart+2] = (*y) + T5xx2[6] * (*x) * (*y) ;
+		yb[raystart+3] = Rface2[3][2] * (*y) + (*py) 
 			                          + T5xx2[7] * (*x) * (*y) 
 									  + T5xx2[8] * (*x) * (*py)
 									  + T5xx2[9] * (*px) * (*y) ;
-		ThisBunch->y[raystart+4] = *z ;
-		ThisBunch->y[raystart+5] = *p0 ;
+		yb[raystart+4] = *z ;
+		yb[raystart+5] = *p0 ;
 
 /* preserve the current momentum */
-
+#ifndef __CUDA_ARCH__
 		LastRayP = *p0 ;
+#endif
 
 /* exit-face aperture test, if requested */
 
 		if (TrackFlag[Aper] == 1)
 		{
-			Stop = CheckAperStopPart( ThisBunch,elemno,&hgapx2,ray,DOWNSTREAM,
+			doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&hgapx2,ray,DOWNSTREAM,
 				                      NULL, 0 ) ;
-			if (Stop == 1)
-				continue ;
+			if (doStop == 1)
+				return ;
 		}
 
 /* apply the 2nd half of SR eloss here */
 
-		ThisBunch->y[raystart+5] -= SR_dP / 2 ;
+		yb[raystart+5] -= SR_dP / 2 ;
 
 /* undo the coordinate rotations */
 
-		ctemp = ThisBunch->y[raystart] ;
-		ThisBunch->y[raystart] = ThisBunch->y[raystart] * cTT 
-			                    - ThisBunch->y[raystart+2] * sTT ;
-		ThisBunch->y[raystart+2] = ThisBunch->y[raystart+2] * cTT 
+		ctemp = yb[raystart] ;
+		yb[raystart] = yb[raystart] * cTT 
+			                    - yb[raystart+2] * sTT ;
+		yb[raystart+2] = yb[raystart+2] * cTT 
 			                      + ctemp * sTT ;
-		ctemp = ThisBunch->y[raystart+1] ;
-		ThisBunch->y[raystart+1] = ThisBunch->y[raystart+1] * cTT 
-			                      - ThisBunch->y[raystart+3] * sTT ;
-		ThisBunch->y[raystart+3] = ThisBunch->y[raystart+3] * cTT 
+		ctemp = yb[raystart+1] ;
+		yb[raystart+1] = yb[raystart+1] * cTT 
+			                      - yb[raystart+3] * sTT ;
+		yb[raystart+3] = yb[raystart+3] * cTT 
 			                      + ctemp * sTT ;
 
 /* undo the coordinate transformations */
 
-	   GetLocalCoordPtrs(ThisBunch->y, raystart) ;
+	   GetLocalCoordPtrs(yb, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0 ) ;
+		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
 
 /* if the bend magnet has an error rotation, this will cause a deflection of the
    beam wrt the design coordinate axis.  Apply this deflection now */
 
-		ThisBunch->y[raystart] += Tx * OffsetFromTiltError ;
-		ThisBunch->y[raystart+1] += Tx * AngleFromTiltError ;
-		ThisBunch->y[raystart+2] += Ty * OffsetFromTiltError ;
-		ThisBunch->y[raystart+3] += Ty * AngleFromTiltError ;
+		yb[raystart] += Tx * OffsetFromTiltError ;
+		yb[raystart+1] += Tx * AngleFromTiltError ;
+		yb[raystart+2] += Ty * OffsetFromTiltError ;
+		yb[raystart+3] += Ty * AngleFromTiltError ;
 
 /* finally, if the transverse momentum has gotten too high, stop the particle */
 
-		Stop = CheckPperpStopPart( ThisBunch, elemno, ray, px, py ) ;
+		doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py ) ;
 
-	}
-
-egress:
-
-	return stat;
- 
-}
-
+}    
+    
 /*=====================================================================*/
 
 /* Perform tracking of one bunch through one RF structure, including
@@ -2694,6 +2865,8 @@ int TrackBunchThruRF( int elemno, int bunchno,
 	static double* Lfrac = NULL ;
 	int TWFSliceno ;
 	int slicecount ;
+  
+  double *x, *px, *y, *py, *z, *p0 ;
 
 /* Pointer which allows us to re-use most of this code for either LCAV or
    TCAV */
@@ -2960,7 +3133,7 @@ int TrackBunchThruRF( int elemno, int bunchno,
 /* make ray coordinates into local ones, including offsets etc which
    are demanded by the transformation structure. */
 
-			GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+			GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
 			Q = &(ThisBunch->Q[ray]) ;
 
 /* if this is the first slice, transform the ray coords to the reference
@@ -2969,13 +3142,13 @@ int TrackBunchThruRF( int elemno, int bunchno,
 			if ( slicecount==0 )
 			{
 
-				ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ) ;
+				ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
 
 /* entrance-face aperture test, if requested */
 
 				if (TrackFlag[Aper] == 1)
 				{
-					Stop = CheckAperStopPart( ThisBunch,elemno,&aper2,ray,UPSTREAM,
+					Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray,elemno,&aper2,ray,UPSTREAM,
 				                      NULL, 0 ) ;
 					if (Stop == 1)
 						continue ;
@@ -3037,7 +3210,7 @@ int TrackBunchThruRF( int elemno, int bunchno,
 
 /* if the exit-momentum is < 0, stop the particle */
 
-			Stop = CheckP0StopPart( ThisBunch, elemno, ray, 
+			Stop = CheckP0StopPart( ThisBunch->stop,&ThisBunch->ngoodray,ThisBunch->x,ThisBunch->y, elemno, ray, 
 				ThisBunch->y[raystart+5], DOWNSTREAM ) ;
 			if (Stop != 0)
 				continue ;
@@ -3118,7 +3291,7 @@ int TrackBunchThruRF( int elemno, int bunchno,
 
 				if (TrackFlag[Aper] == 1)
 				{
-					Stop = CheckAperStopPart( ThisBunch,elemno,&aper2,ray,DOWNSTREAM,
+					Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray,elemno,&aper2,ray,DOWNSTREAM,
 				                      NULL, 0 ) ;
 					if (Stop == 1)
 						continue ;
@@ -3126,13 +3299,13 @@ int TrackBunchThruRF( int elemno, int bunchno,
 
 /* undo the coordinate transformations */
 
-				GetLocalCoordPtrs(ThisBunch->y, raystart) ;
+				GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-				ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0 ) ;
+				ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
 
 /* check amplitude of outgoing angular momentum */
 
-				Stop = CheckPperpStopPart( ThisBunch, elemno, ray, 
+				Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray, elemno, ray, 
 			                              px, py ) ;
 			}
 			
@@ -3142,8 +3315,8 @@ int TrackBunchThruRF( int elemno, int bunchno,
    that the next slice starts tracking the output coords of this slice */
 
 		if (slicecount < nslice-1)
-		{
-			XYExchange( ThisBunch ) ;
+		{      
+			XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
 		}
 
 /* if this slice was an SBPM slice, update the inner SBPM counter */
@@ -4019,7 +4192,7 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
 													 TrackFlag[SynRad]   ) ;
 			SR_dP /= 2 ;
 			ThisBunch->y[raystart+5]  -= SR_dP ;
-			Stop = CheckP0StopPart(ThisBunch,elemno,ray,
+			Stop = CheckP0StopPart(ThisBunch->stop,&ThisBunch->ngoodray,ThisBunch->x,ThisBunch->y,elemno,ray,
 				ThisBunch->y[raystart+5]-SR_dP, UPSTREAM) ;
 			if (Stop != 0)
 				continue ;
@@ -4045,7 +4218,7 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
 
 /* check amplitude of outgoing angular momentum */
 
-		Stop = CheckPperpStopPart( ThisBunch, elemno, ray, 
+		Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray , elemno, ray, 
 			                        ThisBunch->y+raystart+1, 
 											ThisBunch->y+raystart+3 ) ;
 	}
@@ -4080,6 +4253,8 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
 	int Stop ;
 	double Tilt ;  
 	int ray, raystart ;
+  
+  double *x, *px, *y, *py, *z, *p0 ;
 
 /* get the element parameters from BEAMLINE; exit with bad status if
    any parameters are missing or corrupted. */
@@ -4149,11 +4324,11 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
 /* make ray coordinates into local ones, including offsets etc which
    are demanded by the transformation structure. */
 
-	    GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+	    GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ) ;
+		ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
 
-		Stop = CheckAperStopPart( ThisBunch, elemno, aper2, ray,
+		Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray, elemno, aper2, ray,
 			                      UPSTREAM, &shape, Tilt ) ;
 	  }
 
@@ -4183,14 +4358,14 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
 /* make ray coordinates into local ones, including offsets etc which
    are demanded by the transformation structure. */
 
-	    GetLocalCoordPtrs(ThisBunch->y, raystart) ;
+	    GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-		Stop = CheckAperStopPart( ThisBunch, elemno, aper2, ray,
+		Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray, elemno, aper2, ray,
 			                      DOWNSTREAM, &shape, Tilt ) ;
 		if (Stop == 1)
 			continue ;
 
-		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0 ) ;
+		ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
 
 	  }
 
@@ -4219,6 +4394,8 @@ int TrackBunchThruCoord( int elemno, int bunchno,
 	double dx[6] ;
 	double x1, y1 ;
 	int Stop ;
+  
+  double *x, *px, *y, *py, *z, *p0 ;
 
 /* get the element parameters from BEAMLINE; exit with bad status if
    any parameters are missing or corrupted. */
@@ -4258,7 +4435,7 @@ int TrackBunchThruCoord( int elemno, int bunchno,
 
 /* make ray coordinates into local ones */
 
-	   GetLocalCoordPtrs(ThisBunch->x, raystart) ;
+	   GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
 
 /* make transformed coordinates from original coordinates */
 
@@ -4281,9 +4458,9 @@ int TrackBunchThruCoord( int elemno, int bunchno,
    of the particles are now going perpendicular to the new coordinate
 	axes, if so stop them now. */
 
-	   GetLocalCoordPtrs(ThisBunch->y, raystart) ;
+	   GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
 
-		Stop = CheckPperpStopPart( ThisBunch, elemno, ray, 
+		Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray, elemno, ray, 
 			                        px, py ) ;
 		if (Stop != 0)
 			BadParticlePperpMessage( elemno+1, bunchno+1, ray+1 ) ;
@@ -4312,7 +4489,7 @@ egress:
 /* ABORT: never.
 /* FAIL:  never.                                               */
 
-void RmatCopy( const Rmat Rsource, Rmat Rtarget ) 
+void RmatCopy( Rmat Rsource, Rmat Rtarget ) 
 {
 	int i,j ;
    for (i=0 ; i<6 ; i++){
@@ -4336,7 +4513,7 @@ void RmatCopy( const Rmat Rsource, Rmat Rtarget )
 
 
 
-void RmatProduct( const Rmat Rlate, const Rmat Rearly, Rmat Rprod ) 
+void RmatProduct( Rmat Rlate, Rmat Rearly, Rmat Rprod ) 
 {
    Rmat Rtemp = {
 		{0, 0, 0, 0, 0, 0},
@@ -4453,7 +4630,7 @@ egress:
 /* ABORT:  never.
 /* FAIL:   never. */
 
-int CheckAperStopPart( struct Bunch* ThisBunch, 
+int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray,
 							  int elemno, 
 							  double* aper2, 
 							  int ray, int UpstreamDownstream,
@@ -4468,9 +4645,9 @@ int CheckAperStopPart( struct Bunch* ThisBunch,
    particle positions), otherwise at y (post-tracking positions) */
 
 	if (UpstreamDownstream == UPSTREAM)
-		posvec = ThisBunch->x ;
+		posvec = x ;
 	else
-		posvec = ThisBunch->y ;
+		posvec = y ;
 
 /* check the position */
 
@@ -4499,12 +4676,15 @@ int CheckAperStopPart( struct Bunch* ThisBunch,
 
 /* set the stopping point in the ThisBunch->stop vector */
 
-		ThisBunch->stop[ray] = (double)(elemno+1)  ; /* in Matlab indexing */
-		ThisBunch->ngoodray-- ;
+		stop[ray] = (double)(elemno+1)  ; /* in Matlab indexing */
+		*ngoodray-- ;
 
 /* set the global stopped-particle variable */
-
+#ifdef __CUDA_ARCH__
+    StoppedParticles_gpu = 1 ;
+#else
 		StoppedParticles = 1 ;
+#endif
 
 /* if we are doing the upstream face, copy the ray from input to output
    vector */
@@ -4512,7 +4692,7 @@ int CheckAperStopPart( struct Bunch* ThisBunch,
 		if (UpstreamDownstream == UPSTREAM)
 		{
 			for (i=6*ray ; i<6*ray+5 ; i++) 
-				ThisBunch->y[i] = ThisBunch->x[i] ;
+				y[i] = x[i] ;
 		}
 	}
 
@@ -4529,16 +4709,20 @@ int CheckAperStopPart( struct Bunch* ThisBunch,
 /* ABORT:  never.
 /* FAIL:   never. */
 
-int CheckP0StopPart( struct Bunch* TheBunch, int elemno, 
+int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int elemno, 
 						   int rayno, double P0, int upstreamdownstream )
 {
 	int stat = 0, i ;
 	if (P0 <= 0.)
 	{
 		stat = 1 ;
-		TheBunch->stop[rayno] = (double)(elemno+1) ;
-		TheBunch->ngoodray-- ;
+		stop[rayno] = (double)(elemno+1) ;
+		ngoodray-- ;
+#ifdef __CUDA_ARCH__
+    StoppedParticles_gpu = 1 ;
+#else
 		StoppedParticles = 1 ;
+#endif
 
 /* If the check is done on the upstream face, copy the
    x, px, y, py, z coordinates from x to y (ie, we want to preserve
@@ -4548,8 +4732,8 @@ int CheckP0StopPart( struct Bunch* TheBunch, int elemno,
 		if (upstreamdownstream == UPSTREAM)
 		{
 		  for (i=6*rayno ; i<6*rayno+4 ; i++) 
-			TheBunch->y[i] = TheBunch->x[i] ;
-		  TheBunch->y[6*rayno+5] = P0 ;
+			y[i] = x[i] ;
+		  y[6*rayno+5] = P0 ;
 		}
 
 	}
@@ -4565,7 +4749,7 @@ int CheckP0StopPart( struct Bunch* TheBunch, int elemno,
 /* ABORT:  never.
 /* FAIL:   never. */
 
-int CheckPperpStopPart( struct Bunch* TheBunch, int elemno, 
+int CheckPperpStopPart( double* stop, int* ngoodray, int elemno, 
 						   int rayno, double* Px, double* Py )
 {
 	int stat = 0 ;
@@ -4575,9 +4759,13 @@ int CheckPperpStopPart( struct Bunch* TheBunch, int elemno,
 	if (Pperp >= 1.)
 	{
 		stat = 1 ;
-		TheBunch->stop[rayno] = (double)(elemno+1) ;
-		TheBunch->ngoodray-- ;
+		stop[rayno] = (double)(elemno+1) ;
+		ngoodray-- ;
+#ifdef __CUDA_ARCH__    
+    StoppedParticles_gpu = 1 ;
+#else
 		StoppedParticles = 1 ;
+#endif
 	}
 	return stat ;
 }
@@ -5099,19 +5287,19 @@ egress :
 /* FAIL:   never. */
 
 void ApplyTotalXfrm( double Xfrms[6][2], int face, int* TrackFlag, 
-						   double dzmod )
+						   double dzmod, double *x, double *px, double *y, double *py, double *z, double *p0 )
 {
 
 /* The pointers to the particle coordinates have global scope, thus
    are not passed as arguments.  Are we on the upstream or downstream
 	face? */
-
 	if (face == UPSTREAM)
 	{
 		(*x)  += Xfrms[4][0] * (*px) - Xfrms[0][0] ;
 		(*px) -= Xfrms[1][0] ;
 		(*y)  += Xfrms[4][0] * (*py) - Xfrms[2][0] ;
 		(*py) -= Xfrms[3][0] ;
+    
 		if (TrackFlag[ZMotion] == 1)
 			(*z) += 0.5 * Xfrms[4][0] *
 			     ( (*px) * (*px) + (*py) * (*py) )
@@ -5978,18 +6166,78 @@ double GetDesignLorentzDelay( double* pmod )
 /* RET:    None.
 /* ABORT:  never.
 /* FAIL:   never. */
-
-void XYExchange( struct Bunch* TheBunch )
+void XYExchange( double** xb, double** yb, int nray )
 {
 	double* temp ;
-
-	temp = TheBunch->x ;
-	TheBunch->x = TheBunch->y ;
-	TheBunch->y = temp ;
+  
+/* If using GPU, swap x_gpu and y */  
+#ifdef __CUDA_ARCH__
+  cudaMalloc(&temp, 6*nray*sizeof(double)) ;
+  cudaMemcpy(temp, *xb, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
+  cudaMemcpy(*xb, *yb, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
+  cudaMemcpy(*yb, temp, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
+  cudaFree(temp) ;
+#else  
+	temp = *xb ;
+	*xb = *yb ;
+	*yb = temp ;
+#endif  
 
 	return ;
 
 }
+
+
+/*=====================================================================*/
+
+/* Copy required data from CPU memory to GPU memory*/
+
+/* RET:    None.
+/* ABORT:  never.
+/* FAIL:   never. */
+#ifdef __CUDA_ARCH__
+void XCPU2GPU( struct TrackArgsStruc* ArgStruc )
+{
+  int i ;
+  for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
+  {
+    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x_gpu, ArgStruc->TheBeam->bunches[i]->x,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q_gpu, ArgStruc->TheBeam->bunches[i]->Q,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop_gpu, ArgStruc->TheBeam->bunches[i]->stop,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+  }
+	return ;
+
+}
+#endif
+
+/*=====================================================================*/
+
+/* Copy required data from GPU memory to CPU memory*/
+
+/* RET:    None.
+/* ABORT:  never.
+/* FAIL:   never. */
+
+#ifdef __CUDA_ARCH__
+void XGPU2CPU( struct TrackArgsStruc* ArgStruc )
+{
+  int i ;
+	for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
+  {
+	  cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x, ArgStruc->TheBeam->bunches[i]->x_gpu,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
+    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q, ArgStruc->TheBeam->bunches[i]->Q_gpu,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
+    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop, ArgStruc->TheBeam->bunches[i]->stop_gpu,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;   
+  }
+	return ;
+
+}
+#endif
 
 /*=====================================================================*/
 
@@ -6029,7 +6277,7 @@ int InitialMomentumCheck( struct TrackArgsStruc *TrackArgs )
 			if (TheBunch->stop[RayLoop] == 0)
 			{
 				stop = 0 ;
-				stop = CheckP0StopPart( TheBunch, 0, RayLoop, 
+				stop = CheckP0StopPart( TheBunch->stop,&TheBunch->ngoodray,TheBunch->x,TheBunch->y, 0, RayLoop, 
 												TheBunch->x[6*RayLoop+5], UPSTREAM ) ;
 				if (stop != 0)
 					BadParticleMomentumMessage( 0, BunchLoop+1, RayLoop+1 ) ;
@@ -6037,7 +6285,7 @@ int InitialMomentumCheck( struct TrackArgsStruc *TrackArgs )
 				{	
 					px = &(TheBunch->x[6*RayLoop+1]) ;
 					py = &(TheBunch->x[6*RayLoop+3]) ;
-					stop = CheckPperpStopPart( TheBunch, 0, RayLoop, px, py ) ;
+					stop = CheckPperpStopPart( TheBunch->stop, &TheBunch->ngoodray, 0, RayLoop, px, py ) ;
 					if (stop != 0)
 						BadParticlePperpMessage( 0, BunchLoop+1, RayLoop+1 ) ;
 				}
@@ -6060,14 +6308,14 @@ int InitialMomentumCheck( struct TrackArgsStruc *TrackArgs )
 /* ABORT:  never.
 /* FAIL:   If selected rayno > # of rays in the data vector */
 
-void GetLocalCoordPtrs( double coordvec[], int raystart )
+void GetLocalCoordPtrs( double coordvec[], int raystart, double** x, double** px,double** y,double** py,double** z,double** p0 )
 {
-	x  = &(coordvec[raystart]  ) ;
-	px = &(coordvec[raystart+1]) ;
-	y  = &(coordvec[raystart+2]) ;
-	py = &(coordvec[raystart+3]) ;
-	z  = &(coordvec[raystart+4]) ;
-	p0 = &(coordvec[raystart+5]) ;
+	*x  = &(coordvec[raystart]  ) ;
+	*px = &(coordvec[raystart+1]) ;
+	*y  = &(coordvec[raystart+2]) ;
+	*py = &(coordvec[raystart+3]) ;
+	*z  = &(coordvec[raystart+4]) ;
+	*p0 = &(coordvec[raystart+5]) ;
 
 }
 
@@ -8013,3 +8261,40 @@ void AccumulateWFBinPositions( double* binx, double* biny, int binno,
 	return ;
 
 }
+
+/*=====================================================================*/
+
+/* deal with CSR tracking flags */
+
+int GetCsrTrackFlags( int elemNo, int* TFlag, int* trackIter, int* csrSmoothFactor, int class ) ;
+static double* dsL=NULL ;
+static double usL=-1 ;
+
+if ( TFlag[Split] > 0 )
+  if ( TFlag[Split] < 2 ) {
+    TFlag[Split] = 2 ;
+    *trackIter=TFlag[Split]-2;
+  }
+  else {
+  if ( TFlag[CSR] > 0 )
+    *trackIter=48;
+  else
+    *trackIter=0;
+  }
+
+/* Default smooth factor if not supplied is 3 */
+if ( TFlag[CSR] > 0 && TFlag[CSR_SmoothFactor] == 0 )
+  *csrSmoothFactor = 3 ;
+else
+  *csrSmoothFactor = TFlag[CSR_SmoothFactor] ;
+
+/* Min nbins is 10 */
+if ( TFlag[CSR] > 0 && TFlag[CSR] < 10 )
+  TFlag[CSR] = 10 ;
+
+/* If class==1, then SBEN and we are done */
+if ( class == 1 )
+  return 0 ;
+
+/* Otherwise this is a downstream element- find relevent split lengths from last bend */
+
