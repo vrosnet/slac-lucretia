@@ -8,12 +8,13 @@ Beam=lattice;
 % ============
 T=Track(Beam);
 T.verbose=0;
-T.csrStoreData=true;
+T.csrStoreData=false;
 
 % ===========
 % Number of bins to use when histogramming for CSR
 % ===========
 T.csrNbins=600;
+T.csrSmoothVal=2;
 
 % Beam tracking
 T.trackThru;

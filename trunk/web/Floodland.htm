@@ -23,7 +23,7 @@ Project</span><br>
 </div>
 <span style="font-size: 24pt;"><br>
 <small>Floodland<br />
-	<em>(a work in progress!)</em><br>
+	<em>(a work in progress)</em><br>
 <br>
 </small></span><br>
 <div style="text-align: left;">
@@ -103,6 +103,76 @@ Project</span><br>
 	this is just a name. It comes from the name of the album the song &quot;Lucretia 
 	my Reflection&quot; which inspired the name of this software package came from by 
 	the group &quot;The Sister&#39;s of Mercy&quot;.<br />
+	<h3>Floodland</h3>
+	The class <strong>Floodland</strong> is the central object you will use in 
+	dealing when simulating or carrying out hardware access commands. It 
+	contains properties with details about high-level definitions with 
+	information about the accelerator you are interfacing with and also 
+	simulation data about the beam types used in the simulation of the 
+	accelerator. This class works in conjunction with the regular Lucretia 
+	setup, you should first define the usual BEAMLINE,PS,GIRDER,KLYSTRON 
+	structures, the input beam conditions and define Lucretia beams for tracking 
+	etc. Then instantiate this class as your central definition of the 
+	accelerator you will be interfacing with. The instantiated object is passed 
+	by reference to other Floodland classes and functions and defines how they 
+	work (e.g. whether to simulate accelerator responses or to actually try to 
+	communicate with a real control system). It also contains the methods for 
+	simulating or actually getting data from control system variables.<br />
+	<br />
+	<strong>Constructor:</strong><br />
+	<br />
+&nbsp;&nbsp;&nbsp; FL = <strong>Floodland</strong>( 
+	exptName,latticeName,latticeDate,Initial)<br />
+	<br />
+	exptName: string describing experiment associated with this object<br />
+	latticeName: name describing lattice associated with this object<br />
+	latticeDate: lattice date tag (any supported Matlab date format)<br />
+	Initial: Lucretia Initial structure<br />
+	<br />
+	<strong>Main Public Methods:</strong><br />
+	<br />
+&nbsp;&nbsp;&nbsp; FL.<strong>hwGet</strong>( indxObj [,getList] )<br />
+	<br />
+	Read hardware channels into Lucretia<br />
+	indxObj: <strong>FlIndex</strong> object or an object that inherits from 
+	this class<br />
+	getList: (optional) [vector] Only get these elements of the provided indxObj<br />
+	<br />
+&nbsp;&nbsp;&nbsp; FL.<strong>hwSet</strong>( indxObj [,putList] )<br />
+	<br />
+	Trim hardware channels to values in SetPt<br />
+	indxObj: <strong>FlIndex</strong> object or an object that inherits from 
+	this<br />
+	% class<br />
+	% putList: (optional) [double vector] Only set these elements of<br />
+	% the provided indxOnj<br />
+	<br />
+	properties<br />
+	expt % Experiment name to associate with this object<br />
+	Initial % Lucretia Initial beam structure<br />
+	BeamSingle % Single ray<br />
+	BeamMacro % Macro-particle beam<br />
+	BeamSparse % Sparse beam<br />
+	Twiss % Lattice twiss parameters (generated from Initial beam structure)<br />
+	Nmacro=1000; % Number of macro-particles in BeamMacro type<br />
+	beamSigmaCut=3; % Number of sigmas to cut when generating Macro-particle 
+	beam<br />
+	sparse_Nslice=31; % Number of longitudinal slices per beam for sparse 
+	tracking<br />
+	sparse_Nener=11; % Number of energies per slice for sparse beam tracking<br />
+	issim=true; % Simulation switch, if true tracking and hardware get/put 
+	simulated else the control system is accessed<br />
+	repRate=10; % repetition rate of machine<br />
+	latticeName % Name of lattice associated with this Floodland instance<br />
+	latticeDate % Date of lattice, datenum format<br />
+	magTrimStyle=&#39;PTRB&#39;; % PTRB or TRIM (implemented by low level controls)<br />
+	timezone % hours east GMT (set by constructor)<br />
+	end<br />
+	properties(Access=private)<br />
+	seed % random number seed<br />
+	slices % BEAMLINE element slices<br />
+	blocks % BEAMLINE element blocks<br />
+	end<br />
 <br>
 	<a
  href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>

@@ -63,7 +63,7 @@ void GetLcavMap( double, double, double, double, double,
 
 void PropagateRayThruMult( double, double*, double*, double*, int, double*,
 						   double, double, double*, double*, int, int, double,
-							struct Bunch*, int, int ) ;
+							double*, int*, double*, double*, int, int ) ;
 
 /* emulation of the MAD transport map for a sector bend */
 

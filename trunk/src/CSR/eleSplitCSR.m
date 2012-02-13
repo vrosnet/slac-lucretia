@@ -56,7 +56,7 @@ while iele<=length(BEAMLINE)
         BEAMLINE=[BEAMLINE(1:magInd(imag)+magid-1); newBL'; BEAMLINE(magInd(imag)+magid+1:end)];
       elseif magInd(imag)==1
         BEAMLINE=[newBL'; BEAMLINE(2:end)];
-      elseif (magnInd(imag)+1+magid)==length(BEAMLINE)
+      elseif (magInd(imag)+1+magid)==length(BEAMLINE)
         BEAMLINE=[BEAMLINE(1:magInd(imag)+magid-1); newBL'];
       end
       magid=magid+length(newBL)-1;

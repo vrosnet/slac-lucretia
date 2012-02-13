@@ -128,6 +128,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	else
 	{
 		DidTracking = 1 ; 
+    
 		TrackThruMain( TrackArgs ) ;
 		ClearPLHSVars( ) ;
 		if ( TrackArgs->Status == 2 )
@@ -149,10 +150,10 @@ egress:
    GetCheckArgs and the SetReturn functions, so put them outside of the
 	function block definitions */
 
-static char* BeamFieldName[] = {           /* 2 field names */
+const char* BeamFieldName[] = {           /* 2 field names */
 		"BunchInterval","Bunch" 
 	} ;
-static char* BunchFieldName[] = {          /* 3 field names */
+const char* BunchFieldName[] = {          /* 3 field names */
 		"x", "Q", "stop"
 	};
 
@@ -477,9 +478,22 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
 			TheBeam.bunches[i]->ngoodray = npart ;
 			mxSetField(newBunchField,j,BunchFieldName[0],
 				        mxDuplicateArray(x)               ) ;
-			TheBeam.bunches[i]->x = mxGetPr(mxGetField(newBunchField,j,
+			/* If using GPU, then make an additional copy of the bits of the bunch
+         data that get regularly used in tracking in the GPU memory*/
+      TheBeam.bunches[i]->x = mxGetPr(mxGetField(newBunchField,j,
 				                                        BunchFieldName[0])) ;
-			TheBeam.bunches[i]->y = mxMalloc(6*npart*sizeof(double)) ;
+#ifdef __CUDA_ARCH__
+      cudaMalloc(&TheBeam.bunches[i]->x_gpu, 6*npart*sizeof(double)) ;
+      cudaMemcpy(TheBeam.bunches[i]->x_gpu, TheBeam.bunches[i]->x, 6*npart*sizeof(double), cudaMemcpyHostToDevice) ;
+      cudaMalloc(&TheBeam.bunches[i]->Q_gpu, 6*npart*sizeof(double)) ;
+      cudaMalloc(&TheBeam.bunches[i]->stop_gpu, 6*npart*sizeof(double)) ;
+      cudaMalloc(&TheBeam.bunches[i]->y, 6*npart*sizeof(double)) ;
+      cudaMemcpy(TheBeam.bunches[i]->y, TheBeam.bunches[i]->x, 6*npart*sizeof(double), cudaMemcpyHostToDevice) ;
+      cudaMalloc(&TheBeam.bunches[i]->ngoodray_gpu, sizeof(int)) ;
+      cudaMemcpy(TheBeam.bunches[i]->ngoodray_gpu, TheBeam.bunches[i]->ngoodray, sizeof(int), cudaMemcpyHostToDevice) ;
+#else
+      TheBeam.bunches[i]->y = mxMalloc(6*npart*sizeof(double)) ;
+#endif
 			if (nWakes[0] > 0)
 			{
 				TheBeam.bunches[i]->ZSR = mxMalloc(nWakes[0]*sizeof(struct SRWF*)) ;
@@ -525,7 +539,10 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
 				        mxDuplicateArray(q)               ) ;
 			TheBeam.bunches[i]->Q = mxGetPr(mxGetField(newBunchField,j,
 				                                        BunchFieldName[1])) ;
-
+      /* copy to GPU device memory */
+#ifdef __CUDA_ARCH__      
+      cudaMemcpy(TheBeam.bunches[i]->Q_gpu, TheBeam.bunches[i]->Q, 6*npart*sizeof(double), cudaMemcpyHostToDevice) ;
+#endif      
 			stop=mxGetField(BunchField,i,BunchFieldName[2]) ;
 			if ( (mxGetM(stop)!=1)     || 
 				  (mxGetN(stop)!=npart) ||
@@ -535,6 +552,11 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
 				        mxDuplicateArray(stop)               ) ;
 			TheBeam.bunches[i]->stop = mxGetPr(mxGetField(newBunchField,j,
 				                                        BunchFieldName[2])) ;
+      /* copy to GPU device memory */
+#ifdef __CUDA_ARCH__      
+      cudaMemcpy(TheBeam.bunches[i]->stop_gpu, TheBeam.bunches[i]->stop, 6*npart*sizeof(double), cudaMemcpyHostToDevice) ;
+#endif
+      
 			for (sCount=0 ; sCount<TheBeam.bunches[i]->nray ; sCount++)
 				if (TheBeam.bunches[i]->stop[sCount] != 0)
 					TheBeam.bunches[i]->ngoodray-- ;
@@ -905,7 +927,15 @@ egress:
 
 	  for (i = TrackArgs->FirstBunch-1 ; i < TrackArgs->LastBunch ; i++)
 		{
-			mxFree( TrackArgs->TheBeam->bunches[i]->y ) ;
+#ifdef __CUDA_ARCH__      
+      cudaFree( TrackArgs->TheBeam->bunches[i]->x_gpu ) ;
+      cudaFree( TrackArgs->TheBeam->bunches[i]->Q_gpu ) ;
+      cudaFree( TrackArgs->TheBeam->bunches[i]->stop_gpu ) ;
+      cudaFree( TrackArgs->TheBeam->bunches[i]->y ) ;
+      cudaFree( TrackArgs->TheBeam->bunches[i]->goodray_gpu ) ;
+#else
+      mxFree( TrackArgs->TheBeam->bunches[i]->y ) ;
+#endif      
 			if (nWakes[0] > 0)
 			 mxFree( TrackArgs->TheBeam->bunches[i]->ZSR ) ;
 			if (nWakes[1] > 0)

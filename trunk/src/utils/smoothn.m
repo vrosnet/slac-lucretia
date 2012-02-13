@@ -1,5 +1,4 @@
 function [z,s,exitflag,Wtot] = smoothn(varargin)
-
 %SMOOTHN Robust spline smoothing for 1-D to N-D data.
 %   SMOOTHN provides a fast, automatized and robust discretized smoothing
 %   spline for data of any dimension.
@@ -147,7 +146,7 @@ function [z,s,exitflag,Wtot] = smoothn(varargin)
 %   -- Damien Garcia -- 2009/03, revised 2011/11
 %   website: <a
 %   href="matlab:web('http://www.biomecardio.com')">www.BiomeCardio.com</a>
-
+persistent opt
 % Check input arguments
 error(nargchk(1,12,nargin));
 
@@ -331,7 +330,9 @@ RobustStep = 1;
 nit = 0;
 %--- Error on p. Smoothness parameter s = 10^p
 errp = 0.1;
-opt = optimset('TolX',errp);
+if isempty(opt)
+  opt = optimset('TolX',errp);
+end
 %--- Relaxation factor RF: to speedup convergence
 RF = 1 + 0.75*isweighted;
 
