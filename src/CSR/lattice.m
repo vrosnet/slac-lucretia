@@ -6,30 +6,34 @@ global BEAMLINE
 % Setup simple SBEN + DRIFT lattice
 % ==========
 BEAMLINE={};
-B = SBendStruc( 0.9125*2, 1.2586*2, 0.0164*2, [0.0164 0.0164], [0 0], [0.0064 0.0064], 0.5, 0, 'BEN1' );
-D = DrifStruc( 6, 'DRIF1' );
+Angle=2*asin(0.5/(2*1.5));
+B = SBendStruc( 0.5, 2, Angle, [0 0], [0 0], [0.0064 0.0064], 0, 0, 'BEN1' );
+D = DrifStruc( 0.5, 'DRIF1' );
 BEAMLINE{1}=B; BEAMLINE{2}=D;
-BEAMLINE{1}.P=23;
-BEAMLINE{2}.P=23;
+BEAMLINE{1}.P=0.15;
+BEAMLINE{2}.P=0.15;
 BEAMLINE{2}.S=B.L;
 SetSPositions( 1, length(BEAMLINE), 0 );
+BEAMLINE{1}.TrackFlag.LorentzDelay=1;
+BEAMLINE{2}.TrackFlag.LorentzDelay=1;
 
 % ============
 % Make a beam structure
 % ============
 I=InitCondStruc;
-I.Momentum=23;
-I.x.NEmit=1e-30;
+I.Momentum=0.15;
+I.x.NEmit=1e-99;
 I.x.Twiss.beta=1;
 I.x.Twiss.alpha=0;
-I.y.NEmit=1e-30;
+I.y.NEmit=1e-99;
 I.y.Twiss.beta=1;
 I.y.Twiss.alpha=0;
-I.sigz=51e-6;
+I.sigz=50e-6;
 I.SigPUncorrel=0;
 I.PZCorrel=0;
-I.Q=1.6022e-19*2e10;
+I.Q=1e-9;
 Beam=MakeBeam6DGauss(I,1e5,5,0);
+Beam.Bunch.x(1:4,:)=0;
 
 % =========
 % Split BEAMLINE elements up and flag for CSR treatment
@@ -37,7 +41,7 @@ Beam=MakeBeam6DGauss(I,1e5,5,0);
 %   downstream CSR treatment area into, RMS bunch length to use for
 %   estimation of length of downstream CSR region)
 % =========
-eleSplitCSR(50,50,I.sigz);
+eleSplitCSR(100,100,I.sigz);
 
 % Beam tracking (NO CSR)
 [stat bo]=TrackThru(1,length(BEAMLINE),Beam,1,1,0);

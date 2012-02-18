@@ -1,5 +1,5 @@
 function [stat,errdat] = ErrorGroupGaussErrors( group, meanval, rmsval, ...
-                                                keepold, randTrunc )
+  keepold, randTrunc )
 %
 % ERRORGROUPGAUSSERRORS Apply Gaussian-distributed errors to the members of
 % an error group.
@@ -41,6 +41,8 @@ function [stat,errdat] = ErrorGroupGaussErrors( group, meanval, rmsval, ...
 %
 
 % MOD:
+%      14-Feb-2012, GW:
+%         Add distributedLucretia support
 %      25-sep=2007, GRW:
 %         Add truncate functionality
 %      24-feb-2006, PT:
@@ -48,21 +50,21 @@ function [stat,errdat] = ErrorGroupGaussErrors( group, meanval, rmsval, ...
 
 %==========================================================================
 
-  global BEAMLINE KLYSTRON PS GIRDER
-  errdat = [] ; 
-  stat = InitializeMessageStack( ) ;
+global BEAMLINE KLYSTRON PS GIRDER %#ok<NUSED>
+errdat = [] ;
+stat = InitializeMessageStack( ) ;
 
 % first make sure the arguments are consistent with one another
-  if ~isfield(group,'error')
-    error('Incorrectly formatted error group')
-  end
-  statarg = EGGEVerifyArgs( group.error, meanval, rmsval, keepold ) ;
-  stat = AddStackToStack( stat, statarg ) ;
-  if (statarg{1} ~= 1)
-    stat{1} = 0 ;
-    return ;
-  end
-  
+if ~isfield(group,'error')
+  error('Incorrectly formatted error group')
+end
+statarg = EGGEVerifyArgs( group.error, meanval, rmsval, keepold ) ;
+stat = AddStackToStack( stat, statarg ) ;
+if (statarg{1} ~= 1)
+  stat{1} = 0 ;
+  return ;
+end
+
 % if truncate argument given, check that it is either a scalar or of the
 % same dimensionality as rmsval
 % NB: randTrunc in group.gener structure to be eval'd, => has to exist (0=
@@ -75,36 +77,54 @@ end % if truncate arg wrong
 
 % if everything is all right, apply the errors
 
-% pre-allocate the accumulation table for execution speed      
-      
-  eval(group.dimension) ;
+% pre-allocate the accumulation table for execution speed
+
+eval(group.dimension) ;
 
 % loop over clusters
 
+% If specify distributed ops then apply errors to each MC machine
+isdist=false;
+if ~isempty(group.comment) && strcmp(class(group.comment),'distributedLucretia')
+  isdist=true;
+  DL=group.comment;
+  dlLoop=DL.workers;
+else
+  dlLoop=1;
+end
+
+indxList=[];
+for iloop=1:length(dlLoop)
+  
   for ClusterCount = 1:length(group.ClusterList) ;
     
-% generate the errors
-
+    % generate the errors
+    
     if (~isempty(group.gener))
       eval(group.gener) ;
     end
     eval(group.accum) ;
-      
-% loop over cluster members
-
+    
+    % loop over cluster members
+    
     for count = 1:length(group.ClusterList(ClusterCount).index)
       indx = group.ClusterList(ClusterCount).index(count) ;
-      ds = group.ClusterList(ClusterCount).dS(count) ;
+      ds = group.ClusterList(ClusterCount).dS(count) ; %#ok<NASGU>
       
-% execute the adjustment string
-
+      % execute the adjustment string
+      
       if (~isempty(group.adjust))
         eval(group.adjust) ;
       end
-
-% execute the application string
-
-      eval(group.apply) ;
+      
+      % execute the application string
+      if isdist
+        eval(regexprep(group.apply,'.+=','temp='));
+        DL.latticeSyncVals(DL.workers(iloop)).(group.error)(indx,:)=temp;
+        indxList=[indxList indx];
+      else
+        eval(group.apply) ;
+      end
       
     end
     
@@ -114,8 +134,13 @@ end % if truncate arg wrong
   errdat.std = ErrStd ;
   errdat.AppliedErrors = ErrAccum ;
   
+end
 
-  
+% Apply errors to MC machines
+if isdist
+  DL.setError(group.error,indxList);
+end
+
 %==========================================================================
 %==========================================================================
 %==========================================================================
@@ -124,43 +149,43 @@ end % if truncate arg wrong
 
 function statarg = EGGEVerifyArgs( errstring, meanvec, rmsvec, keepold )
 
-  statarg = InitializeMessageStack( ) ;
+statarg = InitializeMessageStack( ) ;
 
-  % if we are doing offsets, verify that the mean, RMS, and keep flags are 1 x 6;
-% if BPMOffset or ElecOffset, that they are 1 x 2; 
+% if we are doing offsets, verify that the mean, RMS, and keep flags are 1 x 6;
+% if BPMOffset or ElecOffset, that they are 1 x 2;
 % otherwise verify that they are scalar
 
-  switch errstring
-      case 'Offset'
-          lenvec = 6 ;
-      case {'BPMOffset','ElecOffset'}
-          lenvec = 2 ;
-      otherwise
-          lenvec = 1 ;
-  end
-  if ( (sum(size(meanvec)==[1 lenvec]) ~= 2) | ...
-       (sum(size(rmsvec) ==[1 lenvec]) ~= 2) | ...
-       (sum(size(keepold)==[1 lenvec]) ~= 2)       )
-   statarg{1} = 0 ;
-   statarg = AddMessageToStack(statarg,...
-       'Arguments 3,4,7 in SetGaussianErrors have incorrect size') ;
-   return ;
-  end
-  
+switch errstring
+  case 'Offset'
+    lenvec = 6 ;
+  case {'BPMOffset','ElecOffset'}
+    lenvec = 2 ;
+  otherwise
+    lenvec = 1 ;
+end
+if ( (sum(size(meanvec)==[1 lenvec]) ~= 2) || ...
+    (sum(size(rmsvec) ==[1 lenvec]) ~= 2) || ...
+    (sum(size(keepold)==[1 lenvec]) ~= 2)       )
+  statarg{1} = 0 ;
+  statarg = AddMessageToStack(statarg,...
+    'Arguments 3,4,7 in SetGaussianErrors have incorrect size') ;
+  return ;
+end
+
 % verify that mean and rms, and keepold are numeric
 
-  if ( (~isfloat(meanvec)) | (~isfloat(rmsvec)) | (~isnumeric(keepold)) )
-    statarg{1} = 0 ;
-    statarg = AddMessageToStack(statarg, ...
-        'Arguments 3,4,7 in SetGaussianErrors must be numeric') ;
-    return ;
-  end
-  
+if ( (~isfloat(meanvec)) || (~isfloat(rmsvec)) || (~isnumeric(keepold)) )
+  statarg{1} = 0 ;
+  statarg = AddMessageToStack(statarg, ...
+    'Arguments 3,4,7 in SetGaussianErrors must be numeric') ;
+  return ;
+end
+
 % verify that all entries in keepold are either one or zero
 
-  if ( length(find(keepold==1))+length(find(keepold==0)) ~= length(keepold) )
-    statarg{1} = 0 ;
-    statarg = AddMessageToStack(statarg, ...
-        'Argument 7 in SetGaussianErrors must be 1''s or 0''s') ;
-    return ;
-  end
+if ( length(find(keepold==1))+length(find(keepold==0)) ~= length(keepold) )
+  statarg{1} = 0 ;
+  statarg = AddMessageToStack(statarg, ...
+    'Argument 7 in SetGaussianErrors must be 1''s or 0''s') ;
+  return ;
+end
