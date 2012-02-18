@@ -5,7 +5,7 @@ function [stat,Group] = MakeErrorGroup( tablecell, range, errname, ...
 % Gaussian-distributed errors and misalignments to a set of elements.
 %
 % [stat,Group] = MakeErrorGroup( Table, Range, ErrName, Clusters, 
-%    Comment ) finds all elements of a given Lucretia data table which fit
+%    [Comment | DL] ) finds all elements of a given Lucretia data table which fit
 %    certain categories (position within the table, element class, etc) and
 %    returns a list of those elements, preserving information on alignment
 %    blocks or element slices if requested.  This structure can be used by
@@ -42,19 +42,22 @@ function [stat,Group] = MakeErrorGroup( tablecell, range, errname, ...
 %         the result is similar to cluster == 2, except that only block
 %         members with the name and class requested will be misaligned and
 %         all other block members will not be moved.
-%     Comment: text string which is attached to the group for user's
-%         reference and information.
+%     [Comment | DL]: text string which is attached to the group for user's
+%         reference and information. Or a distributedLucretia object if
+%         want to apply errors in distributed context.
 %
 % Return status:  +1 if executed successfully, 0 if an invalid combination
 %    of arguments is supplied, -1 if there are no devices which meet the
 %    user's criteria.
 %
-% See Also:  ErrorGroupGaussErrors, SetGaussianErrors, regexp.
+% See Also:  ErrorGroupGaussErrors, SetGaussianErrors, regexp, distributedLucretia
 %
 % Version date:  25-September-2007.
 
 % MOD:
-%      25-sep-2007, GRW:
+%      14-Feb-2012, GW:
+%         Add distributedLucretia support
+%      25-sep-2007, GW:
 %         Changed rand function to use randnt instead of randn to enable
 %         truncation of random number distribution (additional function
 %         randnt placed in same directory as this file)

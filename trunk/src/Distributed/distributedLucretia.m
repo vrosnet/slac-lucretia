@@ -51,6 +51,7 @@ classdef distributedLucretia < handle
   %
   %  ------- Main Public methods
   %  setConfig - change distributed matlab scheduler
+  %  setError - set BEAMLINE error terms (dB, Offset etc...)
   %  PSTrim - trim power supply(ies) (PS)
   %  MoverTrim - trim movers (GIRDERS)
   %  KlystronTrim - trim Klystron Ampls and Phases
@@ -176,11 +177,22 @@ classdef distributedLucretia < handle
       save(obj.asynDataFile,'BEAMLINE','PS','KLYSTRON','WF','GIRDER')
       if synch
         pctRunOnAll(sprintf('load %s',obj.asynDataFile));
+        pctRunOnAll(sprintf('rng(labindex)'));
       end
       
       % Sync lattice with all workers
       latticeCopy(obj,~synch);
       
+    end
+    function setRandSeed(obj,randVals)
+      if length(randVals)~=obj.maxworkers
+        error('Must pass a random seed for each worker')
+      end
+      if obj.synchronous
+        spmd
+          rng(randVals(labindex));
+        end
+      end
     end
     function setConfig(obj,configName,nworkers)
       % setConfig(obj,configName,nworkers)
@@ -189,7 +201,7 @@ classdef distributedLucretia < handle
       if ~ismember(configName,obj.schedConfigs)
         error('Not an existing parallel configuration, choose from obj.schedConfigs list')
       end
-      obj.sched=findResource('scheduler','type',configName);
+      obj.sched=findResource('scheduler','configuration',configName);
       if ~obj.sched.HasSharedFilesystem
         warning('This scheduler is not setup for a shared filesystem, this may cause problems and is not recommended!')
       end
@@ -198,6 +210,44 @@ classdef distributedLucretia < handle
         obj.maxworkers=nworkers;
       else
         obj.maxworkers=obj.sched.ClusterSize;
+      end
+    end
+    function setError(obj,errTerm,errEleList)
+      % setError(obj,errTerm,errEleList)
+      %   Set an error term on all workers for selected elements
+      %   errTerm (char): can be 'dB', 'dV', 'dPhase', 'dAmpl',
+      %           'dScale', 'Offset', 'ElecOffset', 'BPMOffset'
+      %   errEleList: list of BEAMLINE element indices
+      %   valList: value to set desired error term to
+      if ~ismember(errTerm,{'dB', 'dV', 'dPhase', 'dAmpl','dScale', 'Offset', 'ElecOffset', 'BPMOffset', 'B'})
+        error('No support for this errTerm, see documentation for help')
+      end
+      sz=size(obj.latticeSyncVals(1).(errTerm));
+      if sz(1)==1; for iw=obj.workers; obj.latticeSyncVals(1).(errTerm)=obj.latticeSyncVals(1).(errTerm)'; end; end;
+      eUpload=NaN(length(obj.workers),length(errEleList),length(obj.latticeSyncVals(1).(errTerm)(1,:)));
+      ind=0;
+      for iw=obj.workers
+        ind=ind+1;
+        eind=0;
+        for iele=errEleList
+          eind=eind+1;
+          eUpload(ind,eind,:)=reshape(obj.latticeSyncVals(iw).(errTerm)(iele,:),1,1,length(obj.latticeSyncVals(iw).(errTerm)(iele,:)));
+        end
+      end
+      if obj.synchronous
+        pctRunOnAll(['workers=[',num2str(obj.workers,6),'];']);
+        pctRunOnAll(['eInd=[',num2str(errEleList,6),'];']);
+        if length(size(eUpload))<3
+          eus=[num2str(size(eUpload)) ' 1;'];
+        else
+          eus=num2str(size(eUpload));
+        end
+        pctRunOnAll(['edim=[',eus,'];']);
+        pctRunOnAll(['eVals=[',num2str(eUpload(:)',6),'];eVals=reshape(eVals,length(workers),length(eInd),edim(3));']);
+        pctRunOnAll(sprintf('if ismember(labindex,workers);for iele=1:length(eInd);BEAMLINE{eInd(iele)}.%s=squeeze(eVals(ismember(workers,labindex),iele,:))'';end;end;',errTerm));
+      else
+        dlStatus.workers=obj.workers; dlStatus.syncMethod=obj.syncMethod; %#ok<STRNU>
+        save(obj.asynDataFile,'eUpload','errEleList','errTerm','dlStatus','-append')
       end
     end
     function PSTrim(obj,psList)
@@ -475,6 +525,11 @@ classdef distributedLucretia < handle
   methods(Static)
     function [BEAMLINE PS GIRDER KLYSTRON WF]=asynLoadLattice(dataFile,iworker) %#ok<STOUT>
       load(dataFile)
+      if exist('eUpload','var')
+        for iele=1:length(errEleList)
+          BEAMLINE{errEleList(iele)}.(errTerm)=squeeze(eUpload(ismember(dlStatus.workers,iworker),iele,:))'; %#ok<NODEF>
+        end
+      end
       if exist('psUpload','var')
         for ips=1:length(psList)
           if strcmp(dlStatus.syncMethod,'Ampl')

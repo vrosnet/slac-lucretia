@@ -40,6 +40,9 @@ if length(y) < 5
   error('Need at least 5 data points to fit a gaussian')
 end
 
+% If input length >10000 then sparsify
+
+
 x = x(:);
 y = y(:);
 if ~exist('dy','var'),     dy = ones(size(y));  end

@@ -65,21 +65,22 @@ classdef Track < handle
     csrData % Contains CSR data at each track point requiring CSR calculation if csrStoreData set true
     csrSmoothVal=3; % Amount of smoothing to apply to charge distribution for CSR calculation (integer >=1)
   end
-  properties(SetAccess=private)
+  properties(SetAccess=protected)
     isDistrib % Is this Track object opererating in distributed mode?
     DL % distributedLucretia object reference
   end
-  properties(Access=private)
+  properties(Access=protected)
     dBeamIn % distributed input beam
     lBeamIn % local input beam
     instr
     beamout
     stat
+    nray
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
   end
-  properties(Dependent,SetAccess=private)
+  properties(Dependent,SetAccess=protected)
     instrData % (distributed) instrument data from tracking
     beamOut % (distributed) beam object post tracking
     trackStatus % (distributed) Lucretia status from tracking
@@ -186,9 +187,18 @@ classdef Track < handle
       obj.startInd=1;
       obj.finishInd=length(BEAMLINE);
       obj.beamIn=beamIn;
+      obj.nray=numel(beamIn.Bunch.Q);
     end
     function trackThru(obj)
       global BEAMLINE
+      % Check for CSR track flags
+      indcsr=[];
+      for itf=findcells(BEAMLINE,'TrackFlag')
+        if isfield(BEAMLINE{itf}.TrackFlag,'doCSR') && BEAMLINE{itf}.TrackFlag.doCSR
+          indcsr(end+1)=itf;
+        end
+      end
+      t0=clock;
       % tracking in parallel across possibly multiple workers
       if obj.isDistrib
         % If asynchronous, submit jobs and return
@@ -208,10 +218,24 @@ classdef Track < handle
           b1=obj.firstBunch;
           b2=obj.lastBunch;
           lf=obj.loopFlag;
+          verbose=obj.verbose;
+          csrNbins=obj.csrNbins;
+          csrSmoothVal=obj.csrSmoothVal;
+          csrStoreData=obj.csrStoreData;
           useWorkers=obj.DL.workers;
-          spmd
-            if ismember(labindex,useWorkers)
-              [stat beamout instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
+          if ~isempty(indcsr) && obj.nray>1000
+            spmd
+              if ismember(labindex,useWorkers)
+                [stat beamout instdata csrData]=Track.csrTrackThru(startInd,finishInd,BeamIn,b1,b2,...
+                  lf,t0,indcsr,verbose,csrNbins,csrSmoothVal,csrStoreData,1) ;
+              end
+            end
+            obj.csrData=csrData;
+          else
+            spmd
+              if ismember(labindex,useWorkers)
+                [stat beamout instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
+              end
             end
           end
           % Store results
@@ -220,73 +244,27 @@ classdef Track < handle
           obj.instrData=instdata;
         end
       else % local tracking
-        % Check for CSR track flags
-        indcsr=[];
-        for itf=findcells(BEAMLINE,'TrackFlag')
-          if isfield(BEAMLINE{itf}.TrackFlag,'doCSR') && BEAMLINE{itf}.TrackFlag.doCSR
-            indcsr(end+1)=itf;
-          end
-        end
         % If wanting CSR treatment, stop at each CSR calculation point and
         % perturn BEAM energy before continuing (else just track)
-        t0=clock;
-        if ~isempty(indcsr) && length(obj.beamIn.Bunch.Q)>1000
-          t1=obj.startInd;
-          tempBeam=obj.beamIn;
-          idataAccum=cell(1,3);
-          obj.csrData=[];
-          istep=0; nsteps=length(indcsr(indcsr>=obj.startInd & indcsr<=obj.finishInd));
-          firstPrint=true;
-          for itrack=indcsr(indcsr>=obj.startInd & indcsr<=obj.finishInd)
-            [stat tempBeam instdata]=TrackThru(t1,itrack,tempBeam,obj.firstBunch,obj.lastBunch,obj.loopFlag);
-            if stat{1}~=1; break; end;
-            if obj.verbose
-              istep=istep+1;
-              if etime(clock,t0)>1.5
-                if ~firstPrint
-                  fprintf('\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b')
-                else
-                  fprintf('\n')
-                end
-                firstPrint=false;
-                fprintf('CSR Tracking: %3d%% complete...',round((istep/nsteps)*100))
-                t0=clock;
-              end
-            end
-            [pOut W dE z]=applyCSR(tempBeam.Bunch.x,tempBeam.Bunch.Q,obj.csrNbins,obj.csrSmoothVal,itrack,1);
-            tempBeam.Bunch.x(6,:)=pOut;
-            if obj.csrStoreData
-              obj.csrData(1+itrack-obj.startInd).W=W;
-              obj.csrData(1+itrack-obj.startInd).dE=dE;
-              obj.csrData(1+itrack-obj.startInd).z=z;
-              obj.csrData(1+itrack-obj.startInd).beam=tempBeam;
-              obj.csrData(1+itrack-obj.startInd).index=itrack;
-            end
-            t1=itrack+1;
-            for id=1:length(instdata)
-              idataAccum{id}=[idataAccum{id} instdata{id}];
-            end
-          end
-          if itrack~=obj.finishInd
-            [stat beamout instdata]=TrackThru(t1,obj.finishInd,tempBeam,obj.firstBunch,obj.lastBunch,obj.loopFlag);
-            for id=1:length(instdata)
-              instdata{id}=[idataAccum{id} instdata{id}];
-            end
-          else
-            beamout=tempBeam;
-            instdata=idataAccum;
-          end
+        if ~isempty(indcsr) && obj.nray>1000
+          [stat beamout instdata csrData]=Track.csrTrackThru(obj.startInd,obj.finishInd,obj.beamIn,obj.firstBunch,obj.lastBunch,...
+            obj.loopFlag,t0,indcsr,obj.verbose,obj.csrNbins,obj.csrSmoothVal,obj.csrStoreData,0) ;
+          obj.csrData=csrData;
         else
           [stat beamout instdata]=TrackThru(obj.startInd,obj.finishInd,obj.beamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
         end
         obj.trackStatus=stat;
         obj.beamOut=beamout;
         obj.instrData=instdata;
-        if obj.verbose
+        if ~isempty(indcsr) && length(obj.beamIn.Bunch.Q)>1000 && obj.verbose
           fprintf('\n')
         end
       end
     end
+  end
+  
+  methods(Access=private)
+    
   end
   
   %% Static methods (those needing to be called in worker environment)
@@ -300,6 +278,56 @@ classdef Track < handle
         beam=trackBeamIn;
       end
       [stat beamout instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
+    end
+    function [stat beamout instdata csrData]=csrTrackThru(startInd,finishInd,beamIn,firstBunch,lastBunch,loopFlag,t0,indcsr,verbose,csrNbins,csrSmoothVal,csrStoreData,isDistrib)
+      t1=startInd;
+      tempBeam=beamIn;
+      idataAccum=cell(1,3);
+      csrData=[];
+      istep=0; nsteps=length(indcsr(indcsr>=startInd & indcsr<=finishInd));
+      firstPrint=true;
+      %           zp=tempBeam.Bunch.x(5,:);
+      for itrack=indcsr(indcsr>=startInd & indcsr<=finishInd)
+        [stat tempBeam instdata]=TrackThru(t1,itrack,tempBeam,firstBunch,lastBunch,loopFlag);
+        if stat{1}~=1; break; end;
+        %             tempBeam.Bunch.x(1:4,:)=0;
+        %             tempBeam.Bunch.x(5,:)=zp;
+        if verbose && ~isDistrib
+          istep=istep+1;
+          if etime(clock,t0)>1.5
+            if ~firstPrint
+              fprintf('\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b')
+            else
+              fprintf('\n')
+            end
+            firstPrint=false;
+            fprintf('CSR Tracking: %3d%% complete...',round((istep/nsteps)*100))
+            t0=clock;
+          end
+        end
+        [bOut W dE z]=applyCSR(tempBeam.Bunch.x,tempBeam.Bunch.Q,csrNbins,csrSmoothVal,itrack);
+        tempBeam.Bunch.x=bOut;
+        if csrStoreData
+          csrData(1+itrack-startInd).W=W;
+          csrData(1+itrack-startInd).dE=dE;
+          csrData(1+itrack-startInd).z=z;
+          csrData(1+itrack-startInd).beam=tempBeam;
+          csrData(1+itrack-startInd).index=itrack;
+        end
+        t1=itrack+1;
+        for id=1:length(instdata)
+          idataAccum{id}=[idataAccum{id} instdata{id}];
+        end
+      end
+      if itrack~=finishInd
+        [stat beamout instdata]=TrackThru(t1,finishInd,tempBeam,firstBunch,lastBunch,loopFlag);
+        for id=1:length(instdata)
+          instdata{id}=[idataAccum{id} instdata{id}];
+        end
+      else
+        beamout=tempBeam;
+        instdata=idataAccum;
+      end
     end
   end
   

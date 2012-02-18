@@ -1,4 +1,4 @@
-function [beam W dE zOut]=applyCSR(beam,nbin,smoothVal,itrack)
+function [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack)
 % [beamP W dE z]=applyCSR(beam,beamQ,ind,nbin,smoothVal,X)
 %  Calculate CSR wake and change provided momentum profile
 %
@@ -7,7 +7,7 @@ function [beam W dE zOut]=applyCSR(beam,nbin,smoothVal,itrack)
 % nbin: number of bins to use for CSR calculation
 % smoothVal: level of smoothing to use (int >= 1)
 global BEAMLINE
-persistent lastsz bininds z Z ZSP
+persistent lastsz bininds z Z ZSP lastnbin
 W=[]; dE=[]; zOut=[];
 
 %- If zero length element just return
@@ -60,22 +60,23 @@ else
   R=L/(2*sin(PHI/2));
   % --- distance from bend
   X=((BEAMLINE{itrack}.S+BEAMLINE{itrack}.L)-(BEAMLINE{bendele(1)}.S+BEAMLINE{bendele(1)}.L))/R;
-  lDecay=3*(24*std(beam.x(5,:))*R^2)^(1/3);
+  lDecay=3*(24*std(beam(5,:))*R^2)^(1/3);
   if X*R > lDecay; return; end;
 end
 
 % Generate longitudinal grid, only when beam length changes by
 % more than 10%
-if isempty(z) || (abs(std(beam.x(5,:))-lastsz)/lastsz)>0.1
-  zmin=min(-beam.x(5,:));
-  zmax=max(-beam.x(5,:));
+if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1 || lastnbin~=nbin
+  zmin=min(-beam(5,:));
+  zmax=max(-beam(5,:));
   if zmin==zmax
     error('Need some spread in z-distribution of bunch to compute CSR!')
   end
   z=linspace(zmin,zmax,nbin);
-  [count,bininds] = histc(-beam.x(5,:),z);
+  [count,bininds] = histc(-beam(5,:),z);
   [Z ZSP]=meshgrid(z,z);
-  lastsz=std(beam.x(5,:));
+  lastsz=std(beam(5,:));
+  lastnbin=nbin;
 end
 
 % Bin beam particle longitudinal direction
@@ -96,7 +97,7 @@ if strcmp(BEAMLINE{itrack}.Class,'SBEN')
   % calculate energy loss for each bin
   ZINT=zeros(nbin,1);
   for is=1:nbin
-    isp=z>(z(is)-SL) & (1:length(z))<is ;
+    isp=z>=(z(is)-SL) & (1:length(z))<is ;
     ZINT(is)=sum((1./(z(is)-z(isp)).^(1/3)).*dq(isp).*bw);
   end
   IND1=abs(Z-(ZSP-(R*PHI^3)/6));
@@ -123,7 +124,7 @@ else % DRIFT or other element following bend
   % Calculate CSR wake and energy loss per bin
   ZINT=zeros(nbin,1);
   for is=1:nbin
-    isp=z>(z(is)-dsmax) & (1:length(z))<is ;
+    isp=z>=(z(is)-dsmax) & (1:length(z))<is ;
     ZINT(is)=sum((1./(psi(isp)+2.*X)).*dq(isp).*bw);
   end
   IND1=abs(Z-(ZSP-(R/6)*PHI^2*(PHI+3*X)));
@@ -134,6 +135,6 @@ else % DRIFT or other element following bend
   dE=(W'.*Q.*BEAMLINE{itrack}.L)./(1e9*qe); % GeV
 end
 % Apply energy loss for all particles in each bin
-beam.x(6,:)=beam.x(6,:)+dE(bininds);
+beam(6,:)=beam(6,:)+dE(bininds);
 
 zOut=z;
