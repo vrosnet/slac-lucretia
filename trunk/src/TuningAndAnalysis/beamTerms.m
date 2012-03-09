@@ -51,7 +51,14 @@ end
 bsize_corrected=zeros(1,3);
 for iorder=1:3
   p=polyfitn(xfit,yfit,iorder);
-  bsize_corrected(iorder)=std(yfit-polyvaln(p,xfit));
+  if doGaussfit
+    nbin=max([length(yfit)/100 100]);
+    [ fx , bc ] = hist(yfit-polyvaln(p,xfit),nbin) ;
+    [~, q] = gauss_fit(bc,fx) ;
+    bsize_corrected(iorder) = q(4) ;
+  else
+    bsize_corrected(iorder)=std(yfit-polyvaln(p,xfit));
+  end
 end
 xfit=beam.Bunch.x';
 p=polyfitn(xfit,yfit,iorder);
