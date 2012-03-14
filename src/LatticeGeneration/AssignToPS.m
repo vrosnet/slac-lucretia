@@ -1,4 +1,4 @@
-function stat = AssignToPS( elemlist, klysnum, varargin )
+function stat = AssignToPS( elemlist, psno, varargin )
 
 % ASSIGNTOPS Assign elements to a power supply.
 %
@@ -71,14 +71,14 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
       
 % general:  check whether the device is permitted to have a PS  
 
-      if (  (~strcmp(BEAMLINE{elemno}.Class,'XCOR'))     & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'XYCOR'))    & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'YCOR'))     & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'QUAD'))     & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'SEXT'))     & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'OCTU'))     & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'MULT'))     & ...
-            (~strcmp(BEAMLINE{elemno}.Class,'SOLENOID')) & ...            
+      if (  (~strcmp(BEAMLINE{elemno}.Class,'XCOR'))     && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'XYCOR'))    && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'YCOR'))     && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'QUAD'))     && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'SEXT'))     && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'OCTU'))     && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'MULT'))     && ...
+            (~strcmp(BEAMLINE{elemno}.Class,'SOLENOID')) && ...            
             (~strcmp(BEAMLINE{elemno}.Class,'SBEN'))       )
          stat{1} = 0 ;
          stat = AddMessageToStack(stat,...
@@ -88,15 +88,15 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
 % if we are trying to assign an extra PS to a device make sure it's
 % permitted
 
-      elseif ( (PS_index > 1) & ...
-               (~strcmp(BEAMLINE{elemno}.Class,'SBEN')) & ...
+      elseif ( (PS_index > 1) && ...
+               (~strcmp(BEAMLINE{elemno}.Class,'SBEN')) && ...
                (~strcmp(BEAMLINE{elemno}.Class,'XYCOR'))  ...
              )
          stat{1} = 0 ;
          stat = AddMessageToStack(stat,...
              ['Element # ',num2str(elemno),...
              ' cannot have > 1 PS in AssignToPS input']) ;
-      elseif ( (PS_index > 1) & ...
+      elseif ( (PS_index > 1) && ...
                (length(BEAMLINE{elemno}.B) < 2)   )
          stat{1} = 0 ;
          stat = AddMessageToStack(stat,...
@@ -123,17 +123,17 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
              
 % look for conflicting PS assignment           
 
-         if ( (~isempty(BEAMLINE{elemno}.PS))            & ...
-              (length(BEAMLINE{elemno}.PS)>= PS_index)   & ...
-              (BEAMLINE{elemno}.PS(PS_index) ~= 0)       & ...
-              (BEAMLINE{elemno}.PS(PS_index) ~= klysnum) & ...
-              (klysnum ~= 0)                         )
+         if ( (~isempty(BEAMLINE{elemno}.PS))            && ...
+              (length(BEAMLINE{elemno}.PS)>= PS_index)   && ...
+              (BEAMLINE{elemno}.PS(PS_index) ~= 0)       && ...
+              (BEAMLINE{elemno}.PS(PS_index) ~= psno) && ...
+              (psno ~= 0)                         )
              stat{1} = 0 ;
              stat = AddMessageToStack(stat,...
                 ['Element # ',num2str(elemno), ...
                  ' already has conflicting PS assignment in AssignToPS']) ;
          end
-         if (klysnum == 0)
+         if (psno == 0)
              oldpslist = [oldpslist BEAMLINE{elemno}.PS(PS_index)] ;
          end
       end      
@@ -148,11 +148,11 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
 % quad to a common power supply, then we need to do things slightly
 % differently:
 
-      if ( (strcmp(BEAMLINE{elemno}.Class,'SBEN')) & ...
+      if ( (strcmp(BEAMLINE{elemno}.Class,'SBEN')) && ...
            (~MultiPS)                                     )
          Bsum = max(abs(BEAMLINE{elemno}.B)) ;
       
-         if ( (length(BEAMLINE{elemno}.B) > 1 ) & (Bsum == 0) )
+         if ( (length(BEAMLINE{elemno}.B) > 1 ) && (Bsum == 0) )
                 stat{1} = 0 ;
                 stat = AddMessageToStack(stat,...
                     ['Element # ',num2str(elemno), ...
@@ -172,15 +172,15 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
   
 % if we are clearing old assignments, do that now and return
 
-  if (klysnum == 0)
+  if (psno == 0)
     for count = 1:length(elemlist)
-      elemno = elemlist(count) ; klysno = oldpslist(count) ;
-      if (klysno==0)
+      elemno = elemlist(count) ; psno = oldpslist(count) ;
+      if (psno==0)
         continue ;
       end
       BEAMLINE{elemno}.PS(PS_index) = 0 ;
-      elist = find(PS(klysno).Element==elemno) ;
-      PS(klysno).Element(elist) = [] ;
+      elist = find(PS(psno).Element==elemno) ;
+      PS(psno).Element(elist) = [] ; %#ok<FNDSB>
     end
     return ;
   end
@@ -189,26 +189,26 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
   
 % if the PS array doesn't go out far enough, extend it
 
-  if (length(PS) < klysnum)
-      PS(klysnum).Ampl = 1 ;
-      PS(klysnum).SetPt = 1 ;
-      PS(klysnum).Step = 0 ;
-      PS(klysnum).Element = [] ;
-      PS(klysnum).dAmpl = 0 ;
+  if (length(PS) < psno)
+      PS(psno).Ampl = 1 ;
+      PS(psno).SetPt = 1 ;
+      PS(psno).Step = 0 ;
+      PS(psno).Element = [] ;
+      PS(psno).dAmpl = 0 ;
   end
   
 % if the magnets are all zero, set the PS Ampl to zero
 
   if (Btot == 0)
-      PS(klysnum).Ampl = 0 ;
-      PS(klysnum).SetPt = 0 ;
+      PS(psno).Ampl = 0 ;
+      PS(psno).SetPt = 0 ;
   end
   
 % now perform the assignments:  first at the BEAMLINE...
 
   for count = 1:length(elemlist)
       elemno = elemlist(count) ;
-      BEAMLINE{elemno}.PS(PS_index) = klysnum ;
+      BEAMLINE{elemno}.PS(PS_index) = psno ;
       if (Btot == 0)
           BEAMLINE{elemno}.B(PS_index) = 1 ;
       end
@@ -216,7 +216,7 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
   
 % ...now at the PS
 
-  elist = [PS(klysnum).Element elemlist'] ;
+  elist = [PS(psno).Element elemlist'] ;
   elist = sort(elist) ;
   
 % eliminate duplicates
@@ -230,5 +230,5 @@ function stat = AssignToPS( elemlist, klysnum, varargin )
       end
   end
   
-  PS(klysnum).Element = elist2 ;
+  PS(psno).Element = elist2 ;
       

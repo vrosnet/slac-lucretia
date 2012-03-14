@@ -354,7 +354,7 @@ classdef Match < handle & physConsts
         opts=gaoptimset('Display',obj.optimDisplay,...
           'TolCon',1e-6,'TolFun',1e-6,'Generations',100000,'PopulationSize',100,'UseParallel','never','Vectorized','off');
       elseif strcmp(obj.optim,'lsqnonlin')
-        opts=optimset('Display',obj.optimDisplay,'MaxFunEvals',200000,'MaxIter',100000,'TolX',1e-6,'TolFun',1e-6,...
+        opts=optimset('Display',obj.optimDisplay,'MaxFunEvals',200000,'MaxIter',100000,'TolX',1e-4,'TolFun',1e-4,...
           'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state));
       elseif strcmp(obj.optim,'fmincon')
         opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
@@ -381,6 +381,7 @@ classdef Match < handle & physConsts
         case 'fmincon'
           x=fmincon(@(x) minFunc(obj,x,obj.dotrack,obj.dotwiss),varVals./varW,[],[],[],[],...
             obj.varLimits(1,:)./varW,obj.varLimits(2,:)./varW,[],opts);
+%           x = simulannealbnd(@(x) minFunc(obj,x,obj.dotrack,obj.dotwiss),varVals./varW,obj.varLimits(1,:)./varW,obj.varLimits(2,:)./varW,opts);
         case 'fgoalattain'
           x=fgoalattain(@(x) minFunc(obj,x,obj.dotrack,obj.dotwiss),varVals,obj.matchVals,obj.matchWeights,...
             [],[],[],[],obj.varLimits(1,:),obj.varLimits(2,:),[],opts);
@@ -701,157 +702,160 @@ classdef Match < handle & physConsts
         vm=(obj.varLimits(2,:)-obj.varLimits(1,:));
         x=x.*vm;
       end
-      
-      % If using lookup table, do that now and exit
-      if dotrack<0
-        F=obj.doLookup(x);
-        lastvals=F;
-        
-        if strcmp(obj.optim,'lsqnonlin')
-          F=((F-obj.matchVals)./obj.matchWeights);
-          if exist('varW','var')
-            F(end+1:end+length(varW))=(x-varVals)./varW;
+      try
+        % If using lookup table, do that now and exit
+        if dotrack<0
+          F=obj.doLookup(x);
+          lastvals=F;
+
+          if strcmp(obj.optim,'lsqnonlin')
+            F=((F-obj.matchVals)./obj.matchWeights);
+            if exist('varW','var')
+              F(end+1:end+length(varW))=(x-varVals)./varW;
+            end
+          elseif ~strcmp(obj.optim,'fgoalattain')
+            F=sum(((F-obj.matchVals)./obj.matchWeights).^2);
           end
-        elseif ~strcmp(obj.optim,'fgoalattain')
-          F=sum(((F-obj.matchVals)./obj.matchWeights).^2);
+          return
         end
-        return
-      end
-      
-      % Set the variables
-      obj.varVals=x;
-      
-      % Get twiss in correct format
-      if dotwiss && ~(dotrack<0)
-        Ix.beta=obj.initStruc.x.Twiss.beta;
-        Ix.alpha=obj.initStruc.x.Twiss.alpha;
-        Ix.eta=obj.initStruc.x.Twiss.eta;
-        Ix.etap=obj.initStruc.x.Twiss.etap;
-        Ix.nu=obj.initStruc.x.Twiss.nu;
-        Iy.beta=obj.initStruc.y.Twiss.beta;
-        Iy.alpha=obj.initStruc.y.Twiss.alpha;
-        Iy.eta=obj.initStruc.y.Twiss.eta;
-        Iy.etap=obj.initStruc.y.Twiss.etap;
-        Iy.nu=obj.initStruc.y.Twiss.nu;
-      end
-      
-      % Get the data (do the tracking)
-      F=zeros(1,length(obj.matchType));
-      for itrack=1:length(obj.iMatch)
-        try
-          if itrack==1
-            if dotrack
-              [stat beamout]=TrackThru(obj.iInitial,obj.iMatch(1),obj.beam,1,1,0);
-              if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+
+        % Set the variables
+        obj.varVals=x;
+
+        % Get twiss in correct format
+        if dotwiss && ~(dotrack<0)
+          Ix.beta=obj.initStruc.x.Twiss.beta;
+          Ix.alpha=obj.initStruc.x.Twiss.alpha;
+          Ix.eta=obj.initStruc.x.Twiss.eta;
+          Ix.etap=obj.initStruc.x.Twiss.etap;
+          Ix.nu=obj.initStruc.x.Twiss.nu;
+          Iy.beta=obj.initStruc.y.Twiss.beta;
+          Iy.alpha=obj.initStruc.y.Twiss.alpha;
+          Iy.eta=obj.initStruc.y.Twiss.eta;
+          Iy.etap=obj.initStruc.y.Twiss.etap;
+          Iy.nu=obj.initStruc.y.Twiss.nu;
+        end
+
+        % Get the data (do the tracking)
+        F=zeros(1,length(obj.matchType));
+        for itrack=1:length(obj.iMatch)
+          try
+            if itrack==1
+              if dotrack
+                [stat beamout]=TrackThru(obj.iInitial,obj.iMatch(1),obj.beam,1,1,0);
+                if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+              end
+              if dotwiss
+                [stat T]=GetTwiss(obj.iInitial,obj.iMatch(1),Ix,Iy);
+                if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+              end
+            else
+              if dotrack
+                [stat beamout]=TrackThru(obj.iMatch(itrack-1),obj.iMatch(itrack),beamout,1,1,0);
+                if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+              end
+              if dotwiss
+                %             Ix.beta=T.betax; Ix.alpha=T.alphax; Ix.eta=T.etax; Ix.etap=T.etapx; Ix.nu=T.nux;
+                %             Iy.beta=T.betay; Iy.alpha=T.alphay; Iy.eta=T.etay; Iy.etap=T.etapy; Iy.nu=T.nuy;
+                [stat T]=GetTwiss(obj.iInitial,obj.iMatch(itrack),Ix,Iy);
+                if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+              end
             end
-            if dotwiss
-              [stat T]=GetTwiss(obj.iInitial,obj.iMatch(1),Ix,Iy);
-              if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
-            end
-          else
-            if dotrack
-              [stat beamout]=TrackThru(obj.iMatch(itrack-1),obj.iMatch(itrack),beamout,1,1,0);
-              if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
-            end
-            if dotwiss
-              %             Ix.beta=T.betax; Ix.alpha=T.alphax; Ix.eta=T.etax; Ix.etap=T.etapx; Ix.nu=T.nux;
-              %             Iy.beta=T.betay; Iy.alpha=T.alphay; Iy.eta=T.etay; Iy.etap=T.etapy; Iy.nu=T.nuy;
-              [stat T]=GetTwiss(obj.iInitial,obj.iMatch(itrack),Ix,Iy);
-              if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
-            end
+          catch
+            F=ones(size(F)).*1e10;
+            continue
           end
-        catch
-          F=ones(size(F)).*1e10;
-          continue
-        end
-        % Extract the data
-        for itype=1:length(obj.matchType)
-          if obj.matchInd(itype)~=obj.iMatch(itrack); continue; end;
-          switch obj.matchType{itype}
-            case 'alpha_x'
-              F(itype)=T.alphax(end);
-            case 'alpha_y'
-              F(itype)=T.alphay(end);
-            case 'beta_x'
-              F(itype)=T.betax(end);
-            case 'beta_y'
-              F(itype)=T.betay(end);
-            case 'eta_x'
-              F(itype)=T.etax(end);
-            case 'eta_y'
-              F(itype)=T.etay(end);
-            case 'etap_x'
-              F(itype)=T.etapx(end);
-            case 'etap_y'
-              F(itype)=T.etapy(end);
-            case 'nu_x'
-              F(itype)=T.nux(end);
-            case 'nu_y'
-              F(itype)=T.nuy(end);
-            case 'NEmit_x'
-              if ~exist('nx','var')
-                [nx,ny] = GetNEmitFromBeam( beamout ,1);
-              end
-              F(itype)=nx;
-            case 'NEmit_y'
-              if ~exist('ny','var')
-                [nx,ny] = GetNEmitFromBeam( beamout ,1);
-              end
-              F(itype)=ny;
-            case 'Sigma'
-              if ~exist('S','var')
+          % Extract the data
+          for itype=1:length(obj.matchType)
+            if obj.matchInd(itype)~=obj.iMatch(itrack); continue; end;
+            switch obj.matchType{itype}
+              case 'alpha_x'
+                F(itype)=T.alphax(end);
+              case 'alpha_y'
+                F(itype)=T.alphay(end);
+              case 'beta_x'
+                F(itype)=T.betax(end);
+              case 'beta_y'
+                F(itype)=T.betay(end);
+              case 'eta_x'
+                F(itype)=T.etax(end);
+              case 'eta_y'
+                F(itype)=T.etay(end);
+              case 'etap_x'
+                F(itype)=T.etapx(end);
+              case 'etap_y'
+                F(itype)=T.etapy(end);
+              case 'nu_x'
+                F(itype)=T.nux(end);
+              case 'nu_y'
+                F(itype)=T.nuy(end);
+              case 'NEmit_x'
+                if ~exist('nx','var')
+                  [nx,ny] = GetNEmitFromBeam( beamout ,1);
+                end
+                F(itype)=nx;
+              case 'NEmit_y'
+                if ~exist('ny','var')
+                  [nx,ny] = GetNEmitFromBeam( beamout ,1);
+                end
+                F(itype)=ny;
+              case 'Sigma'
+                if ~exist('S','var')
+                  S=cov(beamout.Bunch.x');
+                end
+                F(itype)=S(str2double(obj.matchTypeQualifiers{itype}(1)),str2double(obj.matchTypeQualifiers{itype}(2)));
+              case 'SigmaGauss'
+                if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
+                  dim=str2double(obj.matchTypeQualifiers{itype}(1));
+                  [fitTerm,fitCoef,bsizecor] = beamTerms(dim,beamout);
+                end
+                F(itype)=bsizecor(end);
+              case {'T' 'U'}
+                if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
+                  dim=str2double(obj.matchTypeQualifiers{itype}(1));
+                  [fitTerm,fitCoef] = beamTerms(dim,beamout);
+                end
+                term=[0 0 0 0]; termind=[1 2 3 4 6]; termind=termind(termind~=dim);
+                for iterm=2:length(obj.matchTypeQualifiers{itype})
+                  term(termind==str2double(obj.matchTypeQualifiers{itype}(iterm)))=...
+                    term(termind==str2double(obj.matchTypeQualifiers{itype}(iterm)))+1;
+                end
+                F(itype)=fitCoef(arrayfun(@(x) isequal(fitTerm(x,:),term),1:length(fitTerm)));
+              case {'Waist_x' 'Waist_y'}
                 S=cov(beamout.Bunch.x');
-              end
-              F(itype)=S(str2double(obj.matchTypeQualifiers{itype}(1)),str2double(obj.matchTypeQualifiers{itype}(2)));
-            case 'SigmaGauss'
-              if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
-                dim=str2double(obj.matchTypeQualifiers{itype}(1));
-                [fitTerm,fitCoef,bsizecor] = beamTerms(dim,beamout);
-              end
-              F(itype)=bsizecor(end);
-            case {'T' 'U'}
-              if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
-                dim=str2double(obj.matchTypeQualifiers{itype}(1));
-                [fitTerm,fitCoef] = beamTerms(dim,beamout);
-              end
-              term=[0 0 0 0]; termind=[1 2 3 4 6]; termind=termind(termind~=dim);
-              for iterm=2:length(obj.matchTypeQualifiers{itype})
-                term(termind==str2double(obj.matchTypeQualifiers{itype}(iterm)))=...
-                  term(termind==str2double(obj.matchTypeQualifiers{itype}(iterm)))+1;
-              end
-              F(itype)=fitCoef(arrayfun(@(x) isequal(fitTerm(x,:),term),1:length(fitTerm)));
-            case {'Waist_x' 'Waist_y'}
-              S=cov(beamout.Bunch.x');
-              R=diag(ones(1,6));L=zeros(6,6);L(1,2)=1;L(3,4)=1;
-              if strcmp(obj.matchType{itype},'Waist_x')
-                F(itype)=fminsearch(@(x) minWaist(obj,x,R,L,S,1),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
-              else
-                F(itype)=fminsearch(@(x) minWaist(obj,x,R,L,S,3),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
-              end
-            case {'Disp_x' 'Disp_y'}
-              S=cov(beamout.Bunch.x');
-              if strcmp(obj.matchType{itype},'Disp_x')
-                F(itype)=S(1,6)/S(6,6);
-              else
-                F(itype)=S(3,6)/S(6,6);
-              end
+                R=diag(ones(1,6));L=zeros(6,6);L(1,2)=1;L(3,4)=1;
+                if strcmp(obj.matchType{itype},'Waist_x')
+                  F(itype)=fminsearch(@(x) minWaist(obj,x,R,L,S,1),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
+                else
+                  F(itype)=fminsearch(@(x) minWaist(obj,x,R,L,S,3),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
+                end
+              case {'Disp_x' 'Disp_y'}
+                [Tx Ty]=GetUncoupledTwissFromBeamPars(beamout,1);
+                if strcmp(obj.matchType{itype},'Disp_x')
+                  F(itype)=Tx.eta;
+                else
+                  F(itype)=Ty.eta;
+                end
+            end
+          end
+
+          % Beamsize data
+          if dotrack
+            bs.Beam=beamout;
+            bs.x(itrack)=std(beamout.Bunch.x(1,:));
+            bs.y(itrack)=std(beamout.Bunch.x(3,:));
+            bs.z(itrack)=std(beamout.Bunch.x(5,:));
+          else
+            bs.Beam=[];
+            bs.x(itrack)=sqrt((obj.initStruc.x.NEmit/(obj.initStruc.Momentum/0.511e-3))*T.betax(end));
+            bs.y(itrack)=sqrt((obj.initStruc.y.NEmit/(obj.initStruc.Momentum/0.511e-3))*T.betay(end));
+            bs.z=obj.initStruc.sigz;
           end
         end
-        
-        % Beamsize data
-        if dotrack
-          bs.Beam=beamout;
-          bs.x(itrack)=std(beamout.Bunch.x(1,:));
-          bs.y(itrack)=std(beamout.Bunch.x(3,:));
-          bs.z(itrack)=std(beamout.Bunch.x(5,:));
-        else
-          bs.Beam=[];
-          bs.x(itrack)=sqrt((obj.initStruc.x.NEmit/(obj.initStruc.Momentum/0.511e-3))*T.betax(end));
-          bs.y(itrack)=sqrt((obj.initStruc.y.NEmit/(obj.initStruc.Momentum/0.511e-3))*T.betay(end));
-          bs.z=obj.initStruc.sigz;
-        end
+      catch
+        F=ones(size(obj.varType)).*1e60;
       end
-      
+
       % Subtract desired values so minimiser does the correct thing
       % And apply weights
       lastvals=F;
@@ -863,6 +867,9 @@ classdef Match < handle & physConsts
         end
       elseif ~strcmp(obj.optim,'fgoalattain')
         F=sum(((F-obj.matchVals)./obj.matchWeights).^2);
+      end
+      if any(isnan(F)) || any(isinf(F))
+        F=ones(size(F)).*1e60;
       end
     end
     function chi2 = minWaist(obj,x,R,L,sig,dir) %#ok<MANU>

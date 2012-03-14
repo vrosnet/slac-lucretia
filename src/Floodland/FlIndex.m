@@ -840,12 +840,13 @@ classdef FlIndex < handle & FlGui & FlUtils
         if ~isfield(BEAMLINE{mList(im)},'Girder') || ~BEAMLINE{mList(im)}.Girder
           stat = AssignToGirder(mList(im), length(GIRDER)+1, 1) ;
           if stat{1}~=1; error('GIRDER assignment error:\n%s\n',stat{2}); end;
+          [stat,G]=AddMoverToGirder(1:6,GIRDER{end});
           ind=length(GIRDER);
+          GIRDER{end}=G;
         else
           ind=BEAMLINE{mList(im)}.Girder;
         end
         if ~isfield(GIRDER{ind},'pvname') || ~iscell(GIRDER{ind}.pvname)
-          GIRDER{ind}.Mover=1:6;
           GIRDER{ind}.cunits=cell(2,6);
           GIRDER{ind}.protocol=cell(2,6);
           GIRDER{ind}.pvname=cell(2,6);

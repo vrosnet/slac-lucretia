@@ -127,14 +127,16 @@ classdef distributedLucretia < handle
   
   % Main public methods
   methods
-    function obj=distributedLucretia(synch,nworkers)
-      % distributedLucretia(synchronous,initFileName,nworkers)
+    function obj=distributedLucretia(synch,nworkers,sched)
+      % distributedLucretia(synchronous,initFileName,[nworkers,sched])
       %   Create Distributed object for use with othe distributed Lucretia
       %   tools. Initially setup with default scheduler configuration.
       % 'synch' = true | false
       %   Optionally supply 'nworkers' to set maxworkers, if omitted then use
       %   the default number in the scheduler configuration
       %   argument checks
+      %   Optionally supply scheduler name to use in 'sched' else default
+      %   scheduler used (setup in Matlab parallel options)
       global BEAMLINE PS GIRDER KLYSTRON WF %#ok<NUSED>
       % Arg check
       if ~exist('synch','var') || ~islogical(synch)
@@ -151,10 +153,15 @@ classdef distributedLucretia < handle
       % sceduler configuration
       [config, allconfigs] = defaultParallelConfig;
       obj.schedConfigs=allconfigs;
-      if exist('nworkers','var')
-        setConfig(obj,config,nworkers);
+      if exist('sched','var') && ~isempty(sched)
+        useSched=sched;
       else
-        setConfig(obj,config);
+        useSched=config;
+      end
+      if exist('nworkers','var') && ~isempty(nworkers)
+        setConfig(obj,useSched,nworkers);
+      else
+        setConfig(obj,useSched);
       end
       
       % Initialise to use all workers
@@ -167,13 +174,20 @@ classdef distributedLucretia < handle
           error('There is already parallel resources allocated, maybe another distributedLucretia object is open, destroy it using the destroy method, or try closing resources manually with ''matlabpool close''')
         end
         matlabpool(obj.sched,obj.maxworkers);
+        spmd
+          warning off all
+        end
         obj.synchronous=true;
       else
         obj.synchronous=false;
       end
 
       % Initialise all workers with Lucretia global data
-      obj.asynDataFile=fullfile(obj.sched.DataLocation,'distributedLucretiaStartupData.mat');
+      if isprop(obj.sched,'DataLocation')
+        obj.asynDataFile=fullfile(obj.sched.DataLocation,'distributedLucretiaStartupData.mat');
+      else
+        obj.asynDataFile='distributedLucretiaStartupData.mat';
+      end
       save(obj.asynDataFile,'BEAMLINE','PS','KLYSTRON','WF','GIRDER')
       if synch
         pctRunOnAll(sprintf('load %s',obj.asynDataFile));
@@ -202,14 +216,23 @@ classdef distributedLucretia < handle
         error('Not an existing parallel configuration, choose from obj.schedConfigs list')
       end
       obj.sched=findResource('scheduler','configuration',configName);
-      if ~obj.sched.HasSharedFilesystem
+      if isprop(obj.sched,'HasSharedFilesystem') && ~obj.sched.HasSharedFilesystem
         warning('This scheduler is not setup for a shared filesystem, this may cause problems and is not recommended!')
       end
       obj.thisConfig=configName;
-      if exist('nworkers','var')
-        obj.maxworkers=nworkers;
+      % get max number of useable workers
+      iw=obj.sched.IdleWorkers;
+      if isempty(iw)
+        error('No parallel workers available');
+      end
+      if isprop(iw(1),'Computer') % max is max number of same kind of architctures available
+        comps=get(iw,'Computer');
+        obj.maxworkers=max(cellfun(@(x) sum(ismember(comps,x)),unique(comps)));
       else
         obj.maxworkers=obj.sched.ClusterSize;
+      end
+      if exist('nworkers','var') && nworkers<obj.maxworkers
+        obj.maxworkers=nworkers;
       end
     end
     function setError(obj,errTerm,errEleList)
@@ -286,7 +309,7 @@ classdef distributedLucretia < handle
       end
     end
     function MoverTrim(obj,mList)
-      % MoverTrim(obj,psList)
+      % MoverTrim(obj,mList)
       %  Perform MoverTrim operation on all workers to trim their mover
       %  positions those held in local obj.latticeSyncVals.GIRDER property array
       %
