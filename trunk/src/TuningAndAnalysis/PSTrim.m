@@ -1,4 +1,4 @@
-function stat = PSTrim( klyslist, varargin )
+function stat = PSTrim( pslist )
 
 % PSTRIM Set power supply actual values to desired values
 %
@@ -11,29 +11,43 @@ function stat = PSTrim( klyslist, varargin )
 %      in stat{2...}.
 %
 % See also GirderMoverTrim, KlystronTrim.
+%
 
 %==========================================================================
+% MODS:
+% GW: March-11-2012
+%   Allow PSElement and PS fields to make PSs hierarchical
 
-  global PS ;
-  stat = InitializeMessageStack( ) ;
-  if (max(klyslist) > length(PS))
-      stat{1} = 0 ;
-      stat = AddMessageToStack(stat,...
-          'Out-of-range power supplies found in PSTrim') ;
-  end
-  
-% loop over power supplies
+global PS ;
+stat = InitializeMessageStack( ) ;
+if (max(pslist) > length(PS))
+  stat{1} = 0 ;
+  stat = AddMessageToStack(stat,...
+    'Out-of-range power supplies found in PSTrim') ;
+end
 
-  for count = 1:length(klyslist) 
-      klysno = klyslist(count) ;
-      if (PS(klysno).Step == 0)
-          PS(klysno).Ampl = PS(klysno).SetPt ;
-      else
-          nstep = round( (PS(klysno).SetPt - ...
-                          PS(klysno).Ampl        ) / ...
-                          PS(klysno).Step            ) ;
-          PS(klysno).Ampl = PS(klysno).Ampl + ...
-              nstep * PS(klysno).Step ;
-      end
+
+for count = 1:length(pslist)
+  psno = pslist(count) ;
+  if isfield(PS(psno),'PS') && ~isempty(PS(psno).PS) && PS(psno).PS % There is a master PS, add that strength to this PS
+    mSet=PS(PS(psno).PS).Ampl;
+  else
+    mSet=0;
   end
-      
+  if (PS(psno).Step == 0)
+    PS(psno).Ampl = mSet + PS(psno).SetPt ;
+  else
+    nstep = round( (PS(psno).SetPt - ...
+      PS(psno).Ampl        ) / ...
+      PS(psno).Step            ) ;
+    PS(psno).Ampl = mSet + PS(psno).Ampl + ...
+      nstep * PS(psno).Step ;
+  end
+  if isfield(PS(psno),'PSElement') && ~isempty(PS(psno).PSElement) && PS(psno).PSElement % If this PS controls other PSs loop over those
+    stat=PSTrim(PS(psno).PSElement);
+    stat{1} = 0 ;
+    stat = AddMessageToStack(stat,...
+      sprintf('Trim PS error (PS: %s)',stat{2})) ;
+  end
+end
+
