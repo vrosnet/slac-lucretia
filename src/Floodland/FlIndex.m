@@ -758,6 +758,7 @@ classdef FlIndex < handle & FlGui & FlUtils
       % addPS(obj, blList)
       %   Add a PS control into this object
       %   blList: vector of BEAMLINE elements to assign to this PS
+      %           or cell of vectors
       global BEAMLINE PS
       if ~iscell(blList); blList={blList}; end;
       % If no PS exist for this index, first make it
@@ -768,7 +769,10 @@ classdef FlIndex < handle & FlGui & FlUtils
           ind=length(PS);
         else
           ind=BEAMLINE{blList{ibl}(1)}.PS;
-          if ismember(ind,obj.PS); continue; end;
+          try
+            if ismember(ind,obj.PS); continue; end;
+          catch
+          end
         end
         if ~isfield(PS(ind),'pvname') || ~iscell(PS(ind).pvname)
           PS(ind).trimpv=cell(2,1);
@@ -798,6 +802,7 @@ classdef FlIndex < handle & FlGui & FlUtils
       % addKlystron(obj, kList)
       %   Add a klystron control to this object
       %   kList: vector of BEAMLINE indices to assign to this KLYSTRON
+      %          or cell of vectors
       global BEAMLINE KLYSTRON
       if ~iscell(kList); kList={kList}; end;
       % If no KLYSTRON exist for this index, first make it
@@ -808,7 +813,10 @@ classdef FlIndex < handle & FlGui & FlUtils
           ind=length(KLYSTRON);
         else
           ind=BEAMLINE{kList{ik}(1)}.Klystron;
-          if ismember(ind,obj.KLYSTRON); continue; end;
+          try
+            if ismember(ind,obj.KLYSTRON); continue; end;
+          catch
+          end
         end
         if ~isfield(KLYSTRON(ind),'pvname') || ~iscell(KLYSTRON(ind).pvname)
           KLYSTRON(ind).cunits='none';
@@ -834,17 +842,24 @@ classdef FlIndex < handle & FlGui & FlUtils
       % addMover(obj, mList)
       %   Add a new mover (GIRDER) control element to this object
       %   mList: List of BEAMLINE elements to assign to this GIRDER
+      %   mList can be either a vector of elements or a cell array of
+      %   element vectors for adidng multiple GIRDERS simultaneously
       global BEAMLINE GIRDER
+      if ~iscell(mList); mList={mList}; end;
       % If no GIRDER exist for this index, first make it
       for im=1:length(mList)
-        if ~isfield(BEAMLINE{mList(im)},'Girder') || ~BEAMLINE{mList(im)}.Girder
-          stat = AssignToGirder(mList(im), length(GIRDER)+1, 1) ;
+        if ~isfield(BEAMLINE{mList{im}(1)},'Girder') || ~BEAMLINE{mList{im}(1)}.Girder
+          stat = AssignToGirder(mList{im}, length(GIRDER)+1, 1) ;
           if stat{1}~=1; error('GIRDER assignment error:\n%s\n',stat{2}); end;
           [stat,G]=AddMoverToGirder(1:6,GIRDER{end});
           ind=length(GIRDER);
           GIRDER{end}=G;
         else
-          ind=BEAMLINE{mList(im)}.Girder;
+          ind=BEAMLINE{mList{im}(1)}.Girder;
+          try
+            if ismember(ind,obj.GIRDER); continue; end;
+          catch
+          end
         end
         if ~isfield(GIRDER{ind},'pvname') || ~iscell(GIRDER{ind}.pvname)
           GIRDER{ind}.cunits=cell(2,6);
