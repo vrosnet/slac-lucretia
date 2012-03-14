@@ -59,7 +59,10 @@ classdef Floodland < handle & matlab.mixin.Copyable
         error('Supply # macro particles 2-1e6')
       end
       obj.Nmacro=val;
-      obj.beamGen;
+%       try
+        obj.beamGen;
+%       catch
+%       end
     end
     function set.sparse_Nslice(obj,val)
       if ~isnumeric(val) || val<1 || val>1e6
@@ -253,10 +256,14 @@ classdef Floodland < handle & matlab.mixin.Copyable
     function beamGen(obj,newseed)
       % store current random generator info
       if ~exist('newseed','var') || ~newseed
-        s=rng;
-        if isempty(obj.seed); obj.seed=s.Seed; end;
-        olds=s; olds.Seed=obj.seed;
-        rng(olds);
+        try
+          s=rng;
+          if isempty(obj.seed); obj.seed=s.Seed; end;
+          olds=s; olds.Seed=obj.seed;
+          rng(olds);
+        catch
+          obj.seed=s.Seed;
+        end
       end
       % Generate beam
       obj.BeamMacro = MakeBeam6DGauss( obj.Initial, obj.Nmacro, obj.beamSigmaCut, 1 );
