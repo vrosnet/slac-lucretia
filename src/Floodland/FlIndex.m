@@ -436,7 +436,7 @@ classdef FlIndex < handle & FlGui & FlUtils
     function gpos=get.GIRDER_POS(obj)
       % Get GIRDER (mover) positions (N * 6) double array
       global GIRDER
-      gpos=cell2mat(arrayfun(@(x) GIRDER{x}.MoverPos,obj.GIRDER,'UniformOutput',false));
+      gpos=reshape(cell2mat(arrayfun(@(x) GIRDER{x}.MoverPos,obj.GIRDER,'UniformOutput',false)),6,length(obj.GIRDER))';
     end
     function set.GIRDER_POS(obj,value)
       % Set GIRDER (mover) positions (N * 6) double array
@@ -540,21 +540,21 @@ classdef FlIndex < handle & FlGui & FlUtils
       % Get integrated magnet field strength for magnets associated with
       % this PS
       global BEAMLINE PS
-      ret=arrayfun(@(x) PS(x).Ampl.*sum(arrayfun(@(xx) BEAMLINE{xx}.B,PS(x).Element)),obj.PS);
+      ret=arrayfun(@(x) PS(x).Ampl.*sum(arrayfun(@(xx) BEAMLINE{xx}.B(1),PS(x).Element)),obj.PS);
     end
     function set.PS_B(obj,val)
       % Set integrated magnet field strength for magnets associated with
       % this PS
       global BEAMLINE PS
       for ips=obj.PS
-        PS(ips).SetPt=val(ips)./sum(arrayfun(@(x) BEAMLINE{x}.B,PS(ips).Element));
+        PS(ips).SetPt=val(ips)./sum(arrayfun(@(x) BEAMLINE{x}.B(1),PS(ips).Element));
       end
     end
     function ret = get.PS_BMDL(obj)
       % Get integrated magnet field strength for magnets associated with
       % this PS (design value)
       global BEAMLINE PS
-      ret=arrayfun(@(x) sum(arrayfun(@(xx) BEAMLINE{xx}.B,PS(x).Element)),obj.PS);
+      ret=arrayfun(@(x) sum(arrayfun(@(xx) BEAMLINE{xx}.B(1),PS(x).Element)),obj.PS);
     end
     function names=get.KLYSTRON_names(obj)
       % List of names of KLSYTRON controls in this object
@@ -651,8 +651,14 @@ classdef FlIndex < handle & FlGui & FlUtils
       if ~exist('id','var') || isempty(find(obj.(type)==id, 1))
         error('Must supply type id contained in obj.type')
       end
-      if ~exist('pvname','var') || ~isequal(size(pvname),eval(sprintf('size(%s(%d).pvname)',type,id)))
-        error('Must supply pvname cell of same dimension as global of same type')
+      if strcmp(type,'GIRDER')
+        if ~exist('pvname','var') || ~isequal(size(pvname),eval(sprintf('size(%s{%d}.pvname)',type,id)))
+          error('Must supply pvname cell of same dimension as global of same type')
+        end
+      else
+        if ~exist('pvname','var') || ~isequal(size(pvname),eval(sprintf('size(%s(%d).pvname)',type,id)))
+          error('Must supply pvname cell of same dimension as global of same type')
+        end
       end
       if ~exist('protocol','var') || ~ismember(protocol,{'AIDA' 'EPICS'})
         error('Must supply protocol as either AIDA or EPICS')
@@ -666,11 +672,20 @@ classdef FlIndex < handle & FlGui & FlUtils
       if ~exist('high','var') || ~isequal(size(high),size(pvname))
         error('Must supply high bounds for this control (same dimensionality as conv)')
       end
-      eval(sprintf('%s(%d).pvname=pvname;',type,id));
-      eval(sprintf('%s(%d).protocol=protocol;',type,id));
-      eval(sprintf('%s(%d).conv=conv;',type,id));
-      eval(sprintf('%s(%d).low=low;',type,id));
-      eval(sprintf('%s(%d).high=high;',type,id));
+      if strcmp(type,'GIRDER')
+        eval(sprintf('%s{%d}.pvname=pvname;',type,id));
+        eval(sprintf('%s{%d}.protocol=protocol;',type,id));
+        eval(sprintf('%s{%d}.conv=conv;',type,id));
+        eval(sprintf('%s{%d}.low=low;',type,id));
+        eval(sprintf('%s{%d}.high=high;',type,id));
+      else
+        eval(sprintf('%s(%d).pvname=pvname;',type,id));
+        eval(sprintf('%s(%d).protocol=protocol;',type,id));
+        eval(sprintf('%s(%d).conv=conv;',type,id));
+        eval(sprintf('%s(%d).low=low;',type,id));
+        eval(sprintf('%s(%d).high=high;',type,id));
+      end
+      
       list=obj.(sprintf('%s_list',type));
       ilist=list(obj.(type)==id);
       sz=size(pvname);
@@ -822,8 +837,8 @@ classdef FlIndex < handle & FlGui & FlUtils
           KLYSTRON(ind).cunits='none';
           KLYSTRON(ind).protocol='none';
           KLYSTRON(ind).pvname=cell(2,2);
-          KLYSTRON(ind).preCommand=cell(2,2);
-          KLYSTRON(ind).postCommand=cell(2,2);
+          KLYSTRON(ind).preCommand=cell(2,1);
+          KLYSTRON(ind).postCommand=cell(2,1);
           KLYSTRON(ind).conv={1 1;1 1};
           KLYSTRON(ind).timestamp=0;
           KLYSTRON(ind).high=NaN(2,2);
@@ -865,12 +880,13 @@ classdef FlIndex < handle & FlGui & FlUtils
           GIRDER{ind}.cunits=cell(2,6);
           GIRDER{ind}.protocol=cell(2,6);
           GIRDER{ind}.pvname=cell(2,6);
-          GIRDER{ind}.preCommand=cell(2,6);
-          GIRDER{ind}.postCommand=cell(2,6);
+          GIRDER{ind}.preCommand=cell(2,1);
+          GIRDER{ind}.postCommand=cell(2,1);
           GIRDER{ind}.conv={1 1 1 1 1 1; 1 1 1 1 1 1};
           GIRDER{ind}.timestamp=0;
           GIRDER{ind}.high=NaN(2,6);
           GIRDER{ind}.low=NaN(2,6);
+          GIRDER{ind}.velo=ones(1,6);
         end
         obj.MasterInd(end+1)=ind;
         obj.MasterRef(end+1,:)=[false true false];
