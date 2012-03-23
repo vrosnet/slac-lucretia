@@ -21,9 +21,6 @@ classdef FlMenu < FlGui
   %
   % Full lucretia documentation available online:
   %   <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia">Lucretia</a>
-  properties
-    guiTitle='Lucretia:Floodland'; % Title to display on menu GUI 
-  end
   properties(Access=private)
     FL % pointer to Floodland object
     appList={}; % list of applications (links to Floodland app objects)
@@ -53,6 +50,7 @@ classdef FlMenu < FlGui
         error('Must pass Floodland object as first argument');
       end
       obj.FL=FL;
+      obj.guiTitle='Lucretia:Floodland'; % Title to display on menu GUI 
     end
     function addApp(obj,appObj)
       % addApp(obj,appObj)
@@ -81,31 +79,37 @@ classdef FlMenu < FlGui
     end
     function handle=guiMain(obj,~,~)
       % Main gui
-      if obj.FL.issim
-        mode='Sim';
-      else
-        mode='Live';
-      end
       nApp=length(obj.appList);
       border=0.05;
       appButtonSize=50;
       % Generate GUI
-      obj.guiCreateFigure('guiMain',sprintf('%s (%s)',obj.guiTitle,mode),[350 max([appButtonSize*nApp,50])]);
+      obj.guiCreateFigure('guiMain',obj.guiTitle,[350 max([appButtonSize*nApp,50])]);
       handle=obj.gui.guiMain;
       % Menu & sim mode settings
       mm=uimenu('Parent',obj.gui.guiMain,'Label','Mode');
       obj.gui.menu_simMode=uimenu('Parent',mm,'Label','Sim','Callback',@(src,event)simModeChange(obj,src,event));
       obj.gui.menu_liveMode=uimenu('Parent',mm,'Label','Live','Callback',@(src,event)simModeChange(obj,src,event));
+      mc=uimenu('Parent',obj.gui.guiMain,'Label','Controls');
+      msaf=uimenu('Parent',mc,'Label','Safeties');
+      obj.gui.menu_safeOn=uimenu('Parent',msaf,'Label','on','Callback',@(src,event)safetiesOn(obj,src,event));
+      obj.gui.menu_safeOff=uimenu('Parent',msaf,'Label','off','Callback',@(src,event)safetiesOff(obj,src,event));
+      if strcmp(obj.FL.writeSafety,'on')
+        set(obj.gui.menu_safeOn,'Checked','on')
+        set(obj.gui.menu_safeOff,'Checked','off')
+      else
+        set(obj.gui.menu_safeOn,'Checked','off')
+        set(obj.gui.menu_safeOff,'Checked','on')
+      end
       if obj.FL.issim
         set(obj.gui.menu_simMode,'Checked','on')
         set(obj.gui.menu_liveMode,'Checked','off')
-        set(obj.gui.guiMain,'Color',[170,255,128]./255)
+        obj.simModeChange(obj,obj.gui.menu_simMode);
       else
         set(obj.gui.menu_simMode,'Checked','off')
         set(obj.gui.menu_liveMode,'Checked','on')
-        set(obj.gui.guiMain,'Color',[255,190,0]./255)
+        obj.simModeChange(obj,obj.gui.menu_liveMode);
       end
-%       em=uimenu('Parent',obj.gui.guiMain,'Label','Edit');
+      
       
       % Application buttons
       if ~isempty(obj.appList)
@@ -131,6 +135,18 @@ classdef FlMenu < FlGui
   
   %% GUI callbacks
   methods(Hidden)
+    function safetiesOn(obj,~,~)
+      obj.FL.writeSafety='on';
+      set(obj.gui.menu_safeOn,'Checked','on')
+      set(obj.gui.menu_safeOff,'Checked','off')
+      obj.setBkgCol;
+    end
+    function safetiesOff(obj,~,~)
+      obj.FL.writeSafety='off';
+      set(obj.gui.menu_safeOn,'Checked','off')
+      set(obj.gui.menu_safeOff,'Checked','on')
+      obj.setBkgCol;
+    end
     function simModeChange(obj,src,~)
       % simModeChange(obj,src)
       % callback for change mode menu items
@@ -138,14 +154,24 @@ classdef FlMenu < FlGui
         obj.FL.issim=true;
         set(obj.gui.menu_simMode,'Checked','on')
         set(obj.gui.menu_liveMode,'Checked','off')
-        set(obj.gui.guiMain,'Color',[170,255,128]./255)
-        set(obj.gui.guiMain,'Name',sprintf('%s (%s)',obj.guiTitle,'Sim'))
       else
         obj.FL.issim=false;
         set(obj.gui.menu_simMode,'Checked','off')
         set(obj.gui.menu_liveMode,'Checked','on')
+      end
+      obj.setBkgCol;
+    end
+    function setBkgCol(obj)
+      if obj.FL.issim
+        obj.FL.issim=true;
+        set(obj.gui.guiMain,'Color',[170,255,128]./255)
+        set(obj.gui.guiMain,'Name',sprintf('%s (%s)',obj.guiTitle,'Sim'))
+      elseif strcmp(obj.FL.writeSafety,'on')
         set(obj.gui.guiMain,'Color',[255,190,0]./255)
         set(obj.gui.guiMain,'Name',sprintf('%s (%s)',obj.guiTitle,'Live'))
+      else
+        set(obj.gui.guiMain,'Color','red')
+        set(obj.gui.guiMain,'Name',sprintf('%s (%s)',obj.guiTitle,'Live, safeties off'))
       end
       drawnow('expose')
     end

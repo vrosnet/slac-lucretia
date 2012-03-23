@@ -68,7 +68,7 @@ classdef FlInstr < handle & FlGui & FlUtils
     stopReq=false; % flag for requesting abort of specific in-class operations
     Type; % Instrument type ('stripline', 'ccav', etc...)
   end
-  properties(Access=protected)
+  properties(Hidden)
     AIDA_BPMD = {} ; % AIDA BPMD allocation
     AIDA_NAMES = {} ; % AIDA Names
     instrChoiceFromGui % INSTR choice returned from user in GUI

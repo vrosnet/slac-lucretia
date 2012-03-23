@@ -43,6 +43,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
     slices % BEAMLINE element slices
     blocks % BEAMLINE element blocks
   end
+  properties
+    writeSafety='on'; % 'on' or 'off' : if on then don't at any point try to write to a control system, just print out data instead
+  end
   
   %% Get/Set methods
   methods
@@ -59,24 +62,30 @@ classdef Floodland < handle & matlab.mixin.Copyable
         error('Supply # macro particles 2-1e6')
       end
       obj.Nmacro=val;
-%       try
+      try
         obj.beamGen;
-%       catch
-%       end
+      catch
+      end
     end
     function set.sparse_Nslice(obj,val)
       if ~isnumeric(val) || val<1 || val>1e6
         error('Supply # sparse slices 1-1e6')
       end
       obj.sparse_Nslice=val;
-      obj.beamGen;
+      try
+        obj.beamGen;
+      catch
+      end
     end
     function set.sparse_Nener(obj,val)
       if ~isnumeric(val) || val<1 || val>1e6
         error('Supply # energies per slice 1-1e6')
       end
       obj.sparse_Nener=val;
-      obj.beamGen;
+      try
+        obj.beamGen;
+      catch
+      end
     end
     function set.Initial(obj,newInitial)
       obj.Initial=newInitial;
@@ -178,6 +187,11 @@ classdef Floodland < handle & matlab.mixin.Copyable
       if ~isempty(proplist)
         klyGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(indxObj.KLYSTRON_list(proplist)));
       end
+      % GIRDER
+      proplist=find(indxObj.useCntrl(indxObj.GIRDER_list)&doget(indxObj.GIRDER_list));
+      if ~isempty(proplist)
+        girGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.GIRDER_list(proplist)),hwChans(indxObj.GIRDER_list(proplist)));
+      end
     end
     function hwSet(obj,indxObj,putList)
       % hwSet(obj,indxObj,putList)
@@ -185,7 +199,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
       %   indxObj: FlIndex object or an object that inherits from this
       %   class
       %   putList: (optional) [double vector] Only set these elements of
-      %            the provided indxOnj
+      %            the provided indxObj
       %
       % See also:
       %   FlIndex
@@ -228,6 +242,11 @@ classdef Floodland < handle & matlab.mixin.Copyable
       proplist=find(indxObj.useCntrl(indxObj.KLYSTRON_list)&doput(indxObj.KLYSTRON_list));
       if ~isempty(proplist)
         klyTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(indxObj.KLYSTRON_list(proplist)));
+      end
+      % GIRDER
+      proplist=find(indxObj.useCntrl(indxObj.GIRDER_list)&doput(indxObj.GIRDER_list));
+      if ~isempty(proplist)
+        girTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.GIRDER_list(proplist)),hwChans(indxObj.GIRDER_list(proplist)));
       end
     end
   end
@@ -295,9 +314,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
           continue
         end
         % Add any pre-commands to stack
-        if ~isempty(KLYSTRON(ik).preCommand{1,1})
-          comstack{end+1}=KLYSTRON(ik).preCommand{1,1};
-          comstackVals(end+1)=KLYSTRON(ik).preCommand{1,2};
+        if ~isempty(KLYSTRON(ik).preCommand{1})
+          comstack{end+1}=KLYSTRON(ik).preCommand{1}{1};
+          comstackVals(end+1)=KLYSTRON(ik).preCommand{1}{2};
           comstackProto{end+1}=KLYSTRON(ik).protocol;
         end
         % Main PV to get value from
@@ -318,9 +337,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
           comstack_kly(end+1)=ik;
         end
         % Any post processing commands?
-        if ~isempty(KLYSTRON(ik).postCommand{1,1})
-          comstackP{end+1}=KLYSTRON(ik).postCommand{1,1};
-          comstackValsP(end+1,1)=KLYSTRON(ik).postCommand{1,2};
+        if ~isempty(KLYSTRON(ik).postCommand{1})
+          comstackP{end+1}=KLYSTRON(ik).postCommand{1}{1};
+          comstackValsP(end+1,1)=KLYSTRON(ik).postCommand{1}{2};
           comstackProtoP{end+1}=KLYSTRON(ik).protocol;
         end
       end
@@ -353,7 +372,6 @@ classdef Floodland < handle & matlab.mixin.Copyable
       end
       V=indxObj.KLYSTRON_VMDL; PHA=indxObj.KLYSTRON_PHASEMDL;
       comstack={}; comstackVals=[]; comstackProto={};
-      comstackP={}; comstackValsP=[]; comstackProtoP={};
       % Form get/set & monitor lists
       for n=1:length(klist)
         ik=klist(n);
@@ -362,9 +380,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
           continue
         end
         % Add any pre-commands to stack
-        if ~isempty(KLYSTRON(ik).preCommand{2,1})
-          comstack{end+1}=KLYSTRON(ik).preCommand{2,1};
-          comstackVals(end+1)=KLYSTRON(ik).preCommand{2,2};
+        if ~isempty(KLYSTRON(ik).preCommand{2})
+          comstack{end+1}=KLYSTRON(ik).preCommand{2}{1};
+          comstackVals(end+1)=KLYSTRON(ik).preCommand{2}{2};
           comstackProto{end+1}=KLYSTRON(ik).protocol;
         end
         % Main PV
@@ -388,14 +406,21 @@ classdef Floodland < handle & matlab.mixin.Copyable
           end
         end
         % Any post processing commands?
-        if ~isempty(KLYSTRON(ik).postCommand{2,1})
-          comstackP{end+1}=KLYSTRON(ik).postCommand{2,1};
-          comstackValsP(end+1,1)=KLYSTRON(ik).postCommand{2,2};
-          comstackProtoP{end+1}=KLYSTRON(ik).protocol;
+        if ~isempty(KLYSTRON(ik).postCommand{2})
+          comstack{end+1}=KLYSTRON(ik).postCommand{2}{1};
+          comstackVals(end+1,1)=KLYSTRON(ik).postCommand{2}{2};
+          comstackProto{end+1}=KLYSTRON(ik).protocol;
         end
       end
       % Issue control system command(s)
-      obj.cntrlSet(comstack,comstackProto,comstackVals);
+      if strcmp(obj.writeSafety,'off')
+        obj.cntrlSet(comstack,comstackProto,comstackVals);
+      else
+        disp('Control safety switch on in Floodland object, NOT written to control system:')
+        for ic=1:length(comstack)
+          fprintf('PROTO: %s PV: %s VAL: %g\n',comstackProto{ic},comstack{ic},comstackVals(ic))
+        end
+      end
     end
     function psGet(obj,indxObj,propindx,chanindx,hwindx)
       global PS
@@ -448,9 +473,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
           comstack_ps(end+1)=ips;
         end
         % Any post processing commands?
-        if ~isempty(PS(ips).postCommand{1,1})
-          comstackP{end+1}=PS(ips).postCommand{1,1};
-          comstackValsP(end+1,1)=PS(ips).postCommand{1,2};
+        if ~isempty(PS(ips).postCommand{1})
+          comstackP{end+1}=PS(ips).postCommand{1}{1};
+          comstackValsP(end+1,1)=PS(ips).postCommand{1}{2};
           comstackProtoP{end+1}=PS(ips).protocol;
         end
       end
@@ -487,9 +512,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
           continue
         end
         % Add any pre-commands to stack
-        if ~isempty(PS(ips).preCommand{2,1})
-          comstack{end+1,1}=PS(ips).preCommand{2,1};
-          comstackVals(end+1,1)=PS(ips).preCommand{2,2};
+        if ~isempty(PS(ips).preCommand{2})
+          comstack{end+1,1}=PS(ips).preCommand{2}{1};
+          comstackVals(end+1,1)=PS(ips).preCommand{2}{2};
           comstackProto{end+1,1}=PS(ips).protocol;
         end
         if chanindx{n}(1) && ~isempty(hwindx{1,n})
@@ -568,15 +593,128 @@ classdef Floodland < handle & matlab.mixin.Copyable
           end
         end
         % Any post processing commands?
-        if ~isempty(PS(ips).postCommand{2,1})
-          comstack{end+1}=PS(ips).postCommand{2,1};
-          comstackVals(end+1,1)=PS(ips).postCommand{2,2};
+        if ~isempty(PS(ips).postCommand{2})
+          comstack{end+1}=PS(ips).postCommand{2}{1};
+          comstackVals(end+1,1)=PS(ips).postCommand{2}{2};
           comstackProto{end+1}=PS(ips).protocol;
         end
       end
       % Issue control system command(s)
-      obj.cntrlSet(comstack,comstackProto,comstackVals);
+      if strcmp(obj.writeSafety,'off')
+        obj.cntrlSet(comstack,comstackProto,comstackVals);
+      else
+        disp('Control safety switch on in Floodland object, NOT written to control system:')
+        for ic=1:length(comstack)
+          fprintf('PROTO: %s PV: %s VAL: %g\n',comstackProto{ic},comstack{ic},comstackVals(ic))
+        end
+      end
     end    
+    function girGet(obj,indxObj,propindx,chanindx,hwindx)
+      global GIRDER
+      if obj.issim; return; end;
+      glist=indxObj.GIRDER(propindx);
+      
+      comstack={}; comstackVals=[]; comstackProto={};
+      comstackP={}; comstackValsP=[]; comstackProtoP={};
+      comstack_get={}; comstackProto_get={}; comstack_conv={};
+      gReadInd={};
+      % Form get/set & monitor lists
+      for n=1:length(glist)
+        ig=glist(n);
+        pvname=GIRDER{ig}.pvname;
+        if isempty(pvname{2}) || isequal(GIRDER{ig}.conv{1},0) || isempty(GIRDER{ig}.conv{1})
+          continue
+        end
+        % Add any pre-commands to stack
+        if ~isempty(GIRDER{ig}.preCommand{1})
+          comstack{end+1}=GIRDER{ig}.preCommand{1}{1};
+          comstackVals(end+1)=GIRDER{ig}.preCommand{1}{2};
+          comstackProto{end+1}=GIRDER{ig}.protocol;
+        end
+        % Main PV to get value from
+        for idim=1:6
+          if ~isempty(pvname{1,idim}) && chanindx{n}(idim) && ismember(idim,hwindx{1,n})
+            comstack_get{end+1,1}=pvname{1,idim};
+            comstackProto_get{end+1,1}=GIRDER{ig}.protocol;
+            comstack_conv{end+1,1}=GIRDER{ig}.conv{1,idim};
+            gReadInd{end+1}=[ig idim];
+          end
+        end
+        % Any post processing commands?
+        if ~isempty(GIRDER{ig}.postCommand{1})
+          comstackP{end+1}=GIRDER{ig}.postCommand{1}{1};
+          comstackValsP(end+1,1)=GIRDER{ig}.postCommand{1}{2};
+          comstackProtoP{end+1}=GIRDER{ig}.protocol;
+        end
+      end
+      % Issue control system command(s)
+      if ~isempty(comstack)
+        obj.cntrlSet(comstack,comstackProto,comstackVals);
+      end
+      cvals=obj.cntrlGet(comstack_get,comstackProto_get,comstack_conv);
+      if ~isempty(comstackP)
+        obj.cntrlSet(comstackP,comstackProtoP,comstackValsP);
+      end
+      % Deal out mover positions
+      for ival=1:length(cvals)
+        if ~isnan(cvals{ival})
+          GIRDER{gReadInd{ival}(1)}.MoverPos(gReadInd{ival}(2))=cvals{ival};
+        end
+      end
+    end
+    function girTrim(obj,indxObj,propindx,chanindx,hwindx)
+      global GIRDER
+      glist=indxObj.GIRDER(propindx);
+      if obj.issim
+        stat=MoverTrim(glist);
+        if stat{1}~=1; error('GIRDER simulation trim error:\n%s',stat{2}); end;
+        return
+      end
+      comstack={}; comstackVals=[]; comstackProto={};
+      comstackP={}; comstackValsP=[]; comstackProtoP={};
+      % Form get/set & monitor lists
+      for n=1:length(glist)
+        ig=glist(n);
+        pvname=GIRDER{ig}.pvname;
+        if (isempty(pvname{2,1}) && isempty(pvname{2,2})) || isequal(GIRDER{ig}.conv,0) || isempty(GIRDER{ig}.conv)
+          continue
+        end
+        % Add any pre-commands to stack
+        if ~isempty(GIRDER{ig}.preCommand{2})
+          comstack{end+1}=GIRDER{ig}.preCommand{2}{1};
+          comstackVals(end+1)=GIRDER{ig}.preCommand{2}{2};
+          comstackProto{end+1}=GIRDER{ig}.protocol;
+        end
+        % Main PV
+        conv=GIRDER{ig}.conv;
+        for idim=1:6
+          if ~isempty(pvname{2,idim}) && chanindx{n}(1) && ismember(idim,hwindx{2,n})
+            comstackProto{end+1,1}=GIRDER{ig}.protocol;
+            comstack{end+1,1}=pvname{2,idim};
+            if length(conv{1})==1
+              comstackVals(end+1,1)=(GIRDER{ig}.MoverSetPt(idim))/conv{2,idim};
+            else
+              comstackVals(end+1,1)=interp1(conv{1}(2,:),conv{1}(1,:),GIRDER{ig}.MoverSetPt(idim),'linear');
+            end
+          end
+        end
+        % Any post processing commands?
+        if ~isempty(GIRDER{ig}.postCommand{2})
+          comstackP{end+1}=GIRDER{ig}.postCommand{2}{1};
+          comstackValsP(end+1,1)=GIRDER{ig}.postCommand{2}{2};
+          comstackProtoP{end+1}=GIRDER{ig}.protocol;
+        end
+      end
+      % Issue control system command(s)
+      if strcmp(obj.writeSafety,'off')
+        obj.cntrlSet(comstack,comstackProto,comstackVals);
+      else
+        disp('Control safety switch on in Floodland object, NOT written to control system:')
+        for ic=1:length(comstack)
+          fprintf('PROTO: %s PV: %s VAL: %g\n',comstackProto{ic},comstack{ic},comstackVals(ic))
+        end
+      end
+    end
     function cntrlSet(obj,pv,proto,vals)
       % Set vals to controls (raw)
       if ~iscell(pv); pv={pv,1}; end;
