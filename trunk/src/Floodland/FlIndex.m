@@ -637,7 +637,8 @@ classdef FlIndex < handle & FlGui & FlUtils
       %                    zPV z'PV} {1,:} = read {2,:} = write
       %           KLYSTRON: {VoltPV(read) PhasePV(read); VoltPV(read)
       %                      PhasePV(write)}
-      %   protocol: 'AIDA' or 'EPICS'
+      %   protocol: 'AIDA' or 'EPICS' [or cell array for {read;write} for
+      %              PS type only, otherwise must be same protocol for both]
       %   conv: cell array same dimension as 'pvname'
       %         each array entry either double scalar or 2*N array
       %         * array is Ampl (1,:) vs. control val (2,:) lookup
@@ -660,8 +661,14 @@ classdef FlIndex < handle & FlGui & FlUtils
           error('Must supply pvname cell of same dimension as global of same type')
         end
       end
-      if ~exist('protocol','var') || ~ismember(protocol,{'AIDA' 'EPICS'})
+      if ~exist('protocol','var') 
         error('Must supply protocol as either AIDA or EPICS')
+      elseif iscell(protocol)
+        if any(~cellfun(@(x) ismember(protocol{x},{'AIDA' 'EPICS'}),protocol))
+          error('Must supply protocol entries as either AIDA or EPICS')
+        end
+      elseif ~ismember(protocol,{'AIDA' 'EPICS'})
+        error('Must supply protocol entries as either AIDA or EPICS')
       end
       if ~exist('conv','var') || ~iscell(conv) || ~isequal(size(conv),size(pvname))
         error('Must supply conv conversion scalar or lookup as 2*N array in cell array same dim as pvname')
@@ -804,6 +811,8 @@ classdef FlIndex < handle & FlGui & FlUtils
           PS(ind).trimHigh=NaN(2,1);
           PS(ind).trimLow=NaN(2,1);
           PS(ind).trimUnipolar=false;
+          PS(ind).trimconv={1,1};
+          PS(ind).conv2={1;1};
           obj.MasterInd(end+1)=ind;
           obj.MasterRef(end+1,:)=[true false false];
           obj.useCntrl(end+1)=true;

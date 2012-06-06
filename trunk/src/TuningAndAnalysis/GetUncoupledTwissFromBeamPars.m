@@ -14,7 +14,7 @@ function [Tx,Ty] = GetUncoupledTwissFromBeamPars(beam,bunchno)
 
 %==========================================================================
 
-  Tx = struct('beta',0,'alpha',0,'eta',0,'etap',0,'nu',0) ;
+  Tx = struct('beta',[],'alpha',[],'eta',[],'etap',[],'nu',[]) ;
   Ty = Tx ;
   
   [x,sig] = GetBeamPars(beam,bunchno) ;

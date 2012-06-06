@@ -69,18 +69,18 @@ const int VerifyPars = 2 ;
 
 /* tracking flags information */
 
-   #define NUM_TRACK_FLAGS 16
+   #define NUM_TRACK_FLAGS 17
 
 	enum TrackFlagIndex{
 		SynRad, Aper, GetBPMData, GetBPMBeamPars, MultiBunch,
 	   GetInstData, SRWF_T, SRWF_L, LRWF_T, LRWF_ERR, 
-	   ZMotion, LorentzDelay, GetSBPMData, CSR, CSR_SmoothFactor, Split
+	   ZMotion, LorentzDelay, GetSBPMData, CSR, CSR_SmoothFactor, Split, CSR_DriftSplit
 	} ;
 
 	const char* TrackFlagNames[] = {	
 		"SynRad","Aper","GetBPMData","GetBPMBeamPars","MultiBunch",
 		"GetInstData","SRWF_T", "SRWF_Z","LRWF_T","LRWF_ERR",
-		"ZMotion","LorentzDelay","GetSBPMData", "CSR", "CSR_SmoothFactor" "Split"
+		"ZMotion","LorentzDelay","GetSBPMData", "CSR", "CSR_SmoothFactor", "Split", "CSR_DriftSplit"
 	} ;
 
 	int TrackFlagSet[NUM_TRACK_FLAGS] ;
@@ -88,13 +88,13 @@ const int VerifyPars = 2 ;
 	int TrackFlagMinValue[NUM_TRACK_FLAGS] = {
 		SR_None, 0, 0, 0, 0, 
 		      0, 0, 0, 0, 0,
-		      0, 0, 0, 0, 1, 0
+		      0, 0, 0, 0, 1, 0, 0
 	} ;
 
 	int TrackFlagMaxValue[NUM_TRACK_FLAGS] = {
 		SR_HB, 1, 1, 1, 1, 
 		    1, 1, 1, 1, 1,
-		    1, 1, 1, 10000, 100, 10000
+		    1, 1, 1, 1000, 100, 1000, 1000
 	} ;
 
 
@@ -124,7 +124,7 @@ struct LucretiaParameter DrifPar[nDrifPar] = {
 int DrifTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 0, 0, 0,
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* Quadrupole, also used for sextupole and octupole. 
@@ -153,7 +153,7 @@ struct LucretiaParameter QuadPar[nQuadPar] = {
 int QuadTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* Solenoid: note that any changes made to the Quad pars, above, need
@@ -180,7 +180,7 @@ struct LucretiaParameter SolePar[nSolePar] = {
 int SoleTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* Thin-lens multipole */
@@ -209,7 +209,7 @@ struct LucretiaParameter MultPar[nMultPar] = {
 int MultTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* sector bend */
@@ -241,7 +241,7 @@ struct LucretiaParameter SBendPar[nSBendPar] = {
 int SBendTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	0, 1, 0, 0, 1, 0
+	0, 1, 0, 0, 1, 0, 0
 } ;
 
 /* accelerating structures */
@@ -273,7 +273,7 @@ struct LucretiaParameter LcavPar[nLcavPar] = {
 int LcavTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 1, 0, 0, 0, 
    0, 1, 1, 1, 1,
-	1, 1, 1, 0, 1, 0
+	1, 1, 1, 0, 1, 0, 0
 } ;
 /* deflecting structures */
 
@@ -306,7 +306,7 @@ struct LucretiaParameter TcavPar[nTcavPar] = {
 int TcavTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 1, 1, 1, 1,
-	1, 1, 1, 0, 1, 0
+	1, 1, 1, 0, 1, 0, 0
 } ;
 
 /* dipole correctors -- note that these are treated as drifts by the RMAT code.
@@ -352,7 +352,7 @@ struct LucretiaParameter XYCorrectorPar[nCorrectorPar] = {
 int CorrectorTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 0, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* beam position monitor -- BPMs are treated as drifts by the RMAT code */
@@ -376,7 +376,7 @@ struct LucretiaParameter BPMPar[nBPMPar] = {
 int BPMTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 1, 1, 1,
 	0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* instrument -- treated as a drift by the RMAT code */
@@ -397,7 +397,7 @@ struct LucretiaParameter InstPar[nInstPar] = {
 int InstTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 0, 0, 1,
 	1, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* collimator -- treated as a drift by the RMAT code.  Note that collimators also have
@@ -423,7 +423,7 @@ struct LucretiaParameter CollPar[nCollPar] = {
 int CollTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 1, 0, 0, 0,
     0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0
+	1, 1, 0, 0, 1, 0, 0
 } ;
 
 /* coordinate change element -- has an R-matrix used by the RMAT code */
@@ -442,7 +442,7 @@ struct LucretiaParameter CoordPar[nCoordPar] = {
 int CoordTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0,
-	1, 0, 0, 0, 1, 0
+	1, 0, 0, 0, 1, 0, 0
 } ;
 
 

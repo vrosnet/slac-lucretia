@@ -1,4 +1,4 @@
-function Beam=lattice
+function [Beam bo]=lattice
 global BEAMLINE
 
 
@@ -41,11 +41,22 @@ Beam.Bunch.x(1:4,:)=0;
 %   downstream CSR treatment area into, RMS bunch length to use for
 %   estimation of length of downstream CSR region)
 % =========
-eleSplitCSR(100,100,I.sigz);
+% eleSplitCSR(50,50,I.sigz);
+
+% Set CSR flags Split, CSR_DriftSplit
+for ibl=1:length(BEAMLINE)
+  if strcmp(BEAMLINE{ibl}.Class,'SBEN')
+    BEAMLINE{ibl}.TrackFlag.CSR=600;
+    BEAMLINE{ibl}.TrackFlag.CSR_SmoothFactor=3;
+    BEAMLINE{ibl}.TrackFlag.CSR_DriftSplit=50;
+    BEAMLINE{ibl}.TrackFlag.Split=2;
+    BEAMLINE{ibl}.TrackFlag.SynRad=2;
+  end
+end
 
 % Beam tracking (NO CSR)
 [stat bo]=TrackThru(1,length(BEAMLINE),Beam,1,1,0);
 disp('Initial Beam:')
 fprintf('sigma_z: %g sigma_E: %g mean E: %g\n',std(Beam.Bunch.x(5,:)),std(Beam.Bunch.x(6,:)),mean(Beam.Bunch.x(6,:)))
-disp('CSR off:')
+disp('CSR on:')
 fprintf('sigma_z: %g sigma_E: %g mean E: %g\n',std(bo.Bunch.x(5,:)),std(bo.Bunch.x(6,:)),mean(bo.Bunch.x(6,:)))

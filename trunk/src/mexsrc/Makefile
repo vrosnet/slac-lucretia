@@ -18,9 +18,9 @@
 #===================================================================
 
 # Link to matlab installation directory
- MATPATH = /var/MATLAB/R2011a
+ MATPATH = /Applications/MATLAB_R2011b.app
 # Name of mex file extension for this architecture (mexglx or mexa64)
- MEXEXT = mexa64
+ MEXEXT = mexmaci64
 
   MCOMP = $(MATPATH)/bin/mex
   CCOMP = gcc

@@ -120,8 +120,8 @@ classdef Floodland < handle & matlab.mixin.Copyable
         error('Must supply ''latticeDate'' (any supported Matlab date format)')
       end
       % assign element slices and blocks
-      [stat,obj.slices] = SetElementSlices( 1, length(BEAMLINE) );
-      [stat,obj.blocks] = SetElementBlocks( 1, length(BEAMLINE) );
+      [~,obj.slices] = SetElementSlices( 1, length(BEAMLINE) );
+      [~,obj.blocks] = SetElementBlocks( 1, length(BEAMLINE) );
       obj.latticeName=latticeName;
       obj.latticeDate=datenum(latticeDate);
       obj.expt=exptName;
@@ -180,12 +180,12 @@ classdef Floodland < handle & matlab.mixin.Copyable
       % PS
       proplist=find(indxObj.useCntrl(indxObj.PS_list)&doget(indxObj.PS_list));
       if ~isempty(proplist)
-        psGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.PS_list(proplist)),hwChans(indxObj.PS_list(proplist)));
+        psGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.PS_list(proplist)),hwChans(1,indxObj.PS_list(proplist)));
       end
       % KLYSTRON
       proplist=find(indxObj.useCntrl(indxObj.KLYSTRON_list)&doget(indxObj.KLYSTRON_list));
       if ~isempty(proplist)
-        klyGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(indxObj.KLYSTRON_list(proplist)));
+        klyGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(1,indxObj.KLYSTRON_list(proplist)));
       end
       % GIRDER
       proplist=find(indxObj.useCntrl(indxObj.GIRDER_list)&doget(indxObj.GIRDER_list));
@@ -236,12 +236,12 @@ classdef Floodland < handle & matlab.mixin.Copyable
       % PS
       proplist=find(indxObj.useCntrl(indxObj.PS_list)&doput(indxObj.PS_list));
       if ~isempty(proplist)
-        psTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.PS_list(proplist)),hwChans(indxObj.PS_list(proplist)));
+        psTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.PS_list(proplist)),hwChans(2,indxObj.PS_list(proplist)));
       end
       % KLYSTRON
       proplist=find(indxObj.useCntrl(indxObj.KLYSTRON_list)&doput(indxObj.KLYSTRON_list));
       if ~isempty(proplist)
-        klyTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(indxObj.KLYSTRON_list(proplist)));
+        klyTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.KLYSTRON_list(proplist)),hwChans(2,indxObj.KLYSTRON_list(proplist)));
       end
       % GIRDER
       proplist=find(indxObj.useCntrl(indxObj.GIRDER_list)&doput(indxObj.GIRDER_list));
@@ -320,7 +320,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
           comstackProto{end+1}=KLYSTRON(ik).protocol;
         end
         % Main PV to get value from
-        if ~isempty(pvname{1,1}) && chanindx{n}(1) && ismember(1,hwindx{1,n})
+        if ~isempty(pvname{1,1}) && chanindx{n}(1) && ismember(1,hwindx{n})
           comstack_get{end+1,1}=pvname{1,1};
           comstackProto_get{end+1,1}=KLYSTRON(ik).protocol;
           comstack_conv{end+1,1}=KLYSTRON(ik).conv{1,1};
@@ -328,7 +328,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
           comstack_PHA(end+1)=NaN;
           comstack_kly(end+1)=ik;
         end
-        if ~isempty(pvname{1,2}) && chanindx{n}(2) && ismember(2,hwindx{1,n})
+        if ~isempty(pvname{1,2}) && chanindx{n}(2) && ismember(2,hwindx{n})
           comstack_get{end+1,1}=pvname{1,1};
           comstackProto_get{end+1,1}=KLYSTRON(ik).protocol;
           comstack_conv{end+1,1}=KLYSTRON(ik).conv{1,2};
@@ -387,7 +387,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         end
         % Main PV
         conv=KLYSTRON(ik).conv;
-        if ~isempty(pvname{2,1}) && chanindx{n}(1) && ismember(1,hwindx{2,n})
+        if ~isempty(pvname{2,1}) && chanindx{n}(1) && ismember(1,hwindx{n})
           comstackProto{end+1,1}=KLYSTRON(ik).protocol;
           comstack{end+1,1}=pvname{2,1};
           if length(conv{1})==1
@@ -396,7 +396,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
             comstackVals(end+1,1)=interp1(conv{1}(2,:),conv{1}(1,:),KLYSTRON(ik).V*V(n),'linear');
           end
         end
-        if ~isempty(pvname{2,2}) && chanindx{n}(2) && ismember(2,hwindx{2,n})
+        if ~isempty(pvname{2,2}) && chanindx{n}(2) && ismember(2,hwindx{n})
           comstackProto{end+1,1}=KLYSTRON(ik).protocol;
           comstack{end+1,1}=pvname{2,2};
           if length(conv{2})==1
@@ -431,6 +431,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
       comstack={}; comstackVals=[]; comstackProto={};
       comstackP={}; comstackValsP=[]; comstackProtoP={};
       comstack_get={}; comstackProto_get={}; comstack_conv={}; comstack_ps=[]; comstack_B=[];
+      comstack_pconv={};
       % Form get/set & monitor lists
       for n=1:length(pslist)
         ips=pslist(n);
@@ -438,27 +439,30 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if isempty(pvname{2}) || isequal(PS(ips).conv{1},0) || isempty(PS(ips).conv{1})
           continue
         end
+        if ~isecell(PS(ips).protocol)
+          proto=PS(ips).protocol;
+        else
+          proto=PS(ips).protocol{1};
+        end
         % Add any pre-commands to stack
         if ~isempty(PS(ips).preCommand{1})
           comstack{end+1}=PS(ips).preCommand{1}{1};
           comstackVals(end+1)=PS(ips).preCommand{1}{2};
-          comstackProto{end+1}=PS(ips).protocol;
+          comstackProto{end+1}=proto;
         end
-        if  chanindx{n}(1) && ~isempty(hwindx{1,n})
+        if  chanindx{n}(1) && ~isempty(hwindx{n})
           % Main PV to get value from
           trimVal=0;
           if ~isempty(PS(ips).trimpv{1})
             try
               trimpv=PS(ips).trimpv{1};
-              trimconv=PS(ips).trimconv;
-              if ~iscell(trimpv); trimpv={trimpv}; end;
-              for ipv=1:length(trimpv)
-                comstack_get{end+1,1}=trimpv{ipv};
-                comstackProto_get{end+1,1}=PS(ips).protocol;
-                comstack_conv{end+1,1}=trimconv{ipv};
-                comstack_B(end+1)=B(n);
-                comstack_ps(end+1)=ips;
-              end
+              trimconv=PS(ips).trimconv{1};
+              comstack_get{end+1,1}=trimpv{1};
+              comstackProto_get{end+1,1}=proto;
+              comstack_conv{end+1,1}=trimconv{1};
+              comstack_B(end+1)=B(n);
+              comstack_ps(end+1)=ips;
+              comstack_pconv{end+1,1}=PS(ips).conv2{1};
             catch ME
               error('Trim Controls not available:\n%s',ME.message)
             end
@@ -467,10 +471,11 @@ classdef Floodland < handle & matlab.mixin.Copyable
             end % if bad val returned
           end % if 2 pv's (main and trim)
           comstack_get{end+1,1}=PS(ips).pvname{1};
-          comstackProto_get{end+1,1}=PS(ips).protocol;
+          comstackProto_get{end+1,1}=proto;
           comstack_conv{end+1,1}=PS(ips).conv{1};
           comstack_B(end+1)=B(n);
           comstack_ps(end+1)=ips;
+          comstack_pconv{end+1,1}=PS(ips).conv2{1};
         end
         % Any post processing commands?
         if ~isempty(PS(ips).postCommand{1})
@@ -488,9 +493,23 @@ classdef Floodland < handle & matlab.mixin.Copyable
         obj.cntrlSet(comstackP,comstackProtoP,comstackValsP);
       end
       % Dealt out values to PS ampl
+      % - sum returned (converted) values from control system, then apply a
+      % final conversion
       for ival=1:length(cvals)
         if ~isnan(cvals{ival})
-          PS(comstack_ps(ival)).Ampl=cvals{ival}/comstack_B(ival);
+          cntrlVal=0;
+          for ival2=find(ismember(comstack_ps,comstack_ps(ival)))
+            if ~isnan(cvals{ival2})
+              cntrlVal=cntrlVal+cvals{x};
+            end
+          end
+          conv=comstack_pconv{ival};
+          if length(conv)==1
+            cntrlVal=cntrlVal.*conv;
+          else
+            cntrlVal=interp1(conv(1,:),conv(2,:),cntrlVal,'linear');
+          end
+          PS(comstack_ps(ival)).Ampl=cntrlVal/comstack_B(x);
         end
       end
     end
@@ -511,22 +530,23 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if isempty(pvname{2}) || isequal(PS(ips).conv{2},0) || isempty(PS(ips).conv{2})
           continue
         end
+         if ~isecell(PS(ips).protocol)
+          proto=PS(ips).protocol;
+        else
+          proto=PS(ips).protocol{2};
+        end
         % Add any pre-commands to stack
         if ~isempty(PS(ips).preCommand{2})
           comstack{end+1,1}=PS(ips).preCommand{2}{1};
           comstackVals(end+1,1)=PS(ips).preCommand{2}{2};
           comstackProto{end+1,1}=PS(ips).protocol;
         end
-        if chanindx{n}(1) && ~isempty(hwindx{1,n})
+        if chanindx{n}(1) && ~isempty(hwindx{n})
           % Get trim or main pv names to use and vals to set
           trimVal=0;
-          if ~isempty(PS(ips).trimpv{1})
+          if ~isempty(PS(ips).trimpv{2})
             try
-              trimpv=PS(ips).trimpv{1};
-              if ~iscell(trimpv); trimpv={trimpv}; end;
-              for ipv=1:length(trimpv)
-                trimVal=trimVal+cell2mat(obj.cntrlGet(trimpv{ipv},PS(ips).protocol,PS(ips).trimconv{2,ipv}))/B(n);
-              end
+              trimVal=cell2mat(obj.cntrlGet(PS(ips).trimpv{1},proto,PS(ips).trimconv{1},'force'));
             catch ME
               error('Trim Controls not available:\n%s',ME.message)
             end
@@ -534,17 +554,22 @@ classdef Floodland < handle & matlab.mixin.Copyable
               error('Lucretia:Floodland:psTrim:noTrimControls','Bad response from Trim controls for PS %d',ips)
             end % if bad val returned
           end % if 2 pv's (main and trim)
-          mainVal=cell2mat(obj.cntrlGet(PS(ips).pvname{1},PS(ips).protocol,PS(ips).conv{2}))/B(n);
-          % Use trim PV if available and in range, else use main
-          if ~isempty(PS(ips).trimpv{2}) && iscell(PS(ips).trimpv{2})
-            trimpv=PS(ips).trimpv{2}{1};
+          mainVal=cell2mat(obj.cntrlGet(PS(ips).pvname{1},proto,PS(ips).conv{2}),'force');
+          conv2=PS(ips).conv2{2};
+          if PS(ips).trimUnipolar; trimVal=abs(trimVal); end;
+          if PS(ips).unipolar; mainVal=abs(mainVal); end;
+          if length(conv2)>1
+            trimVal=interp1(conv2(1,:),conv2(2,:),trimVal,'linear')/B(n);
+            mainVal=interp1(conv2(1,:),conv2(2,:),mainVal,'linear')/B(n);
           else
-            trimpv=PS(ips).trimpv{2};
+            trimVal=(trimVal*conv2)/B(n);
+            mainVal=(mainVal*conv2)/B(n);
           end
-          if ~isempty(trimpv) && (isempty(PS(ips).trimHigh(1)) || (PS(ips).SetPt-mainVal)<PS(ips).trimHigh(1)) && ...
+          % Use trim PV if available and in range, else use main
+          if ~isempty(PS(ips).trimpv{2}) && (isempty(PS(ips).trimHigh(1)) || (PS(ips).SetPt-mainVal)<PS(ips).trimHigh(1)) && ...
               (isempty(PS(ips).trimLow(1)) || (PS(ips).SetPt-mainVal)>PS(ips).trimLow(1))
             comstack{end+1}=PS(ips).trimpv{2};
-            comstackProto{end+1}=PS(ips).protocol;
+            comstackProto{end+1}=proto;
             val=PS(ips).SetPt-mainVal;
             % unipolar device?
             unipolar=PS(ips).trimUnipolar;
@@ -561,7 +586,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
           elseif (isempty(PS(ips).high) || (PS(ips).SetPt-trimVal)<PS(ips).high) && ...
               (isempty(PS(ips).low) || (PS(ips).SetPt-trimVal)>PS(ips).low)
             comstack{end+1}=PS(ips).pvname{2};
-            comstackProto{end+1}=PS(ips).protocol;
+            comstackProto{end+1}=proto;
             val=PS(ips).SetPt-trimVal;
             unipolar=PS(ips).unipolar;
             % unipolar device?
@@ -578,17 +603,30 @@ classdef Floodland < handle & matlab.mixin.Copyable
             error('Attempting to set PS beyond software limits (PS %d)',ips)
           end
           % Form trim vals to send to control system
-          if length(conv)==1
+          if length(conv2)==1
             if unipolar
-              comstackVals(end+1,1)=(abs(val)/conv)*abs(B(n));
+              comstackVals(end+1,1)=(abs(val)/conv2)*abs(B(n));
             else
-              comstackVals(end+1,1)=(val/conv)*B(n);
+              comstackVals(end+1,1)=(val/conv2)*B(n);
             end
           else
             if unipolar
-              comstackVals(end+1,1)=interp1(conv(2,:),conv(1,:),abs(val*B(n)),'linear');
+              comstackVals(end+1,1)=interp1(conv2(2,:),conv2(1,:),abs(val*B(n)),'linear');
             else
-              comstackVals(end+1,1)=interp1(conv(2,:),conv(1,:),val*B(n),'linear');
+              comstackVals(end+1,1)=interp1(conv2(2,:),conv2(1,:),val*B(n),'linear');
+            end
+          end
+          if length(conv)==1
+            if unipolar
+              comstackVals(end,1)=comstackVals(end,1)/conv;
+            else
+              comstackVals(end,1)=comstackVals(end,1)/conv;
+            end
+          else
+            if unipolar
+              comstackVals(end,1)=interp1(conv(2,:),conv(1,:),comstackVals(end,1),'linear');
+            else
+              comstackVals(end,1)=interp1(conv(2,:),conv(1,:),comstackVals(end,1),'linear');
             end
           end
         end
@@ -735,7 +773,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
   
   %% Utility methods
   methods(Static)
-    function cvals=cntrlGet(pv,proto,conv)
+    function cvals=cntrlGet(pv,proto,conv,cmd)
       % cvals=Floodland.cntrlGet(pv,proto,conv)
       %
       % Get vals from controls (and convert)
@@ -754,19 +792,27 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if isempty(monitorList)
           lcaSetMonitor(epv);
           monitorList=epv;
+          moniUpdate=true(size(epv));
         elseif any(~ismember(epv,monitorList))
           newpv=~ismember(epv,monitorList);
           lcaSetMonitor(epv(newpv));
-          monitorList{end+1:end+sum(newpv)}=epv(newpv);
+          monitorList(end+1:end+sum(newpv))=epv(newpv);
+          moniUpdate=true(size(epv));
+        else
+          moniUpdate=FlCA('lcaNewMonitorValue',epv);
         end
-        moniUpdate=FlCA('lcaNewMonitorValue',epv);
-        [epicsVals epicsts]=FlCA('lcaGet',epv(moniUpdate));
+        if exist('cmd','var') && isequal(cmd,'force')
+          [epicsVals epicsts]=FlCA('lcaGet',epv);
+        else
+          [epicsVals epicsts]=FlCA('lcaGet',epv(logical(moniUpdate)));
+        end
         epind=find(isEpics);
         ind=0;
-        for ival=find(moniUpdate)
+        for ival=1:length(moniUpdate)
           if moniUpdate(ival)
             ind=ind+1;
-            tvals(epind(ival))=epicsts2mat(epicsts(ind));
+            tvals(epind(ival))=epicsts(ind);
+            tvals(epind(ival))=addtodate(datenum(1990,1,1),floor(real(tvals(epind(ival)))*1e3+imag(tvals(epind(ival)))*1e-6),'millisecond');
             if iscell(epicsVals)
               cvals{epind(ival)}=epicsVals{ind};
             else

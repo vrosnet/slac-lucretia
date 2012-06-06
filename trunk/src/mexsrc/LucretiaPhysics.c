@@ -30,9 +30,12 @@
 		SRSpectrumHB
 		SynRadC
 		GetCoordMap
+    GetRMSCoord
 
 /* AUTH: PT, 03-aug-2004 */
 /* MOD:
+     13-Feb-2012, GW:
+       Add RMS calculation function
 		 24-May-2007, PT:
 		    change PropagateRayThruMult to use new argument list when calling
 			CheckP0StopPart.
@@ -644,7 +647,7 @@ void PropagateRayThruMult( double L, double* Bvec, double* Tvec,
 						   double dB, double Tilt, 
 						   double* xi, double* xf, int zmotion,
 							int SRFlag, double Lrad, double* bstop, int* bngoodray,double* bx,double* by,
-							int elemno, int ray )
+							int elemno, int ray, double splitScale )
 {
 
 	int count,c2 ;
@@ -710,9 +713,9 @@ void PropagateRayThruMult( double L, double* Bvec, double* Tvec,
 	  TiltAll = Tilt + Tvec[count] ;
 	  TiltAll *= (double)(PInd+1) ;
 	  BxL += (BxnL*cos(TiltAll) - BynL*sin(TiltAll))
-		    * Bvec[count] / Bang[PInd] ;
+		    * (splitScale*Bvec[count]) / Bang[PInd] ;
 	  ByL += (BynL*cos(TiltAll) + BxnL*sin(TiltAll))
-		    * Bvec[count] / Bang[PInd] ;
+		    * (splitScale*Bvec[count]) / Bang[PInd] ;
 
 	}
 
@@ -731,8 +734,8 @@ void PropagateRayThruMult( double L, double* Bvec, double* Tvec,
 /* Apply the kick, keeping in mind that the K0L terms apply a bend
    to the reference trajectory which must be taken out */
 
-	*(xf+1) += -ByL/P0/GEV2TM * dB - Angle[0] ;
-	*(xf+3) +=  BxL/P0/GEV2TM * dB - Angle[1] ;
+	*(xf+1) += -ByL/P0/GEV2TM * (splitScale*dB) - Angle[0] ;
+	*(xf+3) +=  BxL/P0/GEV2TM * (splitScale*dB) - Angle[1] ;
 
 /* propagate the new trajectory through the second half-length drift */
 
@@ -2764,3 +2767,25 @@ egress:
 	return status ;
 
 	}
+
+/*==================================================================*/
+
+/* Get RMS of required beam dimension
+
+/* Ret:   RMS quantity
+/* Abort: never.
+/* Fail:  never.  */
+
+double GetRMSCoord( struct Bunch* ThisBunch, int dim )
+{
+  int ic ;
+  double sumdim=0 ;
+  double avedim ;
+  for ( ic=0; ic<ThisBunch->nray; ic++ )
+    sumdim += ThisBunch->x[6*ic+dim] ;
+  avedim=sumdim / ThisBunch->nray ;
+  sumdim=0;
+  for ( ic=0; ic<ThisBunch->nray; ic++ )
+    sumdim += pow((ThisBunch->x[6*ic+dim] - avedim),2) ;
+  return sqrt(sumdim / avedim) ;
+}
