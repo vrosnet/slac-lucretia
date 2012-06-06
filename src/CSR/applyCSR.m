@@ -1,5 +1,5 @@
-function [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack)
-% [beamP W dE z]=applyCSR(beam,beamQ,ind,nbin,smoothVal,X)
+function [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,driftDL)
+% [beam W dE zOut]=applyCSR(beam,nbin,smoothVal,itrack,driftL,driftDL)
 %  Calculate CSR wake and change provided momentum profile
 %
 % beamZ: Lucretia Bunch.x
@@ -9,7 +9,7 @@ function [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack)
 global BEAMLINE
 persistent lastsz bininds z Z ZSP lastnbin
 W=[]; dE=[]; zOut=[];
-
+fprintf('beam: %d beamQ: %d nbin: %d smoothVal: %d itrack: %d driftL: %.3g driftDL: %.3g',numel(beam),numel(beamQ),nbin,smoothVal,itrack,driftL,driftDL)
 %- If zero length element just return
 if ~isfield(BEAMLINE{itrack},'L') || BEAMLINE{itrack}.L==0
   return
@@ -59,14 +59,18 @@ else
   L=sum(arrayfun(@(x) BEAMLINE{x}.L,bendele));
   R=L/(2*sin(PHI/2));
   % --- distance from bend
-  X=((BEAMLINE{itrack}.S+BEAMLINE{itrack}.L)-(BEAMLINE{bendele(1)}.S+BEAMLINE{bendele(1)}.L))/R;
+  if exist('driftL','var')
+    X=driftL/R ;
+  else
+    X=((BEAMLINE{itrack}.S+BEAMLINE{itrack}.L)-(BEAMLINE{bendele(1)}.S+BEAMLINE{bendele(1)}.L))/R;
+  end
   lDecay=3*(24*std(beam(5,:))*R^2)^(1/3);
   if X*R > lDecay; return; end;
 end
 
 % Generate longitudinal grid, only when beam length changes by
 % more than 10%
-if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1 || lastnbin~=nbin
+if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1
   zmin=min(-beam(5,:));
   zmax=max(-beam(5,:));
   if zmin==zmax
@@ -76,7 +80,6 @@ if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1 || lastnbin~=nbin
   [count,bininds] = histc(-beam(5,:),z);
   [Z ZSP]=meshgrid(z,z);
   lastsz=std(beam(5,:));
-  lastnbin=nbin;
 end
 
 % Bin beam particle longitudinal direction
@@ -132,7 +135,11 @@ else % DRIFT or other element following bend
   IND2=abs(Z-(ZSP-dsmax));
   [Y I1]=min(IND2,[],2);
   W = (4/R)*( (q(I1)'./(PHI+2*X)) + ZINT ) - (4/R)*(1/(PHI+2*X)).*q(I)' ;
-  dE=(W'.*Q.*BEAMLINE{itrack}.L)./(1e9*qe); % GeV
+  if exist('driftDL','var')
+    dE=(W'.*Q.*driftDL)./(1e9*qe); % GeV
+  else
+    dE=(W'.*Q.*BEAMLINE{itrack}.L)./(1e9*qe); % GeV
+  end
 end
 % Apply energy loss for all particles in each bin
 beam(6,:)=beam(6,:)+dE(bininds);

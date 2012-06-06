@@ -19,6 +19,9 @@ function varargout=FlCA(varargin)
 %   missingPVs = FlCA('pvlist')
 %     - Get list of any missing PV's
 persistent removedPV removedPVinfo da
+import edu.stanford.slac.err.*;
+import edu.stanford.slac.aida.lib.da.*;
+import edu.stanford.slac.aida.lib.util.common.*;
 
 % init
 if isempty(removedPV); removedPV={}; end;
@@ -48,22 +51,21 @@ if ~any(newlist); return; end;
 while ismissing && ~isempty(pvlist)
   if strcmp(varargin{1},'lcaSetMonitor') || strcmp(varargin{1},'lcaPut') || strcmp(varargin{1},'lcaPutNoWait')
     if nargin>2
-      evalc([varargin{1},'(pvlist,varargin{3});']);
+      evalc([varargin{1},'(pvlist(:),varargin{3});']);
     else
-      evalc([varargin{1},'(pvlist);']);
+      evalc([varargin{1},'(pvlist(:));']);
     end
   elseif strcmp(varargin{1},'lcaNewMonitorValue')
     if nargin>2
-      output=eval([varargin{1},'(pvlist,varargin{3});']);
+      output=eval([varargin{1},'(pvlist(:),varargin{3});']);
     else
-      output=eval([varargin{1},'(pvlist);']);
+      output=eval([varargin{1},'(pvlist(:));']);
     end
     nanout(newlist)=output;
     varargout{1}=nanout;
   elseif ~isempty(regexp(varargin{1},'^aida','once'))
     % Initialise aida if not yet done
     if isempty(da)
-      aidainit;
       da = DaObject();
     end
     if strcmp(varargin{1},'aidaGet')
@@ -78,6 +80,7 @@ while ismissing && ~isempty(pvlist)
           end
           aidaNames=varargin{3}; chNames=varargin{4}; bpmd=varargin{5}; if ~iscell(bpmd); bpmd={bpmd}; end;
           [names X Y Q]=aidaBPM(da,uniPV{ipv},bpmd{uniI(ipv)});
+          if isempty(names); return; end; % AIDA data acquition failed?
           for ipv2=find(ismember(pvlist,uniPV))
             iname=find(ismember(names,aidaNames{ipv2}),1);
             if ~isempty(iname) && strcmp(chNames{ipv2},'x')
@@ -153,9 +156,9 @@ while ismissing && ~isempty(pvlist)
     da.reset();
   else
     if nargin>2
-      [output1 output2]=eval([varargin{1},'(pvlist,varargin{3});']);
+      [output1 output2]=eval([varargin{1},'(pvlist(:),varargin{3});']);
     else
-      [output1 output2]=eval([varargin{1},'(pvlist);']);
+      [output1 output2]=eval([varargin{1},'(pvlist(:));']);
     end
     nanout2=nanout;
     nanout(newlist)=output1;
@@ -180,9 +183,14 @@ STAT_GOOD  = 1;     % 0x00000001
 STAT_OFF   = 8;     % 0x00000008
 STAT_BAD   = 256;   % 0x00000100
 
-da.setParam(sprintf('N=%d',1));
+da.setParam(sprintf('N=%d',4));
 da.setParam(sprintf('BPMD=%d',bpmd));
-v = da.getDaValue(str);
+try
+  v = da.getDaValue(str);
+catch
+  names=[]; X=[]; Y=[]; Q=[];
+  return
+end
 anames = Vector(v.get(0));
 tmits = Vector(v.get(4));
 hstas = Vector(v.get(5));

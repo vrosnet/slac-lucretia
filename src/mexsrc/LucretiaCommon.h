@@ -327,16 +327,15 @@ void ClearTrackingVars( ) ;
 void TrackThruMain( struct TrackArgsStruc* ) ;
 
 /* tracking a bunch through various elements */
-
 int TrackBunchThruDrift( int, int, struct TrackArgsStruc*, int*, double ) ;
-int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int ) ;
-int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int* ) ;
-int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, double, int, int ) ;
+int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int, double, double ) ;
+int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int*, double, double ) ;
+int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, int ) ;
 int TrackBunchThruRF( int, int, struct TrackArgsStruc*, int*, int ) ;
-int TrackBunchThruBPM( int, int, struct TrackArgsStruc*, int* ) ;
-int TrackBunchThruInst( int, int, struct TrackArgsStruc*, int* ) ;
-int TrackBunchThruCorrector( int, int, struct TrackArgsStruc*, int*, int ) ;				
-int TrackBunchThruCollimator( int, int, struct TrackArgsStruc*, int* ) ;
+int TrackBunchThruBPM( int, int, struct TrackArgsStruc*, int*, double ) ;
+int TrackBunchThruInst( int, int, struct TrackArgsStruc*, int*, double ) ;
+int TrackBunchThruCorrector( int, int, struct TrackArgsStruc*, int*, int, double, double ) ;				
+int TrackBunchThruCollimator( int, int, struct TrackArgsStruc*, int*, double, double ) ;
 int TrackBunchThruCoord( int, int, struct TrackArgsStruc*, int* ) ;
 
 
@@ -541,7 +540,8 @@ void AccumulateWFBinPositions( double*, double*, int,
 void ClearOldLRWFFreqKicks( int ) ;
 
 /* Deal with CSR and split track flags */
-int GetCsrTrackFlags( int, int*, int*, int*, int ) ;
+double GetCsrTrackFlags( int, int*, int*, int, struct Bunch*, double* ) ;
+
 
 /* =================================================== */
 /* GPU specific functions and tracking kernels         */
@@ -560,7 +560,7 @@ __global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, do
         int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod) ;
 __global__ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, double L, double MultBValue, double MultTiltValue, double MultPoleIndex, int MultPoleIndexLength,
-        double MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod) ;
+        double MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale) ;
 __global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
@@ -571,7 +571,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
         double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod) ;
 void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray, int elemno, double aper2,
         double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength, double* MultAngleValue,
-        double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod) ;
+        double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale) ;
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,

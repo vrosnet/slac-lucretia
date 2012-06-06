@@ -77,7 +77,7 @@ int GetNumTrackFlags( int elemno ) ;
 /* return the name and value of one tracking flag */
 
 int GetTrackFlagValue( int ) ;
-char* GetTrackFlagName( int ) ;
+const char* GetTrackFlagName( int ) ;
 
 /* Add an error message to the pile */
 
@@ -153,6 +153,6 @@ double GetMatrixNormalizer( double* ) ;
 
 /* Calculation and application of CSR wake */
 
-void GetCsrEloss(struct Bunch*, int, int, int )
+void GetCsrEloss(struct Bunch*, int, int, int, double, double ) ;
 
 

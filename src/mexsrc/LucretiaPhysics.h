@@ -63,7 +63,7 @@ void GetLcavMap( double, double, double, double, double,
 
 void PropagateRayThruMult( double, double*, double*, double*, int, double*,
 						   double, double, double*, double*, int, int, double,
-							double*, int*, double*, double*, int, int ) ;
+							double*, int*, double*, double*, int, int, double ) ;
 
 /* emulation of the MAD transport map for a sector bend */
 
@@ -148,3 +148,6 @@ double ComputeSRMomentumLoss( double, double, double, int ) ;
 /* transfer map for a coordinate-change element */
 
 int GetCoordMap( double[6], double[6], Rmat ) ;
+
+/* RMS of beam dimension */
+double GetRMSCoord( struct Bunch*, int ) ;
