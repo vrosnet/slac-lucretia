@@ -89,8 +89,11 @@ classdef Floodland < handle & matlab.mixin.Copyable
     end
     function set.Initial(obj,newInitial)
       obj.Initial=newInitial;
-      obj.genTwiss;
-      obj.beamGen;
+      try
+        obj.genTwiss;
+        obj.beamGen;
+      catch
+      end
     end
   end
   
@@ -190,7 +193,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
       % GIRDER
       proplist=find(indxObj.useCntrl(indxObj.GIRDER_list)&doget(indxObj.GIRDER_list));
       if ~isempty(proplist)
-        girGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.GIRDER_list(proplist)),hwChans(indxObj.GIRDER_list(proplist)));
+        girGet(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.GIRDER_list(proplist)),hwChans(1,indxObj.GIRDER_list(proplist)));
       end
     end
     function hwSet(obj,indxObj,putList)
@@ -246,7 +249,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
       % GIRDER
       proplist=find(indxObj.useCntrl(indxObj.GIRDER_list)&doput(indxObj.GIRDER_list));
       if ~isempty(proplist)
-        girTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.GIRDER_list(proplist)),hwChans(indxObj.GIRDER_list(proplist)));
+        girTrim(obj,indxObj,proplist,indxObj.useCntrlChan(indxObj.GIRDER_list(proplist)),hwChans(2,indxObj.GIRDER_list(proplist)));
       end
     end
   end
@@ -481,7 +484,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if ~isempty(PS(ips).postCommand{1})
           comstackP{end+1}=PS(ips).postCommand{1}{1};
           comstackValsP(end+1,1)=PS(ips).postCommand{1}{2};
-          comstackProtoP{end+1}=PS(ips).protocol;
+          comstackProtoP{end+1}=proto;
         end
       end
       % Issue control system command(s)
@@ -539,7 +542,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if ~isempty(PS(ips).preCommand{2})
           comstack{end+1,1}=PS(ips).preCommand{2}{1};
           comstackVals(end+1,1)=PS(ips).preCommand{2}{2};
-          comstackProto{end+1,1}=PS(ips).protocol;
+          comstackProto{end+1,1}=proto;
         end
         if chanindx{n}(1) && ~isempty(hwindx{n})
           % Get trim or main pv names to use and vals to set
@@ -634,7 +637,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if ~isempty(PS(ips).postCommand{2})
           comstack{end+1}=PS(ips).postCommand{2}{1};
           comstackVals(end+1,1)=PS(ips).postCommand{2}{2};
-          comstackProto{end+1}=PS(ips).protocol;
+          comstackProto{end+1}=proto;
         end
       end
       % Issue control system command(s)
@@ -671,7 +674,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         end
         % Main PV to get value from
         for idim=1:6
-          if ~isempty(pvname{1,idim}) && chanindx{n}(idim) && ismember(idim,hwindx{1,n})
+          if ~isempty(pvname{1,idim}) && chanindx{n}(idim) && ismember(idim,hwindx{n})
             comstack_get{end+1,1}=pvname{1,idim};
             comstackProto_get{end+1,1}=GIRDER{ig}.protocol;
             comstack_conv{end+1,1}=GIRDER{ig}.conv{1,idim};
@@ -726,7 +729,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         % Main PV
         conv=GIRDER{ig}.conv;
         for idim=1:6
-          if ~isempty(pvname{2,idim}) && chanindx{n}(1) && ismember(idim,hwindx{2,n})
+          if ~isempty(pvname{2,idim}) && chanindx{n}(1) && ismember(idim,hwindx{n})
             comstackProto{end+1,1}=GIRDER{ig}.protocol;
             comstack{end+1,1}=pvname{2,idim};
             if length(conv{1})==1
