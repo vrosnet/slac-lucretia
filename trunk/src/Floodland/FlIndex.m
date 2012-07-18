@@ -664,7 +664,7 @@ classdef FlIndex < handle & FlGui & FlUtils
       if ~exist('protocol','var') 
         error('Must supply protocol as either AIDA or EPICS')
       elseif iscell(protocol)
-        if any(~cellfun(@(x) ismember(protocol{x},{'AIDA' 'EPICS'}),protocol))
+        if any(~cellfun(@(x) ismember(x,{'AIDA' 'EPICS'}),protocol))
           error('Must supply protocol entries as either AIDA or EPICS')
         end
       elseif ~ismember(protocol,{'AIDA' 'EPICS'})
