@@ -221,18 +221,22 @@ classdef distributedLucretia < handle
       end
       obj.thisConfig=configName;
       % get max number of useable workers
-      iw=obj.sched.IdleWorkers;
-      if isempty(iw)
-        error('No parallel workers available');
-      end
-      if isprop(iw(1),'Computer') % max is max number of same kind of architctures available
-        comps=get(iw,'Computer');
-        obj.maxworkers=max(cellfun(@(x) sum(ismember(comps,x)),unique(comps)));
-      else
+      try
+        iw=obj.sched.IdleWorkers;
+        if isempty(iw)
+          error('No parallel workers available');
+        end
+        if isprop(iw(1),'Computer') % max is max number of same kind of architctures available
+          comps=get(iw,'Computer');
+          obj.maxworkers=max(cellfun(@(x) sum(ismember(comps,x)),unique(comps)));
+        else
+          obj.maxworkers=obj.sched.ClusterSize;
+        end
+        if exist('nworkers','var') && nworkers<obj.maxworkers
+          obj.maxworkers=nworkers;
+        end
+      catch
         obj.maxworkers=obj.sched.ClusterSize;
-      end
-      if exist('nworkers','var') && nworkers<obj.maxworkers
-        obj.maxworkers=nworkers;
       end
     end
     function setError(obj,errTerm,errEleList)
