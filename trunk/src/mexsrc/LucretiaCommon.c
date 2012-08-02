@@ -2821,7 +2821,6 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 	double AngleFromTiltError ;
 	
   
-  
   /* get the element parameters from BEAMLINE; exit with bad status if
    parameters are missing or corrupted. */
   
@@ -2848,11 +2847,11 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 		intG = 0. ;
   
 	Theta = GetDBValue(SBendPar+SBendAngle) * splitScale ;
-	dZmod = GetDesignLorentzDelay( SBendPar[SBendP].ValuePtr ) ; 
+	dZmod = GetDesignLorentzDelay( SBendPar[SBendP].ValuePtr ) * splitScale ; 
 	Tilt = GetDBValue(SBendPar+SBendTilt) ;
   
-	E1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),0) ;
-	E2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),1) ;
+	E1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),0) * supEdgeEffect1 ;
+	E2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),1) * supEdgeEffect2 ;
 	if ( (cos(E1)==0.) || (cos(E2)==0.) )
 	{
 		stat = 0 ;
@@ -2860,8 +2859,8 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 		goto egress ;
 	}
   
-	H1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),0) ;
-	H2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),1) ;
+	H1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),0) * supEdgeEffect1 ;
+	H2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),1) * supEdgeEffect2 ;
   
 	hgap  = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),0) ;
 	hgapx = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),1) ;
@@ -3156,6 +3155,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
     GetBendFringeMap( L, intB, intG, *p0, E2, H2, 
                      hgapx, fintx, -1., Rface2, T5xx2 ) ;
   
+
   /* make use of the fact that the map is rather sparse */
   
   yb[raystart] = (*x) + T5xx2[0] * (*x) * (*x) 
@@ -3172,6 +3172,8 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   + T5xx2[9] * (*px) * (*y) ;
   yb[raystart+4] = *z ;
   yb[raystart+5] = *p0 ;
+  
+  
   
   /* preserve the current momentum */
 #ifndef __CUDA_ARCH__
@@ -8780,7 +8782,10 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   }
   else {
     if ( TFlag[CSR] > 0 )
+    {
       trackIter=48;
+      TFlag[Split]=50;
+    }
     else
       trackIter=0;
   }

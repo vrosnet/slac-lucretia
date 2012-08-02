@@ -17,6 +17,8 @@ classdef Track < handle
   %
   % Main public methods (see doc help for details):
   %   trackThru - main tracking method
+  %   trackThru('singleRay') - track single particle (mean of particle
+  %                            distributions, sum of charge)
   %
   % Example:
   %  % Create a distributedLucretia object (choose synchronicity with
@@ -76,6 +78,7 @@ classdef Track < handle
     beamout
     stat
     nray
+    beamInSingle
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
@@ -119,6 +122,14 @@ classdef Track < handle
       end
     end
     function set.beamIn(obj,beamStruc)
+      % Update single ray structure
+      if length(beamStruc.Bunch.Q)>1
+        obj.beamInSingle=beamStruc;
+        obj.beamInSingle.Bunch.Q=sum(beamStruc.Bunch.Q);
+        obj.beamInSingle.Bunch.stop=0;
+        obj.beamInSingle.Bunch.x=mean(beamStruc.Bunch.x,2);
+      end
+      % Deal with new Beam
       if obj.isDistrib && obj.DL.synchronous
         useWorkers=obj.DL.workers;
         spmd
@@ -189,8 +200,19 @@ classdef Track < handle
       obj.beamIn=beamIn;
       obj.nray=numel(beamIn.Bunch.Q);
     end
-    function trackThru(obj)
+    function trackThru(obj,cmd)
       global BEAMLINE
+      % Asking for single-ray tracking?
+      if exist('cmd','var') && isequal(cmd,'singleRay')
+        doSingleRay=true;
+      else
+        doSingleRay=false;
+      end
+      if doSingleRay
+        BeamIn=obj.beamInSingle;
+      else
+        BeamIn=obj.beamIn;
+      end
       % Check for CSR track flags
       indcsr=[];
       for itf=findcells(BEAMLINE,'TrackFlag')
@@ -208,13 +230,12 @@ classdef Track < handle
           % Make new asyn job
           for iw=obj.DL.workers
             obj.DL.createAsynTask(@Track.asynTrack,3,{obj.DL.asynDataFile,iw,obj.startInd,obj.finishInd,...
-              obj.firstBunch,obj.lastBunch,obj.loopFlag});
+              obj.firstBunch,obj.lastBunch,obj.loopFlag,doSingleRay});
           end
           obj.DL.launchAsynJob();
         else % if sycnchronous, submit tracking tasks to the pool and wait for them to finish
           startInd=obj.startInd;
           finishInd=obj.finishInd;
-          BeamIn=obj.beamIn;
           b1=obj.firstBunch;
           b2=obj.lastBunch;
           lf=obj.loopFlag;
@@ -247,35 +268,38 @@ classdef Track < handle
         % If wanting CSR treatment, stop at each CSR calculation point and
         % perturn BEAM energy before continuing (else just track)
         if ~isempty(indcsr) && obj.nray>1000
-          [stat beamout instdata csrData]=Track.csrTrackThru(obj.startInd,obj.finishInd,obj.beamIn,obj.firstBunch,obj.lastBunch,...
+          [stat beamout instdata csrData]=Track.csrTrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,...
             obj.loopFlag,t0,indcsr,obj.verbose,obj.csrNbins,obj.csrSmoothVal,obj.csrStoreData,0) ;
           obj.csrData=csrData;
         else
-          [stat beamout instdata]=TrackThru(obj.startInd,obj.finishInd,obj.beamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
+          [stat beamout instdata]=TrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
         end
         obj.trackStatus=stat;
         obj.beamOut=beamout;
         obj.instrData=instdata;
-        if ~isempty(indcsr) && length(obj.beamIn.Bunch.Q)>1000 && obj.verbose
+        if ~isempty(indcsr) && length(BeamIn.Bunch.Q)>1000 && obj.verbose
           fprintf('\n')
         end
       end
     end
   end
   
-  methods(Access=private)
-    
-  end
-  
   %% Static methods (those needing to be called in worker environment)
   methods(Static)
-    function [stat beamout instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf)
+    function [stat beamout instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf,doSingleParticle)
       [BEAMLINE PS GIRDER KLYSTRON WF]=distributedLucretia.asynLoadLattice(dataFile,iworker); %#ok<NASGU>
       load(dataFile,'trackBeamIn')
       if length(trackBeamIn)>1
         beam=trackBeamIn(iworker);
       else
         beam=trackBeamIn;
+      end
+      if doSingleParticle
+        beamInSingle=beam;
+        beamInSingle.Bunch.Q=sum(beam.Bunch.Q);
+        beamInSingle.Bunch.stop=0;
+        beamInSingle.x=mean(beam.Bunch.x,2);
+        beam=beamInSingle;
       end
       [stat beamout instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
     end

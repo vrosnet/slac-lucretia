@@ -1830,10 +1830,8 @@ bool IsEmpty(const mxArray* pa)
 
 void GetCsrEloss(struct Bunch* ThisBunch, int nbin, int smoothVal, int elementNo, double Lpos, double dL )
 {
-  return ;
   mxArray *lhs, *rhs[7] ;
   int iarr ;
-  
   /* Allocate RHS entries */
   rhs[0] =  mxCreateDoubleMatrix(6, ThisBunch->nray, mxREAL) ;
   memcpy(mxGetPr(rhs[0]),ThisBunch->x,sizeof(double)*ThisBunch->nray*6) ;

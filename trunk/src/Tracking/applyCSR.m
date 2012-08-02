@@ -1,19 +1,42 @@
 function [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,driftDL)
 % [beam W dE zOut]=applyCSR(beam,nbin,smoothVal,itrack,driftL,driftDL)
 %  Calculate CSR wake and change provided momentum profile
+%   - This function is designed to be called from the mex tracking
+%   environment and should not be altered
 %
-% beamZ: Lucretia Bunch.x
+% beam: Lucretia macro particle beam definition (Actually pass Beam.Bunch.x)
 % beamQ: charge of macro particles
 % nbin: number of bins to use for CSR calculation
 % smoothVal: level of smoothing to use (int >= 1)
+% itrack: BEAMLINE element number
+% driftL: distance from d/s edge of previous bend
+% driftDL: segment length of this downstream (from bend) element
+% (last 2 arguments only for application of CSR in downstream areas from
+% bend)
 global BEAMLINE
-persistent lastsz bininds z Z ZSP lastnbin
+persistent lastsz bininds z Z ZSP lastInd iter
 W=[]; dE=[]; zOut=[];
-fprintf('beam: %d beamQ: %d nbin: %d smoothVal: %d itrack: %d driftL: %.3g driftDL: %.3g',numel(beam),numel(beamQ),nbin,smoothVal,itrack,driftL,driftDL)
+
 %- If zero length element just return
 if ~isfield(BEAMLINE{itrack},'L') || BEAMLINE{itrack}.L==0
   return
 end
+
+% Find out what fraction of the way through this element we are
+if isfield(BEAMLINE{itrack},'TrackFlag') && isfield(BEAMLINE{itrack}.TrackFlag,'Split') && BEAMLINE{itrack}.TrackFlag.Split>0
+  if isempty(lastInd) || itrack~=lastInd
+    iter=1;
+  else
+    iter=iter+1;
+  end
+  splitfrac=iter/BEAMLINE{itrack}.TrackFlag.Split;
+  nsplit=BEAMLINE{itrack}.TrackFlag.Split;
+else
+  splitfrac=1;
+  nsplit=1;
+end
+if splitfrac>1; error('Iterating element %d too many times!',itrack); end;
+lastInd=itrack;
 
 % Find distance from start of bend
 if strcmp(BEAMLINE{itrack}.Class,'SBEN')
@@ -33,13 +56,16 @@ if strcmp(BEAMLINE{itrack}.Class,'SBEN')
     end
   end
   % Get parameters for CSR wake calculation
-  R=BEAMLINE{itrack}.L/(2*sin(abs(BEAMLINE{itrack}.Angle)/2));
+  R=(BEAMLINE{itrack}.L./nsplit)/(2*sin(abs((BEAMLINE{itrack}.Angle/nsplit))/2));
   PHI=0;
-  for iele=ind1:itrack
-    if isfield(BEAMLINE{iele},'Angle')
-      PHI=PHI+abs(BEAMLINE{iele}.Angle);
+  if ind1~=itrack
+    for iele=ind1:itrack-1
+      if isfield(BEAMLINE{iele},'Angle')
+        PHI=PHI+abs(BEAMLINE{iele}.Angle);
+      end
     end
   end
+  PHI=PHI+abs(BEAMLINE{itrack}.Angle)*splitfrac;
   X=0;
 else
   % -- find bend elements upstream
@@ -108,7 +134,7 @@ if strcmp(BEAMLINE{itrack}.Class,'SBEN')
   [Y I1]=min(IND1,[],2);
   [Y I2]=min(IND2,[],2);
   W=-(4/(R*PHI)).*q(I1)' + (4/(R*PHI)).*q(I2)' + (2/((3*R^2)^(1/3))).*ZINT;
-  dE=(W'.*Q.*BEAMLINE{itrack}.L)./(1e9*qe); % GeV
+  dE=(W'.*Q.*(BEAMLINE{itrack}.L./nsplit))./(1e9*qe); % GeV
 else % DRIFT or other element following bend
   % Get parameters for wake calculation
   dsmax=((R*PHI^3)/24)*((PHI+4*X)/(PHI+X));

@@ -128,7 +128,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
 	else
 	{
 		DidTracking = 1 ; 
-    
 		TrackThruMain( TrackArgs ) ;
 		ClearPLHSVars( ) ;
 		if ( TrackArgs->Status == 2 )
