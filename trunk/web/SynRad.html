@@ -21,7 +21,8 @@ Project</span><br>
 <small>Synchrotron Radiation<br>
 <br>
 </small></span></div>
-Lucretia allows the user to simulate synchrotron radiation losses in
+<h2><strong>ISR</strong></h2>
+<br>Lucretia allows the user to simulate incoherent synchrotron radiation losses in
 dipole correctors, sector bends, quads, sextupoles, octupoles,
 multipoles, and transverse-mode cavities.&nbsp; During tracking, there
 are four possible methods of synchrotron radiation simulation, which
@@ -88,10 +89,72 @@ SynRad != 0, the
 mean SR loss will be included in the momentum profile for bends,
 correctors, TCAVs, and multipoles with a nonzero dipole field.&nbsp; <br>
 <br>
+<h2><strong>CSR</strong></h2>
+The implementation of Coherent Synchrotron Radiation in Lucretia uses the 
+formulism developed in the paper by G. Stupakov and P. Emma in the EPAC2002 
+paper &quot;<a href="http://accelconf.web.cern.ch/AccelConf/e02/PAPERS/WEPRI029.pdf">CSR 
+Wake for a Short Magnet in Ultrarelativistic Limit</a>&quot;. The implementation in 
+Lucretia closely follows the method by which CSR was implemented in<br>
+<a href="http://www.aps.anl.gov/Accelerator_Systems_Division/Accelerator_Operations_Physics/manuals/elegant_latest/elegant.pdf">
+Elegant</a>. The Elegant implementation very well described measurement data 
+taken during the commissioning of LCLS. The implementation here has been 
+cross-checked against the example case in the Stupakov/Emma paper. It has also 
+been cross-checked against Elegant for the specific case of FACET at SLAC.<br>
+<br>CSR can be turned on through the use of the BEAMLINE <strong>TrackFlags.CSR
+</strong>field (see below) on an SBEN element. When the tracking engine reaches 
+an SBEN element with CSR track flag set, it slices up the element (according to 
+defaults specified below), tracks through each slice and calculates an energy 
+loss per beam slice (beam longitudinal slices also setable by user), applies the 
+energy loss and continues. Upon exiting from the bend, further elements are also 
+optionally split with the CSR field applied as calculated from the preceding 
+bend. The cutoff distance from the bend for application of CSR effects is 
+determined as per the description in the Stupakov/Emma paper. CSR effects are 
+considered in all elements downstream from the bend up to the cutoff with the 
+exception of RF and other bend elements. The CSR calculation relies upon a 
+Matlab function which resides inside the src/Tracking directory (applyCSR.m) 
+which should exist on your Matlab search path.<br><br>CSR tracking options (set 
+through TrackFlags on SBEN elements in BEAMLINE array, default values shown):<br>
+<strong><br>TrackFlags.CSR = 0</strong><br>A setting of 0 means no CSR tracking 
+to take place. An integer value &gt;0 switches on CSR effects in the corresponding 
+SBEN element. The integer value set indicates the number of longitudinal slices 
+(histogram bins) to use for the beam description in the CSR calculation. The 
+optimal number depends upon the topology and number of macro particles within 
+the tracked bunch. A minimum recommended number is 300. It is always advised to 
+experiment with this setting to find a value which produces stable results 
+without too much of a time overhead.<br><br><strong>TrackFlags.CSR_SmoothFactor 
+= 5<br></strong>The longitudinal charge profile is smoothed after binning. This 
+parameter (integer &gt;=1) controls the degree of smoothing. The optimal value 
+depends upon the number of bins used (.CSR field above) and the 'spikiness' of 
+the longitudinal beam profile. The larger the value, the more smoothing 
+(approximately this is the width in bins of the smoothing filter). 
+Experimentation is recommended.<br><br><strong>TrackFlags.Split</strong> =
+<strong>10<br></strong>The number of slices to split the SBEN element into 
+(integer &gt;=10, &gt;=50 recommended). This tracking flag is also independent of the 
+CSR fields, it can be set independently- in which case the tracking engine 
+treats the element as N sequential identical elements with lengths and strengths 
+scaled appropriately. More splitting more closely represents reality but will 
+slow down the tracking. Again, experimentation is recommended.<br><br><strong>
+TrackFlags.DriftSplit = 10<br></strong>If set to 0, then no CSR treatment is 
+applied beyond the downstream face of the SBEN. If integer &gt;0, then CSR is 
+applied to the tracked beam downstream of the bend to a point downstream 
+determined internally where the CSR field ceases to have a significant effect. 
+The following elements are usually drifts (hence the flag name, but can include 
+any element class other than LCAV or TCAV). The value of the DriftSplit flag 
+determines the number of slices between the downstream SBEN face and the cutoff 
+point to use. Depending on the number of downstream elements between bend and 
+cutoff point, the elements are split so that the total number of tracking slices 
+is at least this value. Note if the tracking engine encounters another SBEN 
+element before the cutoff distance, it simply stops the calculation and starts 
+again with the new SBEN (if CSR switched on in this bend), no effort is made to 
+convolve the CSR fields from multiple bends. The slices are made according to a 
+logarithmic distribution, with more slices closer to the bend where the CSR 
+fields are changing most rapidly. A value of &gt;50 is recommended and 
+experimentation suggested.<br>
 <br>
-<br>
-<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a><br>
-21-Apr-2006<br>
+<a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a>
+<a
+ href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
+2-Aug-2012<br>
 <a href="http://www.slac.stanford.edu/detailed.html"><img
  src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
  alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
