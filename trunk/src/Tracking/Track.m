@@ -184,7 +184,7 @@ classdef Track < handle
     function obj=Track(beamIn,distribObj)
       global BEAMLINE
       if exist('distribObj','var') && ~isempty(distribObj)
-        if ~strcmp(class(distribObj),'distributedLucretia')
+        if ~strcmp(class(distribObj),'distributedLucretia') %#ok<STISA>
           error('Can only pass a distributedLucretia object to Track')
         end
         obj.isDistrib=true;
@@ -201,7 +201,6 @@ classdef Track < handle
       obj.nray=numel(beamIn.Bunch.Q);
     end
     function trackThru(obj,cmd)
-      global BEAMLINE
       % Asking for single-ray tracking?
       if exist('cmd','var') && isequal(cmd,'singleRay')
         doSingleRay=true;
@@ -213,14 +212,6 @@ classdef Track < handle
       else
         BeamIn=obj.beamIn;
       end
-      % Check for CSR track flags
-      indcsr=[];
-      for itf=findcells(BEAMLINE,'TrackFlag')
-        if isfield(BEAMLINE{itf}.TrackFlag,'doCSR') && BEAMLINE{itf}.TrackFlag.doCSR
-          indcsr(end+1)=itf;
-        end
-      end
-      t0=clock;
       % tracking in parallel across possibly multiple workers
       if obj.isDistrib
         % If asynchronous, submit jobs and return
@@ -265,21 +256,10 @@ classdef Track < handle
           obj.instrData=instdata;
         end
       else % local tracking
-        % If wanting CSR treatment, stop at each CSR calculation point and
-        % perturn BEAM energy before continuing (else just track)
-        if ~isempty(indcsr) && obj.nray>1000
-          [stat beamout instdata csrData]=Track.csrTrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,...
-            obj.loopFlag,t0,indcsr,obj.verbose,obj.csrNbins,obj.csrSmoothVal,obj.csrStoreData,0) ;
-          obj.csrData=csrData;
-        else
-          [stat beamout instdata]=TrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
-        end
+        [stat beamout instdata]=TrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
         obj.trackStatus=stat;
         obj.beamOut=beamout;
         obj.instrData=instdata;
-        if ~isempty(indcsr) && length(BeamIn.Bunch.Q)>1000 && obj.verbose
-          fprintf('\n')
-        end
       end
     end
   end
@@ -287,7 +267,7 @@ classdef Track < handle
   %% Static methods (those needing to be called in worker environment)
   methods(Static)
     function [stat beamout instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf,doSingleParticle)
-      [BEAMLINE PS GIRDER KLYSTRON WF]=distributedLucretia.asynLoadLattice(dataFile,iworker); %#ok<NASGU>
+      [BEAMLINE PS GIRDER KLYSTRON WF]=distributedLucretia.asynLoadLattice(dataFile,iworker); %#ok<NASGU,ASGLU>
       load(dataFile,'trackBeamIn')
       if length(trackBeamIn)>1
         beam=trackBeamIn(iworker);
@@ -303,56 +283,6 @@ classdef Track < handle
       end
       [stat beamout instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
     end
-    function [stat beamout instdata csrData]=csrTrackThru(startInd,finishInd,beamIn,firstBunch,lastBunch,loopFlag,t0,indcsr,verbose,csrNbins,csrSmoothVal,csrStoreData,isDistrib)
-      t1=startInd;
-      tempBeam=beamIn;
-      idataAccum=cell(1,3);
-      csrData=[];
-      istep=0; nsteps=length(indcsr(indcsr>=startInd & indcsr<=finishInd));
-      firstPrint=true;
-      %           zp=tempBeam.Bunch.x(5,:);
-      for itrack=indcsr(indcsr>=startInd & indcsr<=finishInd)
-        [stat tempBeam instdata]=TrackThru(t1,itrack,tempBeam,firstBunch,lastBunch,loopFlag);
-        if stat{1}~=1; break; end;
-        %             tempBeam.Bunch.x(1:4,:)=0;
-        %             tempBeam.Bunch.x(5,:)=zp;
-        if verbose && ~isDistrib
-          istep=istep+1;
-          if etime(clock,t0)>1.5
-            if ~firstPrint
-              fprintf('\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b')
-            else
-              fprintf('\n')
-            end
-            firstPrint=false;
-            fprintf('CSR Tracking: %3d%% complete...',round((istep/nsteps)*100))
-            t0=clock;
-          end
-        end
-        [bOut W dE z]=applyCSR(tempBeam.Bunch.x,tempBeam.Bunch.Q,csrNbins,csrSmoothVal,itrack);
-        tempBeam.Bunch.x=bOut;
-        if csrStoreData
-          csrData(1+itrack-startInd).W=W;
-          csrData(1+itrack-startInd).dE=dE;
-          csrData(1+itrack-startInd).z=z;
-          csrData(1+itrack-startInd).beam=tempBeam;
-          csrData(1+itrack-startInd).index=itrack;
-        end
-        t1=itrack+1;
-        for id=1:length(instdata)
-          idataAccum{id}=[idataAccum{id} instdata{id}];
-        end
-      end
-      if itrack~=finishInd
-        [stat beamout instdata]=TrackThru(t1,finishInd,tempBeam,firstBunch,lastBunch,loopFlag);
-        for id=1:length(instdata)
-          instdata{id}=[idataAccum{id} instdata{id}];
-        end
-      else
-        beamout=tempBeam;
-        instdata=idataAccum;
-      end
-    end
   end
   
   methods(Access=private)
@@ -364,7 +294,7 @@ classdef Track < handle
       end
       z=linspace(zmin,zmax,nbin);
       z=z-mean(z);
-      [count,bininds] = histc(-beamZ,z);
+      [~,bininds] = histc(-beamZ,z);
       [Z ZSP]=meshgrid(z,z);
     end
   end
