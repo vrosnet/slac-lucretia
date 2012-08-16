@@ -40,14 +40,6 @@ end
 allpar=[1 2 3 4 5 6];
 xfit=beam.Bunch.x(allpar(~ismember(allpar,dim)),:)';
 yfit=beam.Bunch.x(dim,:)';
-if doGaussfit
-  nbin=max([length(yfit)/100 100]);
-  [ fx , bc ] = hist(yfit,nbin) ;
-  [~, q] = gauss_fit(bc,fx) ;
-  bsize_initial = q(4) ;
-else
-  bsize_initial = std(yfit) ;
-end
 bsize_corrected=zeros(1,3);
 for iorder=1:3
   p=polyfitn(xfit,yfit,iorder);
@@ -73,13 +65,11 @@ for iterm=1:length(p.Coefficients)
     yfit=yfit-polyvaln(p2,xfit);
     if doGaussfit
       nbin=max([length(yfit)/100 100]);
-      [ fx , bc ] = hist(yfit,nbin);
+      [ fx , bc ] = hist(polyvaln(p2,xfit),nbin);
       [~, q] = gauss_fit(bc,fx) ;
-      bsize(iterm)=abs(bsize_initial-q(4));
-      bsize_initial=q(4);
+      bsize(iterm)=q(4);
     else
-      bsize(iterm)=abs(bsize_initial-std(yfit));
-      bsize_initial=std(yfit);
+      bsize(iterm)=std(polyvaln(p2,xfit));
     end
   end
   fitTerm(iterm,:)=p.ModelTerms(I(iterm),:);
