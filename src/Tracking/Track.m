@@ -61,11 +61,7 @@ classdef Track < handle
     lastBunch=1; % last bunch to track (if multibunch)
     loopFlag=0; % loop over elements (0) or over bunches (1)
     beamType=0; % 0=all input beams the same, 1=possibly different beams for each worker
-    csrStoreData=false; % true: store Wakefield etc data at each CSR calculation point
-    csrNbins=600; % number of histogram bins to use for CSR calculations
     verbose=0; % verbosity level (0= don't print anything, 1=print at each CSR integration step)
-    csrData % Contains CSR data at each track point requiring CSR calculation if csrStoreData set true
-    csrSmoothVal=3; % Amount of smoothing to apply to charge distribution for CSR calculation (integer >=1)
   end
   properties(SetAccess=protected)
     isDistrib % Is this Track object opererating in distributed mode?
@@ -230,24 +226,10 @@ classdef Track < handle
           b1=obj.firstBunch;
           b2=obj.lastBunch;
           lf=obj.loopFlag;
-          verbose=obj.verbose;
-          csrNbins=obj.csrNbins;
-          csrSmoothVal=obj.csrSmoothVal;
-          csrStoreData=obj.csrStoreData;
           useWorkers=obj.DL.workers;
-          if ~isempty(indcsr) && obj.nray>1000
-            spmd
-              if ismember(labindex,useWorkers)
-                [stat beamout instdata csrData]=Track.csrTrackThru(startInd,finishInd,BeamIn,b1,b2,...
-                  lf,t0,indcsr,verbose,csrNbins,csrSmoothVal,csrStoreData,1) ;
-              end
-            end
-            obj.csrData=csrData;
-          else
-            spmd
-              if ismember(labindex,useWorkers)
-                [stat beamout instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
-              end
+          spmd
+            if ismember(labindex,useWorkers)
+              [stat beamout instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
             end
           end
           % Store results
