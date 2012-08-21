@@ -1832,6 +1832,8 @@ void GetCsrEloss(struct Bunch* ThisBunch, int nbin, int smoothVal, int elementNo
 {
   mxArray *lhs, *rhs[7] ;
   int iarr ;
+  /* If less than 100 particles, don't bother */
+  if (ThisBunch->nray<100) return;
   /* Allocate RHS entries */
   rhs[0] =  mxCreateDoubleMatrix(6, ThisBunch->nray, mxREAL) ;
   memcpy(mxGetPr(rhs[0]),ThisBunch->x,sizeof(double)*ThisBunch->nray*6) ;
