@@ -217,18 +217,22 @@ classdef distributedLucretia < handle
       end
       obj.sched=findResource('scheduler','configuration',configName);
       if isprop(obj.sched,'HasSharedFilesystem') && ~obj.sched.HasSharedFilesystem
-        warning('This scheduler is not setup for a shared filesystem, this may cause problems and is not recommended!')
+        warning('This scheduler is not setup for a shared filesystem, this may cause problems and is not recommended!') %#ok<WNTAG>
       end
       obj.thisConfig=configName;
       % get max number of useable workers
       try
-        iw=obj.sched.IdleWorkers;
-        if isempty(iw)
-          error('No parallel workers available');
-        end
-        if isprop(iw(1),'Computer') % max is max number of same kind of architctures available
-          comps=get(iw,'Computer');
-          obj.maxworkers=max(cellfun(@(x) sum(ismember(comps,x)),unique(comps)));
+        if isprop(obj.sched,'IdleWorkers')
+          iw=obj.sched.IdleWorkers;
+          if isempty(iw)
+            error('No parallel workers available');
+          end
+          if isprop(iw(1),'Computer') % max is max number of same kind of architctures available
+            comps=get(iw,'Computer');
+            obj.maxworkers=max(cellfun(@(x) sum(ismember(comps,x)),unique(comps)));
+          else
+            obj.maxworkers=obj.sched.ClusterSize;
+          end
         else
           obj.maxworkers=obj.sched.ClusterSize;
         end
@@ -395,7 +399,7 @@ classdef distributedLucretia < handle
     function latticeCopy(obj,doSync)
       %latticeCopy(obj,doSync)
       % Copy current in-local-memory Lucretia lattice to all workers
-      % (Copy takes affect next sync event)
+      % (Copy takes effect next sync event)
       % doSync (optional), if true then also sync all workers with Trim
       % methods. Default=true
       global PS GIRDER KLYSTRON

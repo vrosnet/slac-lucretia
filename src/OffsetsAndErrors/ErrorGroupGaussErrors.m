@@ -85,7 +85,7 @@ eval(group.dimension) ;
 
 % If specify distributed ops then apply errors to each MC machine
 isdist=false;
-if ~isempty(group.comment) && strcmp(class(group.comment),'distributedLucretia')
+if ~isempty(group.comment) && isa(group.comment,'distributedLucretia')
   isdist=true;
   DL=group.comment;
   dlLoop=DL.workers;

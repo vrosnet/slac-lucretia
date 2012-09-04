@@ -19,6 +19,10 @@ classdef Track < handle
   %   trackThru - main tracking method
   %   trackThru('singleRay') - track single particle (mean of particle
   %                            distributions, sum of charge)
+  %   getBeamData - get detailed data about output beam (Tracking must have
+  %              occured) - e.g. RMS and gaussian fitted beam sizes, aberrations
+  %              calculated from particle distributions etc
+  %      Fetches beam data from all workers
   %
   % Example:
   %  % Create a distributedLucretia object (choose synchronicity with
@@ -75,6 +79,7 @@ classdef Track < handle
     stat
     nray
     beamInSingle
+    dBeamData % distributed beam data
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
@@ -83,6 +88,7 @@ classdef Track < handle
     instrData % (distributed) instrument data from tracking
     beamOut % (distributed) beam object post tracking
     trackStatus % (distributed) Lucretia status from tracking
+    beamData % Processed beam data
   end
   
   %% Get/Set methods
@@ -173,6 +179,9 @@ classdef Track < handle
         beam=obj.lBeamIn;
       end
     end
+    function data=get.beamData(obj)
+      data=obj.dBeamData;
+    end
   end
   
   %% Main public methods
@@ -244,9 +253,35 @@ classdef Track < handle
         obj.instrData=instdata;
       end
     end
+    function beamData=getBeamData(obj,dims)
+      if isempty(obj.beamOut); error('No tracking has taken place yet!'); end;
+      if ~exist('dims','var'); dims='xyz'; end;
+      bo=obj.beamOut;
+      if obj.isDistrib
+        if ~obj.DL.synchronous
+          % Remove last job if there is one
+          obj.DL.clearAsynJob;
+          % Make new asyn job
+          for iw=obj.DL.workers
+            obj.DL.createAsynTask(@Track.procBeamData,1,{bo{iw},dims});
+          end
+          obj.DL.launchAsynJob();
+          obj.DL.asynWait;
+          bd=asynGetData(obj.DL,1);
+          for ib=1:length(bd); beamData(ib)=bd{ib}; end;
+        else
+          spmd
+            bd=Track.procBeamData(bo,dims) ;
+          end
+          for ib=1:length(bd); beamData(ib)=bd{ib}; end;
+        end
+      else
+        beamData=Track.procBeamData(bo,dims);
+      end
+    end
   end
   
-  %% Static methods (those needing to be called in worker environment)
+  %% Static methods (includes those needing to be called in worker environment for distributed jobs)
   methods(Static)
     function [stat beamout instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf,doSingleParticle)
       [BEAMLINE PS GIRDER KLYSTRON WF]=distributedLucretia.asynLoadLattice(dataFile,iworker); %#ok<NASGU,ASGLU>
@@ -265,8 +300,76 @@ classdef Track < handle
       end
       [stat beamout instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
     end
+    function data=procBeamData(beam,dims)
+      gamma=mean(beam.Bunch.x(6,:))/0.511e-3;
+      if any(ismember(dims,'x'))
+        [fitTerm,fitCoef,bsize_corrected,bsize] = beamTerms(1,beam);
+        [~, I]=sort(bsize,'descend');
+        data.fitTerms_x=fitTerm(I,:);
+        data.fitBeamSizeContrib_x=bsize(I);
+        data.fitCoef_x=fitCoef(I);
+        data.fitBeamSizeCorrected_x=bsize_corrected;
+      end
+      if any(ismember(dims,'y'))
+        [fitTerm,fitCoef,bsize_corrected,bsize] = beamTerms(3,beam);
+        [~, I]=sort(bsize,'descend');
+        data.fitTerms_y=fitTerm(I,:);
+        data.fitBeamSizeContrib_y=bsize(I);
+        data.fitCoef_y=fitCoef(I);
+        data.fitBeamSizeCorrected_y=bsize_corrected;
+      end
+      if any(ismember(dims,'z'))
+        [fitTerm,fitCoef,bsize_corrected,bsize] = beamTerms(5,beam);
+        [~, I]=sort(bsize,'descend');
+        data.fitTerms_z=fitTerm(I,:);
+        data.fitBeamSizeContrib_z=bsize(I);
+        data.fitCoef_z=fitCoef(I);
+        data.fitBeamSizeCorrected_z=bsize_corrected;
+      end
+      [nx,ny] = GetNEmitFromBeam( beam, 1 );
+      data.emit_x=nx/gamma; data.emit_y=ny/gamma;
+      data.xpos=mean(beam.Bunch.x(1,:));
+      data.ypos=mean(beam.Bunch.x(3,:));
+      data.xrms=std(beam.Bunch.x(1,:)); data.xprms=std(beam.Bunch.x(2,:));
+      data.yrms=std(beam.Bunch.x(3,:)); data.yprms=std(beam.Bunch.x(4,:));
+      data.zrms=std(beam.Bunch.x(5,:));
+      data.erms=std(beam.Bunch.x(6,:))/mean(beam.Bunch.x(6,:));
+      data.sigma=cov(beam.Bunch.x');
+      R=diag(ones(1,6));L=zeros(6,6);L(1,2)=1;L(3,4)=1;
+      data.xwaist=fminsearch(@(x) Track.minWaist(x,R,L,data.sigma,1),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
+      data.ywaist=fminsearch(@(x) Track.minWaist(x,R,L,data.sigma,3),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
+      [Tx,Ty] = GetUncoupledTwissFromBeamPars(beam,1);
+      data.xdisp=Tx.eta;
+      data.ydisp=Ty.eta;
+      data.xdp=Tx.etap;
+      data.ydp=Ty.etap;
+      data.betax=data.xrms^2/data.emit_x;
+      data.betay=data.yrms^2/data.emit_y;
+      data.sig13=data.sigma(1,3);
+      data.sig23=data.sigma(2,3);
+      data.sig14=data.sigma(1,4);
+      data.sig15=data.sigma(1,5);
+      nbin=max([length(beam.Bunch.Q)/100 100]);
+      [ fx , bc ] = hist(beam.Bunch.x(3,:),nbin);
+      [~, q] = gauss_fit(bc,fx) ;
+      data.yfit=abs(q(4));
+      [ fx , bc ] = hist(beam.Bunch.x(1,:),nbin);
+      [~, q] = gauss_fit(bc,fx) ;
+      data.xfit=abs(q(4));
+      [ fx , bc ] = hist(beam.Bunch.x(5,:),nbin);
+      [~, q] = gauss_fit(bc,fx) ;
+      data.zfit=abs(q(4));
+    end
   end
-  
+  methods(Static,Access=private)
+    function chi2 = minWaist(x,R,L,sig,dir)
+      newsig=(R+L.*x(1))*sig*(R+L.*x(1))';
+      chi2=newsig(dir,dir)^2;
+    end
+    function chi2 = sinFit(x,data,error)
+      chi2=sum( ( data - ( x(1) * sin((1:length(data))/x(2)+2*pi*x(3))+mean(data) ) ).^2 ./ error.^2);
+    end
+  end
   methods(Access=private)
     function [bininds z Z ZSP]=doBinning(beamZ,nbin)
       zmin=min(-beamZ);
