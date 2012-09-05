@@ -94,6 +94,7 @@ classdef Match < handle & physConsts
     createLookupNdims=1; % =1 if just want to use 1-d lookup, >1 uses higher-order polynomial fits
     useFitData=false; % Use fit data instead of Twiss calculation / tracking
     matchWeights=[]; % Vector of weights for match entries
+    userFitFun % function handle for user supplied fitting routine (must take Lucretia beam structure as only argument)
   end
   properties(SetAccess=protected)
     matchType={}; % Cell array of match type descriptors (see allowedMatchTypes property)
@@ -125,7 +126,7 @@ classdef Match < handle & physConsts
   end
   properties(Constant)
     allowedMatchTypes={'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'NEmit_x' 'NEmit_y' 'eta_x' ...
-      'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'SigmaFit' 'Sigma' 'T' 'U' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'};
+      'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'SigmaFit' 'User' 'Sigma' 'T' 'U' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'};
     allowedVariableTypes={'PS' 'GIRDER' 'KLYSTRON' 'BEAMLINE' 'BUMP'};
     allowedOptimMethods={'gradDrop' 'fminsearch' 'fmincon' 'lsqnonlin' 'genetic' 'fgoalattain'};
   end
@@ -427,7 +428,7 @@ classdef Match < handle & physConsts
         end
       end
       % Check for match requirements to see if tracking is required
-      if any(ismember(obj.matchType,{'Sigma' 'SigmaGauss' 'SigmaFit' 'T' 'U' 'NEmit_x' 'NEmit_y' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'}))
+      if any(ismember(obj.matchType,{'Sigma' 'SigmaGauss' 'SigmaFit' 'User' 'T' 'U' 'NEmit_x' 'NEmit_y' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'}))
         out=true;
       else
         out=false;
@@ -816,6 +817,8 @@ classdef Match < handle & physConsts
                 [ fx , bc ] = hist(beamout.Bunch.x(dim,:),nbin);
                 [~, q] = gauss_fit(bc,fx) ;
                 F(itype)=abs(q(4));
+              case 'User'
+                F(itype) = obj.userFitFun(beamout);
               case {'T' 'U'}
                 if ~exist('fitCoef','var') || dim~=str2double(obj.matchTypeQualifiers{itype}(1))
                   dim=str2double(obj.matchTypeQualifiers{itype}(1));
