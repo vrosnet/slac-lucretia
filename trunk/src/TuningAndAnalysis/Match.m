@@ -158,7 +158,7 @@ classdef Match < handle & physConsts
     end
     function addMatch(obj,mind,type,vals,tol,typeQual)
       % ADDMATCH - add a match condition to the problem set
-      % addMatch(obj,type,weight,vals,tol [,typeQual])
+      % addMatch(obj,mind,type,vals,tol [,typeQual])
       % type = string or cell list of strings, see allowedMatchTypes property for available list
       % weight = double, weighting function for constraints
       % vals = double, desired match values
@@ -787,9 +787,33 @@ classdef Match < handle & physConsts
               case 'etap_y'
                 F(itype)=T.etapy(end);
               case 'nu_x'
-                F(itype)=T.nux(end);
+                try
+                  pcomp=str2double(obj.matchTypeQualifiers{itype});
+                  if isempty(pcomp) || isnan(pcomp); error('no pcomp request'); end;
+                  if pcomp>length(T.nux)
+                    [~, T2]=GetTwiss(obj.iInitial,pcomp,Ix,Iy);
+                    nux2=T2.nux(end);
+                  else
+                    nux2=T.nux(pcomp-obj.iInitial+1);
+                  end
+                  F(itype)=sin(abs(T.nux(end)-nux2)*2*pi);
+                catch
+                  F(itype)=T.nux(end);
+                end
               case 'nu_y'
-                F(itype)=T.nuy(end);
+                try
+                  pcomp=str2double(obj.matchTypeQualifiers{itype});
+                  if isempty(pcomp) || isnan(pcomp); error('no pcomp request'); end;
+                  if pcomp>length(T.nuy)
+                    [~, T2]=GetTwiss(obj.iInitial,pcomp,Ix,Iy);
+                    nuy2=T2.nuy(end);
+                  else
+                    nuy2=T.nuy(pcomp-obj.iInitial+1);
+                  end
+                  F(itype)=sin(abs(T.nuy(end)-nuy2)*2*pi);
+                catch
+                  F(itype)=T.nuy(end);
+                end
               case 'NEmit_x'
                 if ~exist('nx','var')
                   [nx,ny] = GetNEmitFromBeam( beamout ,1);
