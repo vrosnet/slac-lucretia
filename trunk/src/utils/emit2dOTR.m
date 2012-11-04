@@ -1,4 +1,4 @@
-function [stat emitData] = emit2dOTR(otruse,dointrinsic,printData)
+function [stat,emitData] = emit2dOTR(otruse,dointrinsic,printData)
 % [stat emitData] = emit2dOTR(otruse,[dointrinsic,printData])
 % Compute beam sigma matrix, covariance matrix, and chisquare from measured
 % beam sizes and their errors at 3 or more OTRs
@@ -15,9 +15,26 @@ function [stat emitData] = emit2dOTR(otruse,dointrinsic,printData)
 % Outputs:
 % stat = Lucretia status return
 % emitData = data formatted for sending over FlECS interface:
-%            [energy emitx demitx emitxn demitxn embmxn dembmxn bmagx dbmagx bcosx dbcosx bsinx dbsinx betax dbetax bx0 alphx dalphx ax0 chi2x ...
-%                    emity demity emityn demityn embmyn dembmyn bmagy dbmagy bcosy dbcosy bsiny dbsiny betay dbetay by0 alphy dalphy ay0 chi2y ...
-%                    ido length(id) id length(S) S sigxf sigx dsigx sigyf sigy dsigy];
+%   [energy ...
+%    emitx demitx emitxn demitxn embmxn dembmxn ...
+%    bmagx dbmagx bcosx dbcosx bsinx dbsinx ...
+%    betax dbetax bx0 alphx dalphx ax0 chi2x ...
+%    emity demity emityn demityn embmyn dembmyn ...
+%    bmagy dbmagy bcosy dbcosy bsiny dbsiny ...
+%    betay dbetay by0 alphy dalphy ay0 chi2y ...
+%    ido length(id) id length(S) S sigxf sigx dsigx sigyf sigy dsigy ...
+%    R{1:notr} ...
+%    exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
+%    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
+%    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip ...
+%   ];
+% ------------------------------------------------------------------------------
+% 04-Nov-2012, M. Woodley
+%    Use energy=FL.SimModel.Initial.Momentum (BH1R fudge updated 24Oct12);
+%    add to emitData: 4x4 OTR-to-OTR Rmats, design IP Twiss propagated IP beam
+%    parameters
+% ------------------------------------------------------------------------------
+
 global BEAMLINE INSTR FL PS %#ok<NUSED>
 stat{1}=1;
 emitData=[];
@@ -104,7 +121,11 @@ else
     [dDX(n),dDPX(n),dDY(n),dDPY(n)]=deal(dD(1),dD(2),dD(3),dD(4)); % m,rad,m,rad
   end
 end
-dp=8e-4; % nominal energy spread
+if isfield(FL,'props') && isfield(FL.props,'dE')
+  dp=FL.props.dE;
+else
+  dp=8e-4; % nominal energy spread
+end
 
 % correct measured spot sizes for dispersion
 sigxt=sigx;sigxd=abs(dp*DX);sigx2=sigxt.^2-sigxd.^2;
@@ -130,20 +151,34 @@ for n=1:notr
 end
 
 % get the model
+R=cell(1,notr);
 Rx=zeros(notr,2);Ry=zeros(notr,2);
 for n=1:notr
   [stat,Rab]=RmatAtoB(ido(1),ido(n));
   if (stat{1}~=1),error(stat{2}),end
+  R{n}=Rab(1:4,1:4);
   Rx(n,:)=[Rab(1,1),Rab(1,2)];
   Ry(n,:)=[Rab(3,3),Rab(3,4)];
 end
-energy=DR_energy(1,813.72); % FL.SimModel.Initial.Momentum;
 
 % get design Twiss at first OTR
+energy=FL.SimModel.Initial.Momentum;
+egamma=energy/0.51099906e-3;
+ex0=FL.SimModel.Initial.x.NEmit/egamma;
 bx0=FL.SimModel.Design.Twiss.betax(ido(1));
 ax0=FL.SimModel.Design.Twiss.alphax(ido(1));
+ey0=FL.SimModel.Initial.y.NEmit/egamma;
 by0=FL.SimModel.Design.Twiss.betay(ido(1));
 ay0=FL.SimModel.Design.Twiss.alphay(ido(1));
+
+% get design Twiss at IP
+ip=findcells(BEAMLINE,'Name','IP');
+ex0ip=ex0;
+bx0ip=FL.SimModel.Design.Twiss.betax(ip);
+ax0ip=FL.SimModel.Design.Twiss.alphax(ip);
+ey0ip=ey0;
+by0ip=FL.SimModel.Design.Twiss.betay(ip);
+ay0ip=FL.SimModel.Design.Twiss.alphay(ip);
 
 % load analysis variables
 dsigxd=dDX.*dp;
@@ -175,18 +210,17 @@ u=Tx*Bx'*zx;chi2x=zx'*zx-zx'*Bx*Tx*Bx'*zx;du=sqrt(diag(Tx)); %#ok<NASGU,MINV>
 v=Ty*By'*zy;chi2y=zy'*zy-zy'*By*Ty*By'*zy;dv=sqrt(diag(Ty)); %#ok<NASGU,MINV>
 
 % convert fitted input sigma matrix elements to emittance, BMAG, ...
-egamma=energy/0.51099906e-3;
-
 [p,dp]=emit_params(u(1),u(2),u(3),Tx,bx0,ax0);
-if (any(imag(p(1:3))~=0)||any(p(1:3)<=0))
-  stat{1}=-1;
-  if dointrinsic
-    stat{2}='Error in horizontal intrinsic emittance computation';
-  else
-    stat{2}='Error in horizontal projected emittance computation';
-  end
-  return
-end
+p(1:3)=abs(p(1:3));
+% if (any(imag(p(1:3))~=0)||any(p(1:3)<=0))
+%   stat{1}=-1;
+%   if dointrinsic
+%     stat{2}='Error in horizontal intrinsic emittance computation';
+%   else
+%     stat{2}='Error in horizontal projected emittance computation';
+%   end
+%   return
+% end
 emitx=p(1);demitx=dp(1);
 bmagx=p(2);dbmagx=dp(2);
 embmx=p(3);dembmx=dp(3);
@@ -198,15 +232,16 @@ emitxn=egamma*emitx;demitxn=egamma*demitx;
 embmxn=egamma*embmx;dembmxn=egamma*dembmx;
 
 [p,dp]=emit_params(v(1),v(2),v(3),Ty,by0,ay0);
-if (any(imag(p(1:3))~=0)||any(p(1:3)<=0))
-  stat{1}=-1;
-  if dointrinsic
-    stat{2}='Error in vertical intrinsic emittance computation';
-  else
-    stat{2}='Error in vertical projected emittance computation';
-  end
-  return
-end
+p(1:3)=abs(p(1:3));
+% if (any(imag(p(1:3))~=0)||any(p(1:3)<=0))
+%   stat{1}=-1;
+%   if dointrinsic
+%     stat{2}='Error in vertical intrinsic emittance computation';
+%   else
+%     stat{2}='Error in vertical projected emittance computation';
+%   end
+%   return
+% end
 emity=p(1);demity=dp(1);
 bmagy=p(2);dbmagy=dp(2);
 embmy=p(3);dembmy=dp(3);
@@ -286,6 +321,36 @@ for n=1:length(id)
   sigxf(n)=sqrt(sigxm(1,1));sigyf(n)=sqrt(sigym(1,1));
 end
 
+% propagate measured beam from first OTR to IP (ignore coupling)
+[stat,Rab]=RmatAtoB(ido(1),ip); % first OTR to IP
+if (stat{1}~=1),error(stat{2}),end
+
+sig0=[u(1),u(2);u(2),u(3)];
+Rx=Rab(1:2,1:2);
+sigip=Rx*sig0*Rx';
+RT=[   Rx(1,1)^2            2*Rx(1,1)*Rx(1,2)            Rx(1,2)^2   ; ...
+    Rx(1,1)*Rx(2,1)  Rx(1,1)*Rx(2,2)+Rx(1,2)*Rx(2,1)  Rx(1,2)*Rx(2,2); ...
+       Rx(2,1)^2            2*Rx(2,1)*Rx(2,2)            Rx(2,2)^2   ];
+T=RT*Tx*RT'; % propagate covariance matrix to IP
+[p,dp]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
+sigxip=sigip(1,1);dsigxip=sqrt(T(1,1));
+sigpxip=sigip(2,2);dsigpxip=sqrt(T(3,3));
+betaxip=p(4);dbetaxip=dp(4);
+alphxip=p(5);dalphxip=dp(5);
+
+sig0=[v(1),v(2);v(2),v(3)];
+Ry=Rab(3:4,3:4);
+sigip=Ry*sig0*Ry';
+RT=[   Ry(1,1)^2            2*Ry(1,1)*Ry(1,2)            Ry(1,2)^2   ; ...
+    Ry(1,1)*Ry(2,1)  Ry(1,1)*Ry(2,2)+Ry(1,2)*Ry(2,1)  Ry(1,2)*Ry(2,2); ...
+       Ry(2,1)^2            2*Ry(2,1)*Ry(2,2)            Ry(2,2)^2   ];
+T=RT*Ty*RT'; % propagate covariance matrix to IP
+[p,dp]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
+sigyip=sigip(1,1);dsigyip=sqrt(T(1,1));
+sigpyip=sigip(2,2);dsigpyip=sqrt(T(3,3));
+betayip=p(4);dbetayip=dp(4);
+alphyip=p(5);dalphyip=dp(5);
+
 % Print data to screen and plot if requested
 if printData
   disp(txt')
@@ -310,10 +375,26 @@ if printData
   xlabel('S (m)')
   plot_magnets_Lucretia(BEAMLINE(id),1,1);
 else
-  emitData=[energy emitx demitx emitxn demitxn embmxn dembmxn bmagx dbmagx bcosx dbcosx bsinx dbsinx betax dbetax bx0 alphx dalphx ax0 chi2x ...
-                   emity demity emityn demityn embmyn dembmyn bmagy dbmagy bcosy dbcosy bsiny dbsiny betay dbetay by0 alphy dalphy ay0 chi2y ...
-                   ido length(id) id' length(S) S' sigxf' sigx dsigx sigyf' sigy dsigy xf' yf'];
+  emitData=[energy ...
+    emitx demitx emitxn demitxn embmxn dembmxn ...
+    bmagx dbmagx bcosx dbcosx bsinx dbsinx ...
+    betax dbetax bx0 alphx dalphx ax0 chi2x ...
+    emity demity emityn demityn embmyn dembmyn ...
+    bmagy dbmagy bcosy dbcosy bsiny dbsiny ...
+    betay dbetay by0 alphy dalphy ay0 chi2y ...
+    ido length(id) id' length(S) S' sigxf' sigx dsigx sigyf' sigy dsigy xf' yf'];
+  for n=1:notr
+    emitData=[emitData reshape(R{n},1,[])]; % R{n}=reshape(...,4,[])
+  end
+  emitData=[emitData ...
+    exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
+    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
+    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip];
+
   if dointrinsic
-    save(sprintf('userData/emit2dOTR_%s',datestr(now,30)),'rawotrdata','emitData','otruse','BEAMLINE','PS','DX','DPX','DY','DPY','dDX','dDPX','dDY','dDPY','ictdata','icterrdata');
+    save(sprintf('userData/emit2dOTR_%s',datestr(now,30)), ...
+      'rawotrdata','emitData','otruse','BEAMLINE','PS', ...
+      'DX','DPX','DY','DPY','dDX','dDPX','dDY','dDPY', ...
+      'ictdata','icterrdata');
   end
 end
