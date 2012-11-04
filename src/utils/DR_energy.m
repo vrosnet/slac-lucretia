@@ -27,6 +27,8 @@ function varargout=DR_energy(opCode,varargin)
 %   Ibh1r  = BH1R current (amp) assuming bend angle of pi/18
 
 % ==============================================================================
+% 24-OCT-2012, M. Woodley
+%    New BH1R energy fudge per ATF2 eLog: 812.801 amp = 1.269 GeV
 % 07-FEB-2010, M. Woodley
 %    New BH1R energy fudge per T. Okugi: 813.87 amp = 1.2820 GeV
 % 25-JAN-2005, M. Woodley
@@ -75,8 +77,8 @@ theta=pi/18;
 % fudge factor
 
 if (isempty(f))
-  I0=813.87; % amp ... from God
-  E0=1.2820; % GeV ... from God
+  I0=812.801; % amp ... from God
+  E0=1.269; % GeV ... from God
   BL0=(Cb*E0)*theta; % kG-m
   c=fliplr(bvibh1);
   c(end)=c(end)-BL0;
