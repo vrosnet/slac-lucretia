@@ -25,8 +25,8 @@ function [stat,emitData] = emit2dOTR(otruse,dointrinsic,printData)
 %    ido length(id) id length(S) S sigxf sigx dsigx sigyf sigy dsigy ...
 %    R{1:notr} ...
 %    exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
-%    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
-%    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip ...
+%    sigxip dsigxip sigpxip dsigpxip sigyip dsigyip sigpyip dsigpyip ...
+%    betaxip dbetaxip alphxip dalphxip betayip dbetayip alphyip dalphyip ...
 %   ];
 % ------------------------------------------------------------------------------
 % 04-Nov-2012, M. Woodley
@@ -173,12 +173,12 @@ ay0=FL.SimModel.Design.Twiss.alphay(ido(1));
 
 % get design Twiss at IP
 ip=findcells(BEAMLINE,'Name','IP');
-ex0ip=ex0;
-bx0ip=FL.SimModel.Design.Twiss.betax(ip);
-ax0ip=FL.SimModel.Design.Twiss.alphax(ip);
-ey0ip=ey0;
-by0ip=FL.SimModel.Design.Twiss.betay(ip);
-ay0ip=FL.SimModel.Design.Twiss.alphay(ip);
+exip0=ex0;
+bxip0=FL.SimModel.Design.Twiss.betax(ip);
+axip0=FL.SimModel.Design.Twiss.alphax(ip);
+eyip0=ey0;
+byip0=FL.SimModel.Design.Twiss.betay(ip);
+ayip0=FL.SimModel.Design.Twiss.alphay(ip);
 
 % load analysis variables
 dsigxd=dDX.*dp;
@@ -388,8 +388,8 @@ else
   end
   emitData=[emitData ...
     exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
-    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
-    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip];
+    sigxip dsigxip sigpxip dsigpxip sigyip dsigyip sigpyip dsigpyip ...
+    betaxip dbetaxip alphxip dalphxip betayip dbetayip alphyip dalphyip];
 
   if dointrinsic
     save(sprintf('userData/emit2dOTR_%s',datestr(now,30)), ...
