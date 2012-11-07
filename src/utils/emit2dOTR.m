@@ -41,7 +41,13 @@ global BEAMLINE INSTR FL PS %#ok<NUSED>
 stat{1}=1;
 emitData=[];
 
-debug=0;
+% use fake data if Woodley wills it
+% NOTE: mdwGetFlagVal.m lives in ~/home/mdw
+if (exist('mdwGetFlagVal.m','file')==2)
+  mdwFlag=mdwGetFlagVal('emit2dOTR');
+else
+  mdwFlag=0;
+end
 
 % Parse optional parameters
 if ~exist('dointrinsic','var') || isempty(dointrinsic)
@@ -71,28 +77,19 @@ for n=1:notr
   idoi(n)=findcells(INSTR,'Index',ido(n));
 end
 
-% Get OTR data from PVs
-if (debug)
-  load userData/emit2dOTRtest %#ok<*UNRCH>
-  id=find(otruse);
-  for n=1:notr
-    if dointrinsic
-      sigx(n)=1e-6*sqrt(pvdata(1,id(n))); % m
-      dsigx(n)=1e-6*sqrt(pvdata(2,id(n))); % m
-      sigy(n)=1e-6*sqrt(pvdata(3,id(n))); % m
-      dsigy(n)=1e-6*sqrt(pvdata(4,id(n))); % m
-    else
-      sigx(n)=1e-6*pvdata(7,id(n)); % m
-      dsigx(n)=1e-6*pvdata(8,id(n)); % m
-      sigy(n)=1e-6*pvdata(9,id(n)); % m
-      dsigy(n)=1e-6*pvdata(10,id(n)); % m
-    end
-  end
-  z=zeros(1,notr);
-  theta=z; % deg
-  DX=z;DPX=z;DY=z;DPY=z; % m
-  err=1e-6*ones(1,notr);
-  dDX=err;dDPX=err;dDY=err;dDPY=err; % m
+% Get OTR data
+if (mdwFlag)
+  data=mdwGetEmit(1,otruse);
+  sigx=data.sigx;dsigx=data.dsigx; % m
+  sigy=data.sigy;dsigy=data.dsigy; % m
+  theta=zeros(1,notr);
+  DX=data.DX;dDX=data.dDX; % m
+  DPX=data.DPX;dDPX=data.dDPX; % m
+  DY=data.DY;dDY=data.dDY; % m
+  DPY=data.DPY;dDPY=data.dDPY; % m
+  dp=data.dp;
+  clear data
+  stat{1}=1;
 else
   for n=1:notr
     otrNum=str2double(oname{n}(4))+1;
@@ -122,11 +119,11 @@ else
     [DX(n),DPX(n),DY(n),DPY(n)]=deal(D(1),D(2),D(3),D(4)); % m,rad,m,rad
     [dDX(n),dDPX(n),dDY(n),dDPY(n)]=deal(dD(1),dD(2),dD(3),dD(4)); % m,rad,m,rad
   end
-end
-if isfield(FL,'props') && isfield(FL.props,'dE')
-  dp=FL.props.dE;
-else
-  dp=8e-4; % nominal energy spread
+  if isfield(FL,'props') && isfield(FL.props,'dE')
+    dp=FL.props.dE;
+  else
+    dp=8e-4; % nominal energy spread
+  end
 end
 
 % correct measured spot sizes for dispersion
@@ -139,16 +136,18 @@ if (any(sigx2<0)||any(sigy2<0))
 end
 sigx=sqrt(sigx2); % dispersion corrected
 sigy=sqrt(sigy2); % dispersion corrected
+
+txt{1}=' ';
 if dointrinsic
-  txt{1}='Ellipse:';
+  txt{end+1}='Ellipse:';
 else
-  txt{1}='Projected:';
+  txt{end+1}='Projected:';
 end
-txt{2}='  sigxt   sigxd    sigx   sigyt   sigyd    sigy';
-txt{3}='------- ------- ------- ------- ------- -------';
+txt{end+1}='  sigxt   sigxd    sigx   sigyt   sigyd    sigy';
+txt{end+1}='------- ------- ------- ------- ------- -------';
 %       nnnn.nn nnnn.nn nnnn.nn nnnn.nn nnnn.nn nnnn.nn
 for n=1:notr
-  txt{3+n}=sprintf('%7.2f %7.2f %7.2f %7.2f %7.2f %7.2f', ...
+  txt{end+1}=sprintf('%7.2f %7.2f %7.2f %7.2f %7.2f %7.2f', ...
     1e6*[sigxt(n),sigxd(n),sigx(n),sigyt(n),sigyd(n),sigy(n)]);
 end
 
@@ -360,6 +359,7 @@ txt{end+1}=sprintf('bmag_sin   = %10.4f +- %9.4f      (%9.4f)',bsiny,dbsiny,0);
 txt{end+1}=sprintf('beta       = %10.4f +- %9.4f m    (%9.4f)',betay,dbetay,by0);
 txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphy,dalphy,ay0);
 txt{end+1}=sprintf('chisq/N    = %10.4f',chi2y);
+txt{end+1}=' ';
 
 if dointrinsic
   txt{end+1}=sprintf('Vertical ellipse emittance parameters at IP');
@@ -372,7 +372,7 @@ sigpy0=sqrt(emity*(1+ayip0^2)/byip0);
 txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)', ...
   1e6*[sigyip,dsigyip,sigy0]);
 txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)', ...
-  1e6*[sigpyip,dsigyxip,sigpy0]);
+  1e6*[sigpyip,dsigyip,sigpy0]);
 txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)', ...
   1e3*[betayip,dbetayip,byip0]);
 txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)', ...
@@ -391,7 +391,7 @@ txt{end+1}=' ';
 
 % Print data to screen and plot if requested
 if printData
-  disp(txt')
+  for n=1:length(txt),disp(txt{n}),end
   figure(1)
   plot(S(id),1e6*sigxf,'b--')
   hold on
@@ -412,29 +412,32 @@ if printData
   ylabel('Vertical Beam Size (um)')
   xlabel('S (m)')
   plot_magnets_Lucretia(BEAMLINE(id),1,1);
-else
-  emitData=[energy ...
-    emitx demitx emitxn demitxn embmx dembmx ...
-    bmagx dbmagx bcosx dbcosx bsinx dbsinx ...
-    betax dbetax bx0 alphx dalphx ax0 chi2x ...
-    emity demity emityn demityn embmy dembmy ...
-    bmagy dbmagy bcosy dbcosy bsiny dbsiny ...
-    betay dbetay by0 alphy dalphy ay0 chi2y ...
-    ido length(id) id' length(S) S' sigxf' sigyf' ...
-    DX dDX DPX dDPX DY dDY DPY dDPY dp ...
-    sigx dsigx sigy dsigy xf' yf'];
-  for n=1:notr
-    emitData=[emitData reshape(R{n},1,[])]; % R{n}=reshape(...,4,[])
-  end
-  emitData=[emitData ...
-    exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
-    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
-    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip];
+end
 
-  if dointrinsic
-    save(sprintf('userData/emit2dOTR_%s',datestr(now,30)), ...
-      'rawotrdata','emitData','otruse','BEAMLINE','PS', ...
-      'DX','DPX','DY','DPY','dDX','dDPX','dDY','dDPY', ...
-      'ictdata','icterrdata');
-  end
+% load return data array
+emitData=[energy ...
+  emitx demitx emitxn demitxn embmx dembmx ...
+  bmagx dbmagx bcosx dbcosx bsinx dbsinx ...
+  betax dbetax bx0 alphx dalphx ax0 chi2x ...
+  emity demity emityn demityn embmy dembmy ...
+  bmagy dbmagy bcosy dbcosy bsiny dbsiny ...
+  betay dbetay by0 alphy dalphy ay0 chi2y ...
+  ido length(id) id' length(S) S' sigxf' sigyf' ...
+  DX dDX DPX dDPX DY dDY DPY dDPY dp ...
+  sigx dsigx sigy dsigy xf' yf'];
+for n=1:notr
+  emitData=[emitData reshape(R{n},1,[])]; % R{n}=reshape(...,4,[])
+end
+emitData=[emitData ...
+  exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
+  sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
+  sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip];
+
+% if using ellipse fit data, save some stuff
+if dointrinsic
+  save(sprintf('userData/emit2dOTR_%s',datestr(now,30)), ...
+    'rawotrdata','emitData','otruse','BEAMLINE','PS', ...
+    'DX','DPX','DY','DPY','dDX','dDPX','dDY','dDPY', ...
+    'ictdata','icterrdata');
+end
 end
