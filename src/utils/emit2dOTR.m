@@ -16,17 +16,19 @@ function [stat,emitData] = emit2dOTR(otruse,dointrinsic,printData)
 % stat = Lucretia status return
 % emitData = data formatted for sending over FlECS interface:
 %   [energy ...
-%    emitx demitx emitxn demitxn embmxn dembmxn ...
+%    emitx demitx emitxn demitxn embmx dembmx ...
 %    bmagx dbmagx bcosx dbcosx bsinx dbsinx ...
 %    betax dbetax bx0 alphx dalphx ax0 chi2x ...
-%    emity demity emityn demityn embmyn dembmyn ...
+%    emity demity emityn demityn embmy dembmy ...
 %    bmagy dbmagy bcosy dbcosy bsiny dbsiny ...
 %    betay dbetay by0 alphy dalphy ay0 chi2y ...
-%    ido length(id) id length(S) S sigxf sigx dsigx sigyf sigy dsigy ...
+%    ido length(id) id length(S) S sigxf sigyf ...
+%    DX dDX DPX dDPX DY dDY DPY dDPY dp ...
+%    sigx dsigx sigy dsigy xf yf ...
 %    R{1:notr} ...
 %    exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
-%    sigxip dsigxip sigpxip dsigpxip sigyip dsigyip sigpyip dsigpyip ...
-%    betaxip dbetaxip alphxip dalphxip betayip dbetayip alphyip dalphyip ...
+%    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
+%    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip ...
 %   ];
 % ------------------------------------------------------------------------------
 % 04-Nov-2012, M. Woodley
@@ -229,7 +231,6 @@ alphx=p(5);dalphx=dp(5);
 bcosx=p(6);dbcosx=dp(6);
 bsinx=p(7);dbsinx=dp(7);
 emitxn=egamma*emitx;demitxn=egamma*demitx;
-embmxn=egamma*embmx;dembmxn=egamma*dembmx;
 
 [p,dp]=emit_params(v(1),v(2),v(3),Ty,by0,ay0);
 p(1:3)=abs(p(1:3));
@@ -250,53 +251,6 @@ alphy=p(5);dalphy=dp(5);
 bcosy=p(6);dbcosy=dp(6);
 bsiny=p(7);dbsiny=dp(7);
 emityn=egamma*emity;demityn=egamma*demity;
-embmyn=egamma*embmy;dembmyn=egamma*dembmy;
-
-% results txt
-txt{end+1}=' ';
-if dointrinsic
-  txt{end+1}=sprintf('Horizontal intrinsic emittance parameters at %s',oname{1});
-else
-  txt{end+1}=sprintf('Horizontal projected emittance parameters at %s',oname{1});
-end
-txt{end+1}='-------------------------------------------------------';
-txt{end+1}=sprintf('energy     = %10.4f              GeV',energy);
-txt{end+1}=sprintf('emit       = %10.4f +- %9.4f pm',1e12*emitx,1e12*demitx);
-txt{end+1}=sprintf('emitn      = %10.4f +- %9.4f nm',1e9*emitxn,1e9*demitxn);
-txt{end+1}=sprintf('emitn*bmag = %10.4f +- %9.4f nm',1e9*embmxn,1e9*dembmxn);
-txt{end+1}=sprintf('bmag       = %10.4f +- %9.4f      (%9.4f)',bmagx,dbmagx,1);
-txt{end+1}=sprintf('bmag_cos   = %10.4f +- %9.4f      (%9.4f)',bcosx,dbcosx,0);
-txt{end+1}=sprintf('bmag_sin   = %10.4f +- %9.4f      (%9.4f)',bsinx,dbsinx,0);
-txt{end+1}=sprintf('beta       = %10.4f +- %9.4f m    (%9.4f)',betax,dbetax,bx0);
-txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphx,dalphx,ax0);
-txt{end+1}=sprintf('chisq/N    = %10.4f',chi2x);
-txt{end+1}=' ';
-if dointrinsic
-  txt{end+1}=sprintf('Vertical intrinsic emittance parameters at %s',oname{1});
-else
-  txt{end+1}=sprintf('Vertical projected emittance parameters at %s',oname{1});
-end
-txt{end+1}='-------------------------------------------------------';
-txt{end+1}=sprintf('energy     = %10.4f              GeV',energy);
-txt{end+1}=sprintf('emit       = %10.4f +- %9.4f pm',1e12*emity,1e12*demity);
-txt{end+1}=sprintf('emitn      = %10.4f +- %9.4f nm',1e9*emityn,1e9*demityn);
-txt{end+1}=sprintf('emitn*bmag = %10.4f +- %9.4f nm',1e9*embmyn,1e9*dembmyn);
-txt{end+1}=sprintf('bmag       = %10.4f +- %9.4f      (%9.4f)',bmagy,dbmagy,1);
-txt{end+1}=sprintf('bmag_cos   = %10.4f +- %9.4f      (%9.4f)',bcosy,dbcosy,0);
-txt{end+1}=sprintf('bmag_sin   = %10.4f +- %9.4f      (%9.4f)',bsiny,dbsiny,0);
-txt{end+1}=sprintf('beta       = %10.4f +- %9.4f m    (%9.4f)',betay,dbetay,by0);
-txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphy,dalphy,ay0);
-txt{end+1}=sprintf('chisq/N    = %10.4f',chi2y);
-
-% propagate measured beam to OTRs
-xf=sqrt(Mx*u);yf=sqrt(My*v);
-txt{end+1}=sprintf('Propagated spot sizes');
-txt{end+1}='---------------------------------------------------------------------------';
-for n=1:notr
-  txt{end+1}=sprintf('%5s(x) = %6.1f um (%6.1f +- %6.1f), (y) = %6.1f um (%6.1f +- %6.1f)', ...
-    oname{n},1e6*[xf(n),sigx(n),dsigx(n),yf(n),sigy(n),dsigy(n)]);
-end
-txt{end+1}=' ';
 
 % back propagate fitted sigma matrices to MDISP
 sigx1=[u(1),u(2);u(2),u(3)];sigy1=[v(1),v(2);v(2),v(3)];
@@ -333,8 +287,8 @@ RT=[   Rx(1,1)^2            2*Rx(1,1)*Rx(1,2)            Rx(1,2)^2   ; ...
        Rx(2,1)^2            2*Rx(2,1)*Rx(2,2)            Rx(2,2)^2   ];
 T=RT*Tx*RT'; % propagate covariance matrix to IP
 [p,dp]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
-sigxip=sigip(1,1);dsigxip=sqrt(T(1,1));
-sigpxip=sigip(2,2);dsigpxip=sqrt(T(3,3));
+sigxip=sqrt(sigip(1,1));dsigxip=sqrt(T(1,1))/(2*sigxip);
+sigpxip=sqrt(sigip(2,2));dsigpxip=sqrt(T(3,3))/(2*sigpxip);
 betaxip=p(4);dbetaxip=dp(4);
 alphxip=p(5);dalphxip=dp(5);
 
@@ -346,10 +300,94 @@ RT=[   Ry(1,1)^2            2*Ry(1,1)*Ry(1,2)            Ry(1,2)^2   ; ...
        Ry(2,1)^2            2*Ry(2,1)*Ry(2,2)            Ry(2,2)^2   ];
 T=RT*Ty*RT'; % propagate covariance matrix to IP
 [p,dp]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
-sigyip=sigip(1,1);dsigyip=sqrt(T(1,1));
-sigpyip=sigip(2,2);dsigpyip=sqrt(T(3,3));
+sigyip=sqrt(sigip(1,1));dsigyip=sqrt(T(1,1))/(2*sigyip);
+sigpyip=sqrt(sigip(2,2));dsigpyip=sqrt(T(3,3)/(2*sigpyip));
 betayip=p(4);dbetayip=dp(4);
 alphyip=p(5);dalphyip=dp(5);
+
+% results txt
+txt{end+1}=' ';
+
+if dointrinsic
+  txt{end+1}=sprintf('Horizontal intrinsic emittance parameters at %s',oname{1});
+else
+  txt{end+1}=sprintf('Horizontal projected emittance parameters at %s',oname{1});
+end
+txt{end+1}='-------------------------------------------------------';
+txt{end+1}=sprintf('energy     = %10.4f              GeV',energy);
+txt{end+1}=sprintf('emit       = %10.4f +- %9.4f pm',1e12*emitx,1e12*demitx);
+txt{end+1}=sprintf('emitn      = %10.4f +- %9.4f nm',1e9*emitxn,1e9*demitxn);
+txt{end+1}=sprintf('emit*bmag  = %10.4f +- %9.4f nm',1e9*embmx,1e9*dembmx);
+txt{end+1}=sprintf('bmag       = %10.4f +- %9.4f      (%9.4f)',bmagx,dbmagx,1);
+txt{end+1}=sprintf('bmag_cos   = %10.4f +- %9.4f      (%9.4f)',bcosx,dbcosx,0);
+txt{end+1}=sprintf('bmag_sin   = %10.4f +- %9.4f      (%9.4f)',bsinx,dbsinx,0);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f m    (%9.4f)',betax,dbetax,bx0);
+txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphx,dalphx,ax0);
+txt{end+1}=sprintf('chisq/N    = %10.4f',chi2x);
+txt{end+1}=' ';
+
+if dointrinsic
+  txt{end+1}=sprintf('Horizontal ellipse emittance parameters at IP');
+else
+  txt{end+1}=sprintf('Horizontal projected emittance parameters at IP');
+end
+txt{end+1}='-----------------------------------------------';
+sigx0=sqrt(emitx*bxip0);
+sigpx0=sqrt(emitx*(1+axip0^2)/bxip0);
+txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)', ...
+  1e6*[sigxip,dsigxip,sigx0]);
+txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)', ...
+  1e6*[sigpxip,dsigpxip,sigpx0]);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)', ...
+  1e3*[betaxip,dbetaxip,bxip0]);
+txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)', ...
+  alphxip,dalphxip,axip0);
+txt{end+1}=' ';
+
+if dointrinsic
+  txt{end+1}=sprintf('Vertical intrinsic emittance parameters at %s',oname{1});
+else
+  txt{end+1}=sprintf('Vertical projected emittance parameters at %s',oname{1});
+end
+txt{end+1}='-------------------------------------------------------';
+txt{end+1}=sprintf('energy     = %10.4f              GeV',energy);
+txt{end+1}=sprintf('emit       = %10.4f +- %9.4f pm',1e12*emity,1e12*demity);
+txt{end+1}=sprintf('emitn      = %10.4f +- %9.4f nm',1e9*emityn,1e9*demityn);
+txt{end+1}=sprintf('emit*bmag  = %10.4f +- %9.4f nm',1e9*embmy,1e9*dembmy);
+txt{end+1}=sprintf('bmag       = %10.4f +- %9.4f      (%9.4f)',bmagy,dbmagy,1);
+txt{end+1}=sprintf('bmag_cos   = %10.4f +- %9.4f      (%9.4f)',bcosy,dbcosy,0);
+txt{end+1}=sprintf('bmag_sin   = %10.4f +- %9.4f      (%9.4f)',bsiny,dbsiny,0);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f m    (%9.4f)',betay,dbetay,by0);
+txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphy,dalphy,ay0);
+txt{end+1}=sprintf('chisq/N    = %10.4f',chi2y);
+
+if dointrinsic
+  txt{end+1}=sprintf('Vertical ellipse emittance parameters at IP');
+else
+  txt{end+1}=sprintf('Vertical projected emittance parameters at IP');
+end
+txt{end+1}='-----------------------------------------------';
+sigy0=sqrt(emity*byip0);
+sigpy0=sqrt(emity*(1+ayip0^2)/byip0);
+txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)', ...
+  1e6*[sigyip,dsigyip,sigy0]);
+txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)', ...
+  1e6*[sigpyip,dsigyxip,sigpy0]);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)', ...
+  1e3*[betayip,dbetayip,byip0]);
+txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)', ...
+  alphyip,dalphyip,ayip0);
+txt{end+1}=' ';
+
+% propagate measured beam to OTRs
+xf=sqrt(Mx*u);yf=sqrt(My*v);
+txt{end+1}=sprintf('Propagated spot sizes');
+txt{end+1}='---------------------------------------------------------------------------';
+for n=1:notr
+  txt{end+1}=sprintf('%5s(x) = %6.1f um (%6.1f +- %6.1f), (y) = %6.1f um (%6.1f +- %6.1f)', ...
+    oname{n},1e6*[xf(n),sigx(n),dsigx(n),yf(n),sigy(n),dsigy(n)]);
+end
+txt{end+1}=' ';
 
 % Print data to screen and plot if requested
 if printData
@@ -376,20 +414,22 @@ if printData
   plot_magnets_Lucretia(BEAMLINE(id),1,1);
 else
   emitData=[energy ...
-    emitx demitx emitxn demitxn embmxn dembmxn ...
+    emitx demitx emitxn demitxn embmx dembmx ...
     bmagx dbmagx bcosx dbcosx bsinx dbsinx ...
     betax dbetax bx0 alphx dalphx ax0 chi2x ...
-    emity demity emityn demityn embmyn dembmyn ...
+    emity demity emityn demityn embmy dembmy ...
     bmagy dbmagy bcosy dbcosy bsiny dbsiny ...
     betay dbetay by0 alphy dalphy ay0 chi2y ...
-    ido length(id) id' length(S) S' sigxf' sigx dsigx sigyf' sigy dsigy xf' yf'];
+    ido length(id) id' length(S) S' sigxf' sigyf' ...
+    DX dDX DPX dDPX DY dDY DPY dDPY dp ...
+    sigx dsigx sigy dsigy xf' yf'];
   for n=1:notr
     emitData=[emitData reshape(R{n},1,[])]; % R{n}=reshape(...,4,[])
   end
   emitData=[emitData ...
     exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
-    sigxip dsigxip sigpxip dsigpxip sigyip dsigyip sigpyip dsigpyip ...
-    betaxip dbetaxip alphxip dalphxip betayip dbetayip alphyip dalphyip];
+    sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
+    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip];
 
   if dointrinsic
     save(sprintf('userData/emit2dOTR_%s',datestr(now,30)), ...
