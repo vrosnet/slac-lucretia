@@ -211,9 +211,9 @@ u=Tx*Bx'*zx;chi2x=zx'*zx-zx'*Bx*Tx*Bx'*zx;du=sqrt(diag(Tx)); %#ok<NASGU,MINV>
 v=Ty*By'*zy;chi2y=zy'*zy-zy'*By*Ty*By'*zy;dv=sqrt(diag(Ty)); %#ok<NASGU,MINV>
 
 % convert fitted input sigma matrix elements to emittance, BMAG, ...
-[p,dp]=emit_params(u(1),u(2),u(3),Tx,bx0,ax0);
-p(1:3)=abs(p(1:3));
-% if (any(imag(p(1:3))~=0)||any(p(1:3)<=0))
+[px,dpx]=emit_params(u(1),u(2),u(3),Tx,bx0,ax0);
+px(1:3)=abs(px(1:3));
+% if (any(imag(px(1:3))~=0)||any(px(1:3)<=0))
 %   stat{1}=-1;
 %   if dointrinsic
 %     stat{2}='Error in horizontal intrinsic emittance computation';
@@ -222,18 +222,18 @@ p(1:3)=abs(p(1:3));
 %   end
 %   return
 % end
-emitx=p(1);demitx=dp(1);
-bmagx=p(2);dbmagx=dp(2);
-embmx=p(3);dembmx=dp(3);
-betax=p(4);dbetax=dp(4);
-alphx=p(5);dalphx=dp(5);
-bcosx=p(6);dbcosx=dp(6);
-bsinx=p(7);dbsinx=dp(7);
+emitx=px(1);demitx=dpx(1);
+bmagx=px(2);dbmagx=dpx(2);
+embmx=px(3);dembmx=dpx(3);
+betax=px(4);dbetax=dpx(4);
+alphx=px(5);dalphx=dpx(5);
+bcosx=px(6);dbcosx=dpx(6);
+bsinx=px(7);dbsinx=dpx(7);
 emitxn=egamma*emitx;demitxn=egamma*demitx;
 
-[p,dp]=emit_params(v(1),v(2),v(3),Ty,by0,ay0);
-p(1:3)=abs(p(1:3));
-% if (any(imag(p(1:3))~=0)||any(p(1:3)<=0))
+[py,dpy]=emit_params(v(1),v(2),v(3),Ty,by0,ay0);
+py(1:3)=abs(py(1:3));
+% if (any(imag(py(1:3))~=0)||any(py(1:3)<=0))
 %   stat{1}=-1;
 %   if dointrinsic
 %     stat{2}='Error in vertical intrinsic emittance computation';
@@ -242,13 +242,13 @@ p(1:3)=abs(p(1:3));
 %   end
 %   return
 % end
-emity=p(1);demity=dp(1);
-bmagy=p(2);dbmagy=dp(2);
-embmy=p(3);dembmy=dp(3);
-betay=p(4);dbetay=dp(4);
-alphy=p(5);dalphy=dp(5);
-bcosy=p(6);dbcosy=dp(6);
-bsiny=p(7);dbsiny=dp(7);
+emity=py(1);demity=dpy(1);
+bmagy=py(2);dbmagy=dpy(2);
+embmy=py(3);dembmy=dpy(3);
+betay=py(4);dbetay=dpy(4);
+alphy=py(5);dalphy=dpy(5);
+bcosy=py(6);dbcosy=dpy(6);
+bsiny=py(7);dbsiny=dpy(7);
 emityn=egamma*emity;demityn=egamma*demity;
 
 % back propagate fitted sigma matrices to MDISP
@@ -285,11 +285,11 @@ RT=[   Rx(1,1)^2            2*Rx(1,1)*Rx(1,2)            Rx(1,2)^2   ; ...
     Rx(1,1)*Rx(2,1)  Rx(1,1)*Rx(2,2)+Rx(1,2)*Rx(2,1)  Rx(1,2)*Rx(2,2); ...
        Rx(2,1)^2            2*Rx(2,1)*Rx(2,2)            Rx(2,2)^2   ];
 T=RT*Tx*RT'; % propagate covariance matrix to IP
-[p,dp]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
+[px,dpx]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
 sigxip=sqrt(sigip(1,1));dsigxip=sqrt(T(1,1))/(2*sigxip);
 sigpxip=sqrt(sigip(2,2));dsigpxip=sqrt(T(3,3))/(2*sigpxip);
-betaxip=p(4);dbetaxip=dp(4);
-alphxip=p(5);dalphxip=dp(5);
+betaxip=px(4);dbetaxip=dpx(4);
+alphxip=px(5);dalphxip=dpx(5);
 
 sig0=[v(1),v(2);v(2),v(3)];
 Ry=Rab(3:4,3:4);
@@ -298,11 +298,11 @@ RT=[   Ry(1,1)^2            2*Ry(1,1)*Ry(1,2)            Ry(1,2)^2   ; ...
     Ry(1,1)*Ry(2,1)  Ry(1,1)*Ry(2,2)+Ry(1,2)*Ry(2,1)  Ry(1,2)*Ry(2,2); ...
        Ry(2,1)^2            2*Ry(2,1)*Ry(2,2)            Ry(2,2)^2   ];
 T=RT*Ty*RT'; % propagate covariance matrix to IP
-[p,dp]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
+[py,dpy]=emit_params(sigip(1,1),sigip(1,2),sigip(2,2),T,1,0);
 sigyip=sqrt(sigip(1,1));dsigyip=sqrt(T(1,1))/(2*sigyip);
 sigpyip=sqrt(sigip(2,2));dsigpyip=sqrt(T(3,3)/(2*sigpyip));
-betayip=p(4);dbetayip=dp(4);
-alphyip=p(5);dalphyip=dp(5);
+betayip=py(4);dbetayip=dpy(4);
+alphyip=py(5);dalphyip=dpy(5);
 
 % results txt
 txt{end+1}=' ';
