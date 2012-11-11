@@ -11,6 +11,9 @@ C
 C     AUTH:  PT, 25-FEB-2004
 C
 C     MOD:
+C       19-FEB-2012, M. Woodley
+C         Change type declarations of mx-functions from INTEGER*4
+C         to mwPointer
 
       IMPLICIT NONE
 
@@ -29,8 +32,8 @@ C     local declarations
 
 C     argument declarations
 
-      INTEGER*4 mxCreateCellMatrix ! Create a Matlab cell data structure
-	INTEGER*4 mxCreateString     ! create a Matlab string
+      mwPointer mxCreateCellMatrix ! Create a Matlab cell data structure
+	    mwPointer mxCreateString     ! create a Matlab string
 
 C========1=========2=========3=========4=========5=========6=========7=C
 C                                                                      C
