@@ -1,10 +1,10 @@
 function varargout=get_ATF2_quads(opCode,energy,varargin)
 %
-% KL=get_ATF2_quads(1,energy,Iquad,QMFFrev,fflag);
+% KL=get_ATF2_quads(1,energy,Iquad,fflag);
 %
 % Compute ATF2 quadrupole KLs from power supply currents and beam energy
 %
-% Iquad=get_ATF2_quads(2,energy,KL,QMFFrev,fflag);
+% Iquad=get_ATF2_quads(2,energy,KL,fflag);
 %
 % Compute ATF2 quadrupole power supply currents from KLs and beam energy
 %
@@ -15,7 +15,6 @@ function varargout=get_ATF2_quads(opCode,energy,varargin)
 %   opCode  = 1 (I to KL conversion)
 %   energy  = beam energy (GeV)
 %   Iquad   = ATF2 quad currents (amps) [51 element array]
-%   QMFFrev = normal(=1) or reverse(=-1) polarity for FF QMs [6 element array]
 %   fflag   = (optional) if present and nonzero, fudge factors will be used
 %
 % INPUTS (opCode=2):
@@ -23,7 +22,6 @@ function varargout=get_ATF2_quads(opCode,energy,varargin)
 %   opCode  = 2 (KL to I conversion)
 %   energy  = beam energy (GeV)
 %   KL      = quadrupole KLs (1/m; positive means "QF")
-%   QMFFrev = normal(=1) or reverse(=-1) polarity for FF QMs [6 element array]
 %   fflag   = (optional) if present and nonzero, fudge factors will be used
 %
 % The order of quadrupoles in the Iquad or KL arrays must be:
@@ -35,10 +33,6 @@ function varargout=get_ATF2_quads(opCode,energy,varargin)
 %   QF7FF  ,QD6FF  ,QF5BFF ,QF5AFF ,QD4BFF ,QD4AFF ,QF3FF  ,QD2BFF ,QD2AFF ,QF1FF  ,
 %   QD0FF
 %
-% The order of quadrupoles in the QMFFrev array must be:
-%
-%   QM16FF ,QM15FF ,QM14FF ,QM13FF ,QM12FF ,QM11FF
-%
 % OUTPUT (opCode=1):
 %
 %   KL   = quadrupole KLs (1/m; positive means "QF") [51 element array]
@@ -48,6 +42,8 @@ function varargout=get_ATF2_quads(opCode,energy,varargin)
 %   Iquad = quadrupole currents (amps) [51 element array]
 
 % ==============================================================================
+% 05-DEC-2011, M. Woodley
+%    FF matching quads are now bipolar
 % 03-MAR-2009, M. Woodley
 %    QS1X and QS2X are wired in reverse polarity (top=South when I>0)
 % 26-FEB-2009, M. Woodley
@@ -71,16 +67,16 @@ else
   end
 end
 if (opCode==1)
-  if (nargin<4)
-    error('At least 4 input arguments required for opCode=1')
+  if (nargin<3)
+    error('At least 3 input arguments required for opCode=1')
   end
   Iquad=varargin{1};
   if (length(Iquad)~=NATF2q)
     error('Incorrect Iquad length')
   end
 elseif (opCode==2)
-  if (nargin<4)
-    error('At least 4 input arguments required for opCode=2')
+  if (nargin<3)
+    error('At least 3 input arguments required for opCode=2')
   end
   KL=varargin{1};
   if (length(KL)~=NATF2q)
@@ -89,12 +85,8 @@ elseif (opCode==2)
 else
   error('Invalid opCode')
 end
-QMFFrev=varargin{2};
-if (length(QMFFrev)~=6)
-  error('Incorrect QMFFrev length')
-end
-if (nargin>4)
-  fflag=varargin{3};
+if (nargin>3)
+  fflag=varargin{2};
 else
   fflag=0;
 end
@@ -203,31 +195,24 @@ qG2(:,2)=qG2(:,2)/qleff(7); % QC3 [QD0FF]
 % quadrupole family types
 
 qtype=[ ...
-  1; 2; 5; 3; 3; 3; 3; 3; ...
-  3; 5; 4; 3; 3; 5; 8; 8; ...
-  5; 8; 1; 1; 1; 5; 8; 8; ...
-  5; 8; 8; 4; 4; 8; 8; 8; ...
-  8; 8; 8; 8; 8; 8; 8; 8; ...
-  8; 8; 8; 8; 8; 8; 8; 8; ...
-  8; 6; 7; ...
+  1; 2; 5; 3; 3; 3; 3; 3; 3; 5; ...
+  4; 3; 3; 5; 8; 8; 5; 8; 1; 1; ...
+  1; 5; 8; 8; 5; 8; 8; 4; 4; 8; ...
+  8; 8; 8; 8; 8; 8; 8; 8; 8; 8; ...
+  8; 8; 8; 8; 8; 8; 8; 8; 8; 6; ...
+  7; ...
 ];
 
 % polarities (zero means bipolar)
 
 qsgn=[...
-  -1; 1; 0; 1;-1; 1; 1;-1; ...
-   1; 0; 1;-1; 1; 0;-1; 1; ...
-   0;-1; 1;-1; 1; 0;-1; 1; ...
-   0;-1; 1;-1; 1; 1;-1;-1; ...
-   1; 1;-1;-1;-1; 1; 1;-1; ...
-   1;-1; 1; 1;-1;-1; 1;-1; ...
-  -1; 1;-1; ...
+  -1; 1; 0; 1;-1; 1; 1;-1; 1; 0; ...
+   1;-1; 1; 0;-1; 1; 0;-1; 1;-1; ...
+   1; 0;-1; 1; 0;-1; 1;-1; 1; 0; ...
+   0; 0; 0; 0; 0;-1;-1; 1; 1;-1; ...
+   1;-1; 1; 1;-1;-1; 1;-1;-1; 1; ...
+  -1; ...
 ];
-
-% FF QM reversal state
-
-idQM=[30:35]';
-qsgn(idQM)=qsgn(idQM).*QMFFrev;
 
 % "Kubo" fudge factors
 % (NOTE: set fudge factors to zero ... who knows what they are now)
