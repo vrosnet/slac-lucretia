@@ -92,7 +92,7 @@ while(1)
       r(row,col)=str2double(line(16*col-15:16*col));
     end
   end
-  S=str2double(line(97:112));
+  S=[S;str2double(line(97:112))];
   P=[P;p];
   rmat=[rmat;r];
 end
