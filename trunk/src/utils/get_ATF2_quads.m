@@ -300,9 +300,9 @@ else
       Iquad(n)=interp1(Gmms,Imms,G,'linear');
       if (bipolar),Iquad(n)=Iquad(n)*sign(KL(n));end
     end
-    Iquad(idQSX)=-Iquad(idQSX); % QS1X and QS2X wired in reverse polarity
-    varargout{1}=Iquad;
   end
+  Iquad(idQSX)=-Iquad(idQSX); % QS1X and QS2X wired in reverse polarity
+  varargout{1}=Iquad;
 end
 
 end

@@ -31,9 +31,11 @@ function [stat,emitData] = emit2dOTR(otruse,dointrinsic,printData)
 %    sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip ...
 %   ];
 % ------------------------------------------------------------------------------
+% 02-Dec-2012, M. Woodley
+%    Add to emitData: distance to waists; beta, size, and divergence at waists
 % 04-Nov-2012, M. Woodley
 %    Use energy=FL.SimModel.Initial.Momentum (BH1R fudge updated 24Oct12);
-%    add to emitData: 4x4 OTR-to-OTR Rmats, design IP Twiss propagated IP beam
+%    add to emitData: 4x4 OTR-to-OTR Rmats, design IP Twiss, propagated IP beam
 %    parameters
 % ------------------------------------------------------------------------------
 
@@ -291,6 +293,13 @@ sigpxip=sqrt(sigip(2,2));dsigpxip=sqrt(T(3,3))/(2*sigpxip);
 betaxip=px(4);dbetaxip=dpx(4);
 alphxip=px(5);dalphxip=dpx(5);
 
+% waist shift, beta, beam size, and beam divergence at the waist
+[pxw,dpxw]=waist_params(sigip(1,1),sigip(1,2),sigip(2,2),T);
+Lxw=pxw(1);dLxw=dpxw(1);
+betaxw=pxw(2);dbetaxw=dpxw(2);
+sigxw=pxw(3);dsigxw=dpxw(3);
+sigpxw=pxw(4);dsigpxw=dpxw(4);
+
 sig0=[v(1),v(2);v(2),v(3)];
 Ry=Rab(3:4,3:4);
 sigip=Ry*sig0*Ry';
@@ -303,6 +312,13 @@ sigyip=sqrt(sigip(1,1));dsigyip=sqrt(T(1,1))/(2*sigyip);
 sigpyip=sqrt(sigip(2,2));dsigpyip=sqrt(T(3,3)/(2*sigpyip));
 betayip=py(4);dbetayip=dpy(4);
 alphyip=py(5);dalphyip=dpy(5);
+
+% waist shift, beta, beam size, and beam divergence at the waist
+[pyw,dpyw]=waist_params(sigip(1,1),sigip(1,2),sigip(2,2),T);
+Lyw=pyw(1);dLyw=dpyw(1);
+betayw=pyw(2);dbetayw=dpyw(2);
+sigyw=pyw(3);dsigyw=dpyw(3);
+sigpyw=pyw(4);dsigpyw=dpyw(4);
 
 % results txt
 txt{end+1}=' ';
@@ -333,14 +349,21 @@ end
 txt{end+1}='-----------------------------------------------';
 sigx0=sqrt(emitx*bxip0);
 sigpx0=sqrt(emitx*(1+axip0^2)/bxip0);
-txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)', ...
-  1e6*[sigxip,dsigxip,sigx0]);
-txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)', ...
-  1e6*[sigpxip,dsigpxip,sigpx0]);
-txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)', ...
-  1e3*[betaxip,dbetaxip,bxip0]);
-txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)', ...
-  alphxip,dalphxip,axip0);
+txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)',1e6*[sigxip,dsigxip,sigx0]);
+txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)',1e6*[sigpxip,dsigpxip,sigpx0]);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)',1e3*[betaxip,dbetaxip,bxip0]);
+txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphxip,dalphxip,axip0);
+txt{end+1}=' ';
+
+if dointrinsic
+  txt{end+1}=sprintf('Horizontal ellipse emittance parameters at waist');
+else
+  txt{end+1}=sprintf('Horizontal projected emittance parameters at waist');
+end
+txt{end+1}='-----------------------------------------------';
+txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um',1e6*[sigxw,dsigxw]);
+txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur',1e6*[sigpxw,dsigpxw]);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm',1e3*[betaxw,dbetaxw]);
 txt{end+1}=' ';
 
 if dointrinsic
@@ -369,14 +392,21 @@ end
 txt{end+1}='-----------------------------------------------';
 sigy0=sqrt(emity*byip0);
 sigpy0=sqrt(emity*(1+ayip0^2)/byip0);
-txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)', ...
-  1e6*[sigyip,dsigyip,sigy0]);
-txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)', ...
-  1e6*[sigpyip,dsigyip,sigpy0]);
-txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)', ...
-  1e3*[betayip,dbetayip,byip0]);
-txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)', ...
-  alphyip,dalphyip,ayip0);
+txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um   (%9.4f)',1e6*[sigyip,dsigyip,sigy0]);
+txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur   (%9.4f)',1e6*[sigpyip,dsigpyip,sigpy0]);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm   (%9.4f)',1e3*[betayip,dbetayip,byip0]);
+txt{end+1}=sprintf('alpha      = %10.4f +- %9.4f      (%9.4f)',alphyip,dalphyip,ayip0);
+txt{end+1}=' ';
+
+if dointrinsic
+  txt{end+1}=sprintf('Vertical ellipse emittance parameters at waist');
+else
+  txt{end+1}=sprintf('Vertical projected emittance parameters at waist');
+end
+txt{end+1}='-----------------------------------------------';
+txt{end+1}=sprintf('sig        = %10.4f +- %9.4f um',1e6*[sigyw,dsigyw]);
+txt{end+1}=sprintf('sigp       = %10.4f +- %9.4f ur',1e6*[sigpyw,dsigpyw]);
+txt{end+1}=sprintf('beta       = %10.4f +- %9.4f mm',1e3*[betayw,dbetayw]);
 txt{end+1}=' ';
 
 % propagate measured beam to OTRs
@@ -431,7 +461,9 @@ end
 emitData=[emitData ...
   exip0 bxip0 axip0 eyip0 byip0 ayip0 ...
   sigxip dsigxip sigpxip dsigpxip betaxip dbetaxip alphxip dalphxip ...
-  sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip];
+  sigyip dsigyip sigpyip dsigpyip betayip dbetayip alphyip dalphyip ...
+  sigxw dsigxw sigpxw dsigpxw betaxw dbetaxw ...
+  sigyw dsigyw sigpyw dsigpyw betayw dbetayw];
 
 % save some stuff
 if dointrinsic
