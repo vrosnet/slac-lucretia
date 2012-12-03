@@ -2,9 +2,9 @@ function [p,dp]=waist_params(sig11,sig12,sig22,C)
 
 % [p,dp]=waist_params(sig11,sig12,sig22,C);
 %
-% Returns distance to nearest waist and beam parameters at the waist (beta,
-% size, and divergence), and errors on these, given fitted sigma11(33),
-% sigma12(34), sigma22(44) and the 3X3 covariance matrix of this fit.
+% Returns distance to nearest waist and beam parameters at the waist (beta and
+% size), and errors on these, given fitted sigma11(33), sigma12(34), 
+% sigma22(44) and the 3X3 covariance matrix of this fit.
 %
 % INPUTS:
 %
@@ -19,8 +19,7 @@ function [p,dp]=waist_params(sig11,sig12,sig22,C)
 %   p  : p(1) = distance to nearest waist (m) ... positive = downstream
 %        p(2) = beta function at the waist (m)
 %        p(3) = beam size at the waist (m)
-%        p(3) = beam divergence at the waist (rad)
-%   dp : propagated errors on above p(1),p(2),...
+%   dp : propagated errors on p(1),p(2),p(3)
 
 %===============================================================================
 
@@ -34,8 +33,8 @@ Lw=-sig12/sig22;
 grad=[0;-1/sig22;sig12/sig22^2];
 dLw=sqrt(grad'*C*grad);
 
-bw=ex/sig22;
-grad=[1/(2*e);-sig12/(e*sig22);sig11/(2*e*sig22)-1/(e*sig22^2)];
+bw=e/sig22;
+grad=[1/(2*e);-sig12/(e*sig22);sig11/(2*e*sig22)-e/(sig22^2)];
 dbw=sqrt(grad'*C*grad);
 
 sigw=sqrt(e*bw);
@@ -43,11 +42,7 @@ grad=[sqrt(sig22)/(2*e);-sig12/(e*sqrt(sig22)); ...
   sig11/(2*e*sqrt(sig22))-e/(2*sig22*sqrt(sig22))];
 dsigw=sqrt(grad'*C*grad);
 
-sigpw=1/sigw;
-grad=[0;0;1/(2*sqrt(sig22))];
-dsigpw=sqrt(grad'*C*grad);
-
-p=[Lw,bw,sigw,sigpw];
-dp=[dLw,dbw,dsigw,dsigpw];
+p=[Lw,bw,sigw];
+dp=[dLw,dbw,dsigw];
 
 end
