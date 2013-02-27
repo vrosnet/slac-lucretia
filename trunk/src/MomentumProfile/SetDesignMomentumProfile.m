@@ -35,6 +35,8 @@ function stat = SetDesignMomentumProfile( istart, iend, Q, P0, varargin )
 % Version date:  12-May-2006
 
 % MOD:
+%       24-Sep-2012, GW:
+%          don't error if no PS's/KLYSTRON's
 %       12-may-2006, PT:
 %          bugfix in units of Egain field (MeV, not GeV).
 %       13-jan-2006, PT:
@@ -48,147 +50,153 @@ function stat = SetDesignMomentumProfile( istart, iend, Q, P0, varargin )
 
 %==========================================================================
 
-  global BEAMLINE KLYSTRON PS
-  stat = InitializeMessageStack( ) ;
-% 
-% verify correct ranges for all variables 
+global BEAMLINE
+stat = InitializeMessageStack( ) ;
 %
-  if ( (istart < 1) | (istart > length(BEAMLINE)) | ...
-       (iend < 1)  |  (iend > length(BEAMLINE)  ) | ...
-       (istart > iend)                            | ...
-       (Q<0)                                      | ...
-       (P0<=0)                                          )
-     stat = AddMessageToStack(stat, ...
-       'Invalid arguments specified for SetDesignMomentumProfile') ;
-     stat{1} = -4 ;
-     return ;
+% verify correct ranges for all variables
+%
+if ( (istart < 1) || (istart > length(BEAMLINE)) || ...
+    (iend < 1)  ||  (iend > length(BEAMLINE)  ) || ...
+    (istart > iend)                            || ...
+    (Q<0)                                      || ...
+    (P0<=0)                                          )
+  stat = AddMessageToStack(stat, ...
+    'Invalid arguments specified for SetDesignMomentumProfile') ;
+  stat{1} = -4 ;
+  return ;
+end
+if (nargin == 5)
+  Pfdes = varargin{1} ;
+  if (Pfdes <= 0)
+    stat = AddMessageToStack(stat,...
+      'Invalid final momentum specified for SetDesignMomentumProfile') ;
+    stat{1} = -4 ;
+    return
   end
-  if (nargin == 5)
-    Pfdes = varargin{1} ;
-    if (Pfdes <= 0)
-      stat = AddMessageToStack(stat,...
-        'Invalid final momentum specified for SetDesignMomentumProfile') ;
-      stat{1} = -4 ;
-      return 
-    end
-  else
-    Pfdes = 0 ;
-  end
-%  
+else
+  Pfdes = 0 ;
+end
+%
 % get the klystrons and power supplies which support elements within the
 % range of BEAMLINE
 %
-  [statcall,klist] = GetKlystronsInRange( istart, iend ) ;
-  if (statcall{1} ~= 1)
-      stat{1} = -2 ;
-      stat = AddStackToStack(stat,statcall) ;
-      return ;
-  end
-  [statcall,plist] = GetPSInRange( istart, iend ) ;
-  if (statcall{1} ~= 1)
-    stat{1} = -1 ;
-    stat = AddStackToStack(stat,statcall) ;
-    return ;
-  end
+[~,klist] = GetKlystronsInRange( istart, iend ) ;
+% if (statcall{1} ~= 1)
+%   stat{1} = -2 ;
+%   stat = AddStackToStack(stat,statcall) ;
+%   %       return ;
+% end
+[~,plist] = GetPSInRange( istart, iend ) ;
+% if (statcall{1} ~= 1)
+%   stat{1} = -1 ;
+%   stat = AddStackToStack(stat,statcall) ;
+%   return ;
+% end
 %
 % compute the momentum profile without scaling
 %
-  [statcall,V_on,V_off,V_load,V_SR,P] = ...
-      ComputeMomentumProfile( istart, iend, Q, P0 ) ;
-  if (statcall{1} ~= 1)
-      stat{1} = statcall{1} ;
-      stat = AddStackToStack(stat,statcall) ;
-      return ;
-  end
-  Pfact = P(length(P)) ;
-  if (Pfdes == 0)
-    Pfdes = Pfact ;
-  end
-% 
+[statcall,V_on,~,V_load,V_SR,P] = ...
+  ComputeMomentumProfile( istart, iend, Q, P0 ) ;
+if (statcall{1} ~= 1)
+  stat{1} = statcall{1} ;
+  stat = AddStackToStack(stat,statcall) ;
+  return ;
+end
+Pfact = P(length(P)) ;
+if (Pfdes == 0)
+  Pfdes = Pfact ;
+end
+%
 % momentum scaling:
 %
-  if ( Pfdes ~= Pfact )
-    sum_V_on = sum(V_on(:,1)) ;
-%
-% we can only _specify_ a final momentum if the on-beam energy gain is not
-% zero, so check that now
-%
-    if (sum_V_on==0)
-      stat{1} = -5 ;
-      stat = AddMessageToStack(stat, ...
-          'Final momentum specification invalid when on-beam energy gain zero') ;
-      return ;
-    end
-%
-% we need to scale V_on until it gets us the right final momentum, taking
-% into account the loading and SR losses
-%
-    V_needed = Pfdes - P0 + sum(V_load) + sum(V_SR) ; 
-    V_scale = V_needed / sum_V_on ;
-    
-  else
-      
-    V_scale = 1.0 ;
-    
+if ( Pfdes ~= Pfact )
+  sum_V_on = sum(V_on(:,1)) ;
+  %
+  % we can only _specify_ a final momentum if the on-beam energy gain is not
+  % zero, so check that now
+  %
+  if (sum_V_on==0)
+    stat{1} = -5 ;
+    stat = AddMessageToStack(stat, ...
+      'Final momentum specification invalid when on-beam energy gain zero') ;
+    return ;
   end
-% 
+  %
+  % we need to scale V_on until it gets us the right final momentum, taking
+  % into account the loading and SR losses
+  %
+  V_needed = Pfdes - P0 + sum(V_load) + sum(V_SR) ;
+  V_scale = V_needed / sum_V_on ;
+  
+else
+  
+  V_scale = 1.0 ;
+  
+end
+%
 % at this point, we're basically guaranteed success so we can proceed to do
 % things which actually change the lattice:
 %
 % update the klystron status
 %
+if ~isempty(klist)
   UpdateKlystronStatus( klist ) ;
+end
 %
 % renormalize klystrons and power supplies
 %
+if ~isempty(klist)
   for count = klist
-    statcall = RenormalizeKlystron( count ) ;
+    RenormalizeKlystron( count ) ;
   end
+end
+if ~isempty(plist)
   for count = plist
-    statcall = RenormalizePS( count ) ;
+    RenormalizePS( count ) ;
   end
+end
 %
-% do voltage scaling  
+% do voltage scaling
 %
-  list = findcells(BEAMLINE,'Class','LCAV',istart,iend) ;
-  for count = list
-    BEAMLINE{count}.Volt = BEAMLINE{count}.Volt * V_scale ;
-  end
-% 
+list = findcells(BEAMLINE,'Class','LCAV',istart,iend) ;
+for count = list
+  BEAMLINE{count}.Volt = BEAMLINE{count}.Volt * V_scale ;
+end
+%
 % recompute the momentum profile using the new voltages
 %
-  [statcall,V_on,V_off,V_load,V_SR,P] = ...
-      ComputeMomentumProfile( istart, iend, Q, P0 ) ;
+[~,V_on,~,V_load,~,P] = ...
+  ComputeMomentumProfile( istart, iend, Q, P0 ) ;
 %
 % apply the profile and scale magnets appropriately, taking care that
 % elements which are "slices" of a single physical element get the correct
 % scaling
 %
-  dcount = istart-1 ;
-  for count = istart:iend
-    count2 = count-dcount ;
-    if (isfield(BEAMLINE{count},'Slices'))
-      slice1 = BEAMLINE{count}.Slices(1) ;
-      slice2 = BEAMLINE{count}.Slices(end)+1 ;
-      if (slice1 == count)
-        Pmean = (P(slice1-dcount)+P(slice2-dcount))/2 ;
-        Pold = BEAMLINE{slice1}.P ;
-      end
-    else
-      Pmean = P(count2) ;
-      Pold = BEAMLINE{count}.P ;
+dcount = istart-1 ;
+for count = istart:iend
+  count2 = count-dcount ;
+  if (isfield(BEAMLINE{count},'Slices'))
+    slice1 = BEAMLINE{count}.Slices(1) ;
+    slice2 = BEAMLINE{count}.Slices(end)+1 ;
+    if (slice1 == count)
+      Pmean = (P(slice1-dcount)+P(slice2-dcount))/2 ;
+      Pold = BEAMLINE{slice1}.P ;
     end
-    if (isfield(BEAMLINE{count},'B'))
-      BEAMLINE{count}.B = BEAMLINE{count}.B * ...
-          Pmean / Pold ;
-    end
-    if (strcmp(BEAMLINE{count}.Class,'TCAV'))
-      BEAMLINE{count}.Volt = BEAMLINE{count}.Volt * ...
-          Pmean / Pold ;
-    end
-    if (isfield(BEAMLINE{count},'Egain'))
-      BEAMLINE{count}.Egain = 1000*(V_on(count2,1)-V_load(count2)) ;
-    end
-    BEAMLINE{count}.P = P(count2) ;
+  else
+    Pmean = P(count2) ;
+    Pold = BEAMLINE{count}.P ;
   end
+  if (isfield(BEAMLINE{count},'B'))
+    BEAMLINE{count}.B = BEAMLINE{count}.B * ...
+      Pmean / Pold ;
+  end
+  if (strcmp(BEAMLINE{count}.Class,'TCAV'))
+    BEAMLINE{count}.Volt = BEAMLINE{count}.Volt * ...
+      Pmean / Pold ;
+  end
+  if (isfield(BEAMLINE{count},'Egain'))
+    BEAMLINE{count}.Egain = 1000*(V_on(count2,1)-V_load(count2)) ;
+  end
+  BEAMLINE{count}.P = P(count2) ;
+end
 %

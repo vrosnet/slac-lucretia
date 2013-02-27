@@ -126,8 +126,8 @@ classdef Match < handle & physConsts
   end
   properties(Constant)
     allowedMatchTypes={'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'NEmit_x' 'NEmit_y' 'eta_x' ...
-      'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'SigmaFit' 'User' 'Sigma' 'T' 'U' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'};
-    allowedVariableTypes={'PS' 'GIRDER' 'KLYSTRON' 'BEAMLINE' 'BUMP'};
+      'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'SigmaFit' 'User' 'Sigma' 'R' 'T' 'U' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'};
+    allowedVariableTypes={'PS' 'GIRDER' 'KLYSTRON' 'BEAMLINE' 'BUMP' 'INITIAL'};
     allowedOptimMethods={'gradDrop' 'fminsearch' 'fmincon' 'lsqnonlin' 'genetic' 'fgoalattain'};
   end
   
@@ -158,7 +158,7 @@ classdef Match < handle & physConsts
     end
     function addMatch(obj,mind,type,vals,tol,typeQual)
       % ADDMATCH - add a match condition to the problem set
-      % addMatch(obj,mind,type,vals,tol [,typeQual])
+      % addMatch(obj,type,weight,vals,tol [,typeQual])
       % type = string or cell list of strings, see allowedMatchTypes property for available list
       % weight = double, weighting function for constraints
       % vals = double, desired match values
@@ -310,8 +310,12 @@ classdef Match < handle & physConsts
         fprintf('Beam sizes at match points:\n')
         ov=obj.optimVals;
         v=obj.minFunc('getvals');
-        for im=1:length(obj.iMatch)
-          fprintf('%d: sigma_x= %g sigma_y = %g\n',obj.iMatch(im),v.bs.x(im),v.bs.y(im))
+        try
+          for im=1:length(obj.iMatch)
+            fprintf('%d: sigma_x= %g sigma_y = %g\n',obj.iMatch(im),v.bs.x(im),v.bs.y(im))
+          end
+        catch
+          disp('...No beam data...');
         end
         fprintf('-----------------------------------------\n')
         fprintf('Constraints / Desired Vals / Current Vals / Weights\n')
@@ -336,7 +340,9 @@ classdef Match < handle & physConsts
         fprintf('============================================\n')
         fprintf('============================================\n')
       catch
-        disp('')
+        disp('--==--==--==--==--==--==')
+        disp('!!! Error in data !!!')
+        disp('--==--==--==--==--==--==')
       end
     end
     function doMatch(obj)
@@ -359,7 +365,7 @@ classdef Match < handle & physConsts
           'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state));
       elseif strcmp(obj.optim,'fmincon')
         opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
-          'MaxIter',100000,'TolX',1e-6,'TolFun',1e-6,'UseParallel','never','Algorithm','active-set');
+          'MaxIter',100000,'TolX',1e-3,'TolFun',1e-1,'UseParallel','never','Algorithm','active-set');
       else
         opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
           'MaxIter',1500,'TolX',1e-6,'TolFun',1e-6,'UseParallel','never');
@@ -436,7 +442,7 @@ classdef Match < handle & physConsts
     end
     function out=get.dotwiss(obj)
       % Check for match requirements to see if tracking is required
-      if any(ismember(obj.matchType,{'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'eta_x' 'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y'}))
+      if any(ismember(obj.matchType,{'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'eta_x' 'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'R'}))
         out=true;
       else
         out=false;
@@ -471,6 +477,8 @@ classdef Match < handle & physConsts
             vals(itype)=KLYSTRON(ind).(obj.varField{itype})(obj.varFieldIndex(itype));
           case 'BUMP'
             vals(itype)=obj.BUMP(ind).val;
+          case 'INITIAL'
+            vals(itype)=obj.initStruc.(obj.varField{itype}(end)).Twiss.(obj.varField{itype}(1:end-1));
         end
       end
     end
@@ -503,6 +511,8 @@ classdef Match < handle & physConsts
             case 'BUMP'
               bsize=x(itype)-obj.BUMP(ind).val;
               obj.applyBump(ind,obj.varField{itype},bsize);
+            case 'INITIAL'
+              obj.initStruc.(obj.varField{itype}(end)).Twiss.(obj.varField{itype}(1:end-1))=x(itype);
           end
         end
       end
@@ -722,7 +732,7 @@ classdef Match < handle & physConsts
 
         % Set the variables
         obj.varVals=x;
-
+        
         % Get twiss in correct format
         if dotwiss && ~(dotrack<0)
           Ix.beta=obj.initStruc.x.Twiss.beta;
@@ -743,22 +753,22 @@ classdef Match < handle & physConsts
           try
             if itrack==1
               if dotrack
-                [stat beamout]=TrackThru(obj.iInitial,obj.iMatch(1),obj.beam,1,1,0);
-                if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+                [~, beamout]=TrackThru(obj.iInitial,obj.iMatch(1),obj.beam,1,1,0);
+%                 if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
               end
               if dotwiss
-                [stat T]=GetTwiss(obj.iInitial,obj.iMatch(1),Ix,Iy);
+                [stat, T]=GetTwiss(obj.iInitial,obj.iMatch(1),Ix,Iy);
                 if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
               end
             else
               if dotrack
-                [stat beamout]=TrackThru(obj.iMatch(itrack-1),obj.iMatch(itrack),beamout,1,1,0);
-                if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
+                [~, beamout]=TrackThru(obj.iMatch(itrack-1),obj.iMatch(itrack),beamout,1,1,0);
+%                 if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
               end
               if dotwiss
                 %             Ix.beta=T.betax; Ix.alpha=T.alphax; Ix.eta=T.etax; Ix.etap=T.etapx; Ix.nu=T.nux;
                 %             Iy.beta=T.betay; Iy.alpha=T.alphay; Iy.eta=T.etay; Iy.etap=T.etapy; Iy.nu=T.nuy;
-                [stat T]=GetTwiss(obj.iInitial,obj.iMatch(itrack),Ix,Iy);
+                [stat, T]=GetTwiss(obj.iInitial,obj.iMatch(itrack),Ix,Iy);
                 if stat{1}~=1; error('Error in tracking in minimiser function: %s',stat{2}); end;
               end
             end
@@ -770,6 +780,9 @@ classdef Match < handle & physConsts
           for itype=1:length(obj.matchType)
             if obj.matchInd(itype)~=obj.iMatch(itrack); continue; end;
             switch obj.matchType{itype}
+              case 'R'
+                [~,R]=RmatAtoB(obj.iInitial,obj.iMatch(itrack));
+                F(itype)=R(str2double(obj.matchTypeQualifiers{itype}(1)),str2double(obj.matchTypeQualifiers{itype}(2)));
               case 'alpha_x'
                 F(itype)=T.alphax(end);
               case 'alpha_y'
@@ -787,33 +800,9 @@ classdef Match < handle & physConsts
               case 'etap_y'
                 F(itype)=T.etapy(end);
               case 'nu_x'
-                try
-                  pcomp=str2double(obj.matchTypeQualifiers{itype});
-                  if isempty(pcomp) || isnan(pcomp); error('no pcomp request'); end;
-                  if pcomp>length(T.nux)
-                    [~, T2]=GetTwiss(obj.iInitial,pcomp,Ix,Iy);
-                    nux2=T2.nux(end);
-                  else
-                    nux2=T.nux(pcomp-obj.iInitial+1);
-                  end
-                  F(itype)=sin(abs(T.nux(end)-nux2)*2*pi);
-                catch
-                  F(itype)=T.nux(end);
-                end
+                F(itype)=T.nux(end);
               case 'nu_y'
-                try
-                  pcomp=str2double(obj.matchTypeQualifiers{itype});
-                  if isempty(pcomp) || isnan(pcomp); error('no pcomp request'); end;
-                  if pcomp>length(T.nuy)
-                    [~, T2]=GetTwiss(obj.iInitial,pcomp,Ix,Iy);
-                    nuy2=T2.nuy(end);
-                  else
-                    nuy2=T.nuy(pcomp-obj.iInitial+1);
-                  end
-                  F(itype)=sin(abs(T.nuy(end)-nuy2)*2*pi);
-                catch
-                  F(itype)=T.nuy(end);
-                end
+                F(itype)=T.nuy(end);
               case 'NEmit_x'
                 if ~exist('nx','var')
                   [nx,ny] = GetNEmitFromBeam( beamout ,1);
@@ -863,7 +852,7 @@ classdef Match < handle & physConsts
                   F(itype)=fminsearch(@(x) minWaist(obj,x,R,L,S,3),0,optimset('Tolx',1e-6,'TolFun',0.1e-6^2));
                 end
               case {'Disp_x' 'Disp_y'}
-                [Tx Ty]=GetUncoupledTwissFromBeamPars(beamout,1);
+                [Tx, Ty]=GetUncoupledTwissFromBeamPars(beamout,1);
                 if strcmp(obj.matchType{itype},'Disp_x')
                   F(itype)=Tx.eta;
                 else
@@ -905,7 +894,7 @@ classdef Match < handle & physConsts
         F=ones(size(F)).*1e60;
       end
     end
-    function chi2 = minWaist(obj,x,R,L,sig,dir) %#ok<MANU>
+    function chi2 = minWaist(~,x,R,L,sig,dir)
       newsig=(R+L.*x(1))*sig*(R+L.*x(1))';
       chi2=newsig(dir,dir)^2;
     end

@@ -1,4 +1,4 @@
-function stat = PSTrim( pslist )
+function stat = PSTrim( pslist, varargin )
 
 % PSTRIM Set power supply actual values to desired values
 %

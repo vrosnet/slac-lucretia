@@ -56,16 +56,16 @@ if strcmp(BEAMLINE{itrack}.Class,'SBEN')
     end
   end
   % Get parameters for CSR wake calculation
-  R=(BEAMLINE{itrack}.L./nsplit)/(2*sin(abs((BEAMLINE{itrack}.Angle/nsplit))/2));
+  R=(BEAMLINE{itrack}.L./nsplit)/(2*sin(abs((BEAMLINE{itrack}.Angle(1)/nsplit))/2));
   PHI=0;
   if ind1~=itrack
     for iele=ind1:itrack-1
       if isfield(BEAMLINE{iele},'Angle')
-        PHI=PHI+abs(BEAMLINE{iele}.Angle);
+        PHI=PHI+abs(BEAMLINE{iele}.Angle(1));
       end
     end
   end
-  PHI=PHI+abs(BEAMLINE{itrack}.Angle)*splitfrac;
+  PHI=PHI+abs(BEAMLINE{itrack}.Angle(1))*splitfrac;
   X=0;
 else
   % -- find bend elements upstream
@@ -81,7 +81,7 @@ else
     error('No BEND found upstream for CSR calculation')
   end
   % --- bend angle and radius
-  PHI=abs(sum(arrayfun(@(x) BEAMLINE{x}.Angle,bendele)));
+  PHI=abs(sum(arrayfun(@(x) BEAMLINE{x}.Angle(1),bendele)));
   L=sum(arrayfun(@(x) BEAMLINE{x}.L,bendele));
   R=L/(2*sin(PHI/2));
   % --- distance from bend

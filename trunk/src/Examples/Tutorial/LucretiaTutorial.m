@@ -34,16 +34,15 @@
 %==========================================================================
 %==========================================================================
 
-  clear all ;
+  clear all global ;
+  global BEAMLINE GIRDER KLYSTRON WF %#ok<NUSED>
   
 % step 1:  generate the lattice and load the wakefields  
   
   statall = GenerateTutorialLattice() ;  
   if (sum(statall{1}) ~= length(statall)-1)
       error('Problem encountered in GenerateTutorialLattice') ;
-      return ;
   end
-  global BEAMLINE WF ;
 
 % fill a data structure of initial conditions, assuming a charge of 3.2 nC
 % (about 2e10 particles) per bunch, 1000 bunches, and a 400 bucket spacing
@@ -52,7 +51,6 @@
   statall = AddStackToMasterStack(statall,stat,'GenerateTutorialInitial') ;
   if (stat{1} ~= 1)
       error('Problem encountered in GenerateTutorialInitial') ;
-      return ;
   end
   
 % display the phase advance per cell, which is going to be slightly
@@ -69,13 +67,13 @@
 %    BPMs and instruments set to return readout data
 %    BPMs and instruments set to produce bunch-by-bunch data
 
-  tflist = SetTrackFlags('ZMotion',0,1,length(BEAMLINE)) ;
-  tflist = SetTrackFlags('SRWF_T',1,1,length(BEAMLINE)) ;
-  tflist = SetTrackFlags('SRWF_Z',1,1,length(BEAMLINE)) ;
-  tflist = SetTrackFlags('LRWF_T',1,1,length(BEAMLINE)) ;
-  tflist = SetTrackFlags('GetBPMData',1,1,length(BEAMLINE)) ;
-  tflist = SetTrackFlags('GetInstData',1,1,length(BEAMLINE)) ;
-  tflist = SetTrackFlags('MultiBunch',1,1,length(BEAMLINE)) ;
+  SetTrackFlags('ZMotion',0,1,length(BEAMLINE)) ;
+  SetTrackFlags('SRWF_T',1,1,length(BEAMLINE)) ;
+  SetTrackFlags('SRWF_Z',1,1,length(BEAMLINE)) ;
+  SetTrackFlags('LRWF_T',1,1,length(BEAMLINE)) ;
+  SetTrackFlags('GetBPMData',1,1,length(BEAMLINE)) ;
+  SetTrackFlags('GetInstData',1,1,length(BEAMLINE)) ;
+  SetTrackFlags('MultiBunch',1,1,length(BEAMLINE)) ;
   
 % Get and plot the Twiss functions
 
@@ -101,7 +99,7 @@
 
   stat = SetPS_G_K ;
   statall = AddStackToMasterStack(statall,stat,'SetPS_G_K') ;
-  global GIRDER KLYSTRON PS ;
+  
   
 % In the current configuration, all the RF stations are on and at full
 % gradient.  It's convenient to have one spare tube, and to set the final
@@ -122,13 +120,13 @@
   [stat,beamout,instdata] = TrackThru(1,length(BEAMLINE),beamsparse,1,1,0) ;
   statall = AddStackToMasterStack(statall,stat,'TrackThru 1 bunch sparse') ;
   disp('...done!')
-  [nx,ny,nt] = GetNEmitFromBeam(beamout,1) ;
+  [nx,ny] = GetNEmitFromBeam(beamout,1) ;
   disp(['Horizontal norm emittance = ',num2str(nx*1e6),' um']) ;
   disp(['Vertical norm emittance = ',num2str(ny*1e9),' nm']) ;
   disp(['x Beam size at wire scanner = ',...
       num2str(1e6*sqrt(instdata{2}.sig11)),' um']) ;
   disp(' ') ;
-  [x,y,s] = BPMZPlot(instdata{1}) ;  
+  BPMZplot(instdata{1}) ;  
   subplot(2,1,1) ; title('Initial orbit') ;
      
 % Demonstrate some klystron complement fun and games -- trip off the first
@@ -138,12 +136,12 @@
   KLYSTRON(1).Stat = 'TRIPPED' ;
   [stat,beamout,instdata] = TrackThru(1,length(BEAMLINE),beamsparse,1,1,0) ;
   statall = AddStackToMasterStack(statall,stat,'TrackThru 1 bunch sparse') ;
-  [nx,ny,nt] = GetNEmitFromBeam(beamout,1) ;
+  [nx,ny] = GetNEmitFromBeam(beamout,1) ;
   disp('Trip off first RF station: ') ;
   disp(['Horizontal norm emittance = ',num2str(nx*1e6),' um']) ;
   disp(['Vertical norm emittance = ',num2str(ny*1e9),' nm']) ;
   disp(' ') ;
-  [x,y,s] = BPMZPlot(instdata{1}) ; 
+  BPMZplot(instdata{1}) ; 
   subplot(2,1,1) ; title('Energy mismatch orbit')
   
 % now turn on the spare to make up the energy, but don't scale the linac
@@ -151,12 +149,12 @@
   KLYSTRON(end).Stat = 'MAKEUP' ;
   [stat,beamout,instdata] = TrackThru(1,length(BEAMLINE),beamsparse,1,1,0) ;
   statall = AddStackToMasterStack(statall,stat,'TrackThru 1 bunch sparse') ;
-  [nx,ny,nt] = GetNEmitFromBeam(beamout,1) ;
+  [nx,ny] = GetNEmitFromBeam(beamout,1) ;
   disp('Turn on makeup station but don''t adjust the optics: ') ;
   disp(['Horizontal norm emittance = ',num2str(nx*1e6),' um']) ;
   disp(['Vertical norm emittance = ',num2str(ny*1e9),' nm']) ;
   disp(' ') ;
-  [x,y,s] = BPMZPlot(instdata{1}) ; 
+  BPMZplot(instdata{1}) ; 
   subplot(2,1,1) ; title('Orbit with corrected energy')
   
 % finally, scale the linac and update the tube status
@@ -165,12 +163,12 @@
   statall = AddStackToMasterStack(statall,stat,'UpdateMomentumProfile') ;
   [stat,beamout,instdata] = TrackThru(1,length(BEAMLINE),beamsparse,1,1,0) ;
   statall = AddStackToMasterStack(statall,stat,'TrackThru 1 bunch sparse') ;
-  [nx,ny,nt] = GetNEmitFromBeam(beamout,1) ;
+  [nx,ny] = GetNEmitFromBeam(beamout,1) ;
   disp('Now scale the optics to the new momentum profile: ') ;
   disp(['Horizontal norm emittance = ',num2str(nx*1e6),' um']) ;
   disp(['Vertical norm emittance = ',num2str(ny*1e9),' nm']) ;
   disp(' ') ;
-  [x,y,s] = BPMZPlot(instdata{1}) ; 
+  [x,y,s] = BPMZplot(instdata{1}) ;  %#ok<ASGLU>
   subplot(2,1,1) ; title('Orbit with corrected energy and scaled')
   
 % Track the dense beam and look at the y-py distribution at the end
@@ -179,7 +177,7 @@
   [stat,beamout] = TrackThru(1,length(BEAMLINE),beamdense,1,1,0) ;
   statall = AddStackToMasterStack(statall,stat,'TrackThru 1 bunch dense') ;
   disp('...done!')
-  [x,sig] = GetBeamPars(beamout,1) ;
+  x = GetBeamPars(beamout,1) ;
   figure ; plot( (beamout.Bunch.x(3,:)-x(3))*1e6, ...
                  (beamout.Bunch.x(4,:)-x(4))*1e6,'k.') ;
   xlabel('Y position [{\mu}m]') ; ylabel('Y momentum [{\mu}rad]') ;
