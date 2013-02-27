@@ -66,10 +66,12 @@ classdef Track < handle
     loopFlag=0; % loop over elements (0) or over bunches (1)
     beamType=0; % 0=all input beams the same, 1=possibly different beams for each worker
     verbose=0; % verbosity level (0= don't print anything, 1=print at each CSR integration step)
+    doPlasmaTrack=0; % Include tracking through plasma region (0=no)
   end
   properties(SetAccess=protected)
     isDistrib % Is this Track object opererating in distributed mode?
     DL % distributedLucretia object reference
+    plasmaData % Tracked data through plasma channel if requested
   end
   properties(Access=protected)
     dBeamIn % distributed input beam
@@ -217,6 +219,7 @@ classdef Track < handle
       else
         BeamIn=obj.beamIn;
       end
+      doplas=obj.doPlasmaTrack;
       % tracking in parallel across possibly multiple workers
       if obj.isDistrib
         % If asynchronous, submit jobs and return
@@ -240,17 +243,41 @@ classdef Track < handle
             if ismember(labindex,useWorkers)
               [stat beamout instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
             end
+            if doplas
+              try
+                [bunchProfile plas_sx plas_sy]=Track.plasmaTrack(beamout,4);
+              catch
+                bunchProfile=[]; plas_sx=1e10; plas_sy=1e10;
+              end
+            end
           end
           % Store results
           obj.trackStatus=stat;
           obj.beamOut=beamout;
           obj.instrData=instdata;
+          if doplas
+            obj.plasmaData.bunchProfile=bunchProfile;
+            obj.plasmaData.sx=plas_sx;
+            obj.plasmaData.sy=plas_sy;
+          end
         end
       else % local tracking
         [stat beamout instdata]=TrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
+        if doplas
+          try
+            [bunchProfile plas_sx plas_sy]=Track.plasmaTrack(beamout,4);
+          catch
+            bunchProfile=[]; plas_sx=1e10; plas_sy=1e10;
+          end
+        end
         obj.trackStatus=stat;
         obj.beamOut=beamout;
         obj.instrData=instdata;
+        if doplas
+          obj.plasmaData.bunchProfile=bunchProfile;
+          obj.plasmaData.sx=plas_sx;
+          obj.plasmaData.sy=plas_sy;
+        end
       end
     end
     function beamData=getBeamData(obj,dims)
@@ -360,6 +387,90 @@ classdef Track < handle
       [~, q] = gauss_fit(bc,fx) ;
       data.zfit=abs(q(4));
     end
+    function [bunchProfile sx sy]=plasmaTrack(beamIn,decimate,doplot)
+      persistent n_in s_in
+      if isempty(n_in)
+        ld=load('data/plasProf');
+        n_in=ld.n; s_in=ld.s;
+      end
+      n0=1e11; % / m^3 (1e17 cm^-3)
+      
+      s=linspace(s_in(1),s_in(end),2048);
+      n=interp1(s_in,n_in,s);
+      
+      gamma=mean(beamIn.Bunch.x(6,:))/0.511e-3;
+      
+      B=beamIn.Bunch.x;
+      if ~exist('decimate','var') || isempty(decimate)
+        decimate=1;
+      end
+      NH=100; NLAST=length(s)/decimate;
+      
+      sx=zeros(1,NLAST-1); sy=sx;
+      
+      bunchProfile=zeros(NH,NH,NLAST);
+      bp=zeros(2,length(B),length(s)-1);
+      nbin=max([length(beamIn.Bunch.Q)/100 100]);
+      for is=2:NLAST
+        K=n(is)*(n0/gamma);
+        dl=s(is)-s(is-1);
+        R=[1 0 0 0 0 0;
+          -K*dl 1 0 0 0 0;
+          0 0 1 0 0 0;
+          0 0 -K*dl 1 0 0;
+          0 0 0 0 1 0;
+          0 0 0 0 0 1];
+        %   R=diag(ones(1,6));
+        RL=[1 dl/2 0 0 0 0;
+          0 1 0 0 0 0;
+          0 0 1 dl/2 0 0;
+          0 0 0 1 0 0;
+          0 0 0 0 1 0;
+          0 0 0 0 0 1];
+        B=RL*(R*(RL*B));
+        bp(:,:,is-1)=B([1 3],:);
+        [ fx , bc ] = hist(B(3,:),nbin);
+        [~, q] = gauss_fit(bc,fx) ;
+        sy(is-1)=abs(q(4));
+        [ fx , bc ] = hist(B(1,:),nbin);
+        [~, q] = gauss_fit(bc,fx) ;
+        sx(is-1)=abs(q(4));
+      end
+      xran=linspace(min(min(bp(1,:,1:NLAST-1))),max(max(bp(1,:,1:NLAST-1))),NH);
+      yran=linspace(min(min(bp(2,:,1:NLAST-1))),max(max(bp(2,:,1:NLAST-1))),NH);
+      for is=1:NLAST-1
+        hh=hist2(bp(1,:,is),bp(2,:,is),xran,yran);
+        bunchProfile(:,:,is)=hh;%reshape(hh,NH,NH,1);
+      end
+      if exist('doplot','var') && ~isempty(doplot)
+        % fit plot
+        figure
+        plot(s(2:NLAST).*1e2,sx.*1e6)
+        hold on
+        plot(s(2:NLAST).*1e2,sy.*1e6,'r')
+        hold off
+        xlabel('s / cm')
+        ylabel('Fitted Transverse Beam Size / um')
+        legend({'X' 'Y'})
+        grid on
+        % 3D plot
+        figure
+        data=bunchProfile;
+        % data(data<100)=0;
+        data = smooth3(data,'box',5);
+        p = patch(isosurface(data,.5), ...
+          'FaceColor', 'blue', 'EdgeColor', 'none');
+        patch(isocaps(data,.5), ...
+          'FaceColor', 'interp', 'EdgeColor', 'none');
+        isonormals(data,p)
+        view([4 -32]);
+        axis vis3d tight
+        % axis([1 NH 1 NH 1 NLAST])
+        camlight; lighting phong
+        colorbar
+        axis off
+      end
+    end
   end
   methods(Static,Access=private)
     function chi2 = minWaist(x,R,L,sig,dir)
@@ -383,5 +494,4 @@ classdef Track < handle
       [Z ZSP]=meshgrid(z,z);
     end
   end
-  
 end

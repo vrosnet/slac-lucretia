@@ -1,4 +1,4 @@
-function [fitTerm,fitCoef,bsize_corrected,bsize,p] = beamTerms(dim,beam)
+function [fitTerm,fitCoef,bsize_corrected,bsize,p,bsize_accum] = beamTerms(dim,beam)
 % [fitTerm,fitCoef,bsize_corrected,bsize] = beamTerms(dim,beam)
 % Show relative contributions of up to 3rd-order beam correlations to the
 % beam size in the requested dimension
@@ -42,15 +42,25 @@ for iorder=1:3
 end
 p=polyfitn(xfit,yfit,iorder);
 % Get contribution of beamsize to each fit term
-[~, I]=sort(sum(p.ModelTerms,2));
-bsize=zeros(length(p.Coefficients),1);
-fitTerm=zeros(length(p.Coefficients),6);
-fitCoef=zeros(1,length(p.Coefficients));
-for iterm=1:length(p.Coefficients)
-  p2=polyfitn(xfit,yfit,p.ModelTerms(I(iterm),:));
-  bsize(iterm)=std(yfit)-std(yfit-polyvaln(p2,xfit));
-  fitTerm(iterm,~ismember(allpar,dim))=p.ModelTerms(I(iterm),:);
-  fitCoef(iterm)=p2.Coefficients;
+bsize=zeros(length(p.Coefficients)-1,1);
+fitTerm=zeros(length(p.Coefficients)-1,6);
+fitCoef=zeros(1,length(p.Coefficients)-1);
+allTerms=1:length(p.ModelTerms);
+for iterm=1:length(p.Coefficients)-1
+  p2=polyfitn(xfit,yfit,p.ModelTerms(allTerms~=iterm,:));
+  bsize(iterm)=std(yfit-polyvaln(p2,xfit))-bsize_corrected(end);
+  fitTerm(iterm,allpar~=dim)=p.ModelTerms(iterm,:);
+  fitCoef(iterm)=p.Coefficients(iterm);
+end
+[VAL, I]=sort(bsize,'descend');
+bsize=VAL;
+fitTerm=fitTerm(I,:);
+fitCoef=fitCoef(I);
+if nargout>=6
+  for iterm=1:length(I)
+    p2=polyfitn(xfit,yfit,p.ModelTerms([I(1:iterm); end],:));
+    bsize_accum(iterm)=std(yfit-polyvaln(p2,xfit));
+  end
 end
 
 % Put warnings back to original state
