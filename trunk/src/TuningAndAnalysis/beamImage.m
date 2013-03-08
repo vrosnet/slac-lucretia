@@ -16,8 +16,8 @@ rays=beam.Bunch.x(:,id)';
 name={'X (um)','PX (ur)','Y (um)','PY (ur)','Z (um)','dP (%)'};
 conv=[1e6,1e6,1e6,1e6,1e6,1e2];
 nbin=100;
-asym=false;
-npix=1024;
+asym=true;
+npix=750;
 
 x=conv(1)*rays(:,1);
 px=conv(2)*rays(:,2);
@@ -52,9 +52,10 @@ else
   idy=(1:length(x))';
   idpy=(1:length(x))';
   idz=(1:length(x))';
-  iddp=(1:length(x))';
 end
+iddp=(1:length(x))';
 
+figure
 subplot(221)
 [v,u]=hist(y,nbin);
 warning off MATLAB:rankDeficientMatrix
@@ -73,7 +74,7 @@ set(h1,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
 hold on
 plot(yfit,u,'r-')
 hold off
-title(sprintf('\\sigma_y = %.1f um',sigy))
+title(sprintf('\\sigma_y = %.1f um',abs(sigy)))
 ylabel('y (um)')
 
 subplot(224)
@@ -94,7 +95,7 @@ set(h2,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
 hold on
 plot(u,xfit,'r-')
 hold off
-title(sprintf('\\sigma_x = %.1f um',sigx))
+title(sprintf('\\sigma_x = %.1f um',abs(sigx)))
 xlabel('x (um)')
 
 ulim=max(abs([xlim,ylim]));
@@ -118,5 +119,72 @@ title(sprintf('%d\\sigma cuts: rmsx= %.1f um, rmsy= %.1f um', ...
   nsig,rmsx,rmsy))
 ylabel('y (um)')
 xlabel('x (um)')
+
+figure
+subplot(221)
+[v,u]=hist(dp,nbin);
+warning off MATLAB:rankDeficientMatrix
+warning off MATLAB:nearlySingularMatrix
+if (asym)
+  [yfit,q,dq,chi2]=agauss_fit(u,v,[],0);
+else
+  [yfit,q,dq,chi2]=gauss_fit(u,v,[],0);
+end
+warning on MATLAB:rankDeficientMatrix
+warning on MATLAB:nearlySingularMatrix
+sigy=q(4);
+h1=barh(u,v);
+ylim=get(gca,'YLim');
+set(h1,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
+hold on
+plot(yfit,u,'r-')
+hold off
+title(sprintf('\\sigma_E = %.1f %% RMS = %.1f %%',abs(sigy),100*(std(E)/mean(E))))
+ylabel('dP (%)')
+
+subplot(224)
+[v,u]=hist(z,nbin);
+warning off MATLAB:rankDeficientMatrix
+warning off MATLAB:nearlySingularMatrix
+if (asym)
+  [xfit,q,dq,chi2]=agauss_fit(u,v,[],0);
+else
+  [xfit,q,dq,chi2]=gauss_fit(u,v,[],0);
+end
+warning on MATLAB:rankDeficientMatrix
+warning on MATLAB:nearlySingularMatrix
+sigx=q(4);
+h2=bar(u,v);
+xlim=get(gca,'XLim');
+set(h2,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
+hold on
+plot(u,xfit,'r-')
+hold off
+title(sprintf('\\sigma_z = %.1f um',abs(sigx)))
+xlabel('z (um)')
+
+ulim=max(abs([xlim,ylim]));
+if (~exist('alim','var'))
+  alim=ulim;
+end
+% subplot(221),set(gca,'YLim',[-alim,alim]),axis square
+% subplot(224),set(gca,'XLim',[-alim,alim]),axis square
+
+subplot(222)
+id=intersect(idz,iddp);
+rmsx=std(z(id));
+rmsy=std(dp(id));
+beamprof=hist2(z(id),dp(id), ...
+  linspace(xlim(1),xlim(2),npix),linspace(ylim(1),ylim(2),npix));
+imagesc(xlim,ylim,beamprof)
+% plot(z(id),dp(id),'.')
+set(gca,'YDir','normal')
+% axis square
+axis([xlim ylim])
+title(sprintf('Mean Energy = %.3f GeV',mean(E)))
+ylabel('dP (%)')
+xlabel('z (um)')
+
+drawnow('expose')
 
 end
