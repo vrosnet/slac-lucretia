@@ -91,7 +91,7 @@ classdef distributedLucretia < handle
     asynJobOutputArgs % Output arguments from asynchronous jobs. Cell array {iworker,iarg}
   end
   properties
-    latticeSyncVals % data values used to specify differences between lattices in different workers (PS/GIRDER/KLYSTRON values)
+    latticeSyncVals % data values used to specify differences between lattices in different workers (PS/GIRDER/KLYSTRON_V/KLYSTRON_PHA values)
     syncMethod='Ampl'; % Method to synchronise lattice on workers, ('SetPt' or 'Ampl')
     asynDataFile % Location of data file for parameter exchange when running in asynchronous mode, default=distributedLucretiaStartupData.mat in scheduler data area. Also used for initial setup in synchronous mode.
   end
@@ -360,7 +360,7 @@ classdef distributedLucretia < handle
     function KlystronTrim(obj,kList)
       % KlystronTrim(obj,kList)
       %  Perform KlystronTrim operation on all workers to trim their KLYSTRON
-      %  values to those held in local obj.latticeSyncVals.KLYSTRON property array
+      %  values to those held in local obj.latticeSyncVals.KLYSTRON_V / KLYSTRON_PHA property array
       %
       % kList=list of KLYSTRON indices to trim (on all workers selected in
       %        obj.workers)

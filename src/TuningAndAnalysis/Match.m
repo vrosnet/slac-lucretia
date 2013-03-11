@@ -746,6 +746,9 @@ classdef Match < handle & physConsts
           Iy.etap=obj.initStruc.y.Twiss.etap;
           Iy.nu=obj.initStruc.y.Twiss.nu;
         end
+        
+        % Set the variables
+        obj.varVals=x;
 
         % Get the data (do the tracking)
         F=zeros(1,length(obj.matchType));
