@@ -71,7 +71,8 @@ classdef Track < handle
     centerZInd=[]; % Indices to re-center longitudinal distribution
   end
   properties(SetAccess=protected)
-    isDistrib % Is this Track object opererating in distributed mode?
+    isDistrib=false; % Is this Track object opererating in distributed mode?
+    isPTrack=false; % Track object setup to parallel track through common lattice?
     DL % distributedLucretia object reference
     plasmaData % Tracked data through plasma channel if requested
     beamStore % Beam saved at intermediate tracking locations if requested in 'beamStoreInd'
@@ -85,6 +86,9 @@ classdef Track < handle
     nray
     beamInSingle
     dBeamData % distributed beam data
+    beamDividers_r0
+    beamDividers_r1
+    pTrackStopElements
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
@@ -94,6 +98,9 @@ classdef Track < handle
     beamOut % (distributed) beam object post tracking
     trackStatus % (distributed) Lucretia status from tracking
     beamData % Processed beam data
+  end
+  properties(Constant)
+    minPTrackDist=3; % Min number of elements to bother tracking in parallel
   end
   
   %% Get/Set methods
@@ -122,7 +129,18 @@ classdef Track < handle
       obj.beamout=val;
     end
     function val=get.beamOut(obj)
-      if obj.isDistrib && ~obj.DL.synchronous
+      if obj.isPTrack
+        r0=obj.beamDividers_r0;
+        r1=obj.beamDividers_r1;
+        B=obj.beamout;
+        val=B{obj.DL.workers(1)};
+        for iB=obj.DL.workers(2:end)
+          beam=B{iB};
+          val.Bunch.Q(r0(iB):r1(iB))=beam.Bunch.Q;
+          val.Bunch.stop(r0(iB):r1(iB))=beam.Bunch.stop;
+          val.Bunch.x(:,r0(iB):r1(iB))=beam.Bunch.x;
+        end
+      elseif obj.isDistrib && ~obj.DL.synchronous
         val=asynGetData(obj.DL,2);
       else
         val=obj.beamout;
@@ -136,8 +154,40 @@ classdef Track < handle
         obj.beamInSingle.Bunch.stop=0;
         obj.beamInSingle.Bunch.x=mean(beamStruc.Bunch.x,2);
       end
+      % Store given beam as local beam
+      obj.lBeamIn=beamStruc;
       % Deal with new Beam
-      if obj.isDistrib && obj.DL.synchronous
+      if obj.isPTrack
+        % Divide up beam particles amongst worker nodes
+        np=length(obj.DL.workers);
+        nmp_1=length(beamStruc.Bunch.Q);
+        nmp=floor(nmp_1/np);
+        n=0;
+        for iw=obj.DL.workers
+          n=n+1;
+          if n==np
+            r1(iw)=nmp_1;
+          else
+            r1(iw)=n*nmp;
+          end
+          r0(iw)=(n-1)*nmp+1;
+        end
+        useWorkers=obj.DL.workers;
+        nbunch=length(beamStruc.Bunch);
+        spmd
+          if ismember(labindex,useWorkers)
+            BeamIn.BunchInterval=beamStruc.BunchInterval;
+            for bn=1:nbunch
+              BeamIn.Bunch(bn).Q=beamStruc.Bunch(bn).Q(r0(labindex):r1(labindex));
+              BeamIn.Bunch(bn).stop=beamStruc.Bunch(bn).stop(r0(labindex):r1(labindex));
+              BeamIn.Bunch(bn).x=beamStruc.Bunch(bn).x(:,r0(labindex):r1(labindex));
+            end
+          end
+        end
+        obj.dBeamIn=BeamIn;
+        obj.beamDividers_r0=r0;
+        obj.beamDividers_r1=r1;
+      elseif obj.isDistrib && obj.DL.synchronous
         useWorkers=obj.DL.workers;
         spmd
           if ismember(labindex,useWorkers)
@@ -169,7 +219,7 @@ classdef Track < handle
       end
     end
     function beam=get.beamIn(obj)
-      if obj.isDistrib && obj.DL.synchronous
+      if (obj.isDistrib && obj.DL.synchronous) || obj.isPTrack
         beam=obj.dBeamIn;
       elseif obj.isDistrib
         dataFile=fullfile(obj.DL.sched.DataLocation,'distributedLucretiaStartupData.mat');
@@ -191,16 +241,18 @@ classdef Track < handle
   
   %% Main public methods
   methods
-    function obj=Track(beamIn,distribObj)
+    function obj=Track(beamIn,distribObj,setPT)
       global BEAMLINE
       if exist('distribObj','var') && ~isempty(distribObj)
         if ~strcmp(class(distribObj),'distributedLucretia') %#ok<STISA>
           error('Can only pass a distributedLucretia object to Track')
         end
         obj.isDistrib=true;
+        obj.isPTrack=false;
         obj.DL=distribObj;
       else
         obj.isDistrib=false;
+        obj.isPTrack=false;
       end
       if ~exist('beamIn','var')
         error('Must supply input beam structure')
@@ -209,6 +261,16 @@ classdef Track < handle
       obj.finishInd=length(BEAMLINE);
       obj.beamIn=beamIn;
       obj.nray=numel(beamIn.Bunch.Q);
+      if exist('setPT','var') && setPT
+        try
+          obj.setupPTrackThru(beamIn);
+        catch ME
+          obj.isDistrib=true;
+          obj.isPTrack=false;
+          obj.beamIn=beamIn;
+          error('Setup of parallel tracking failed, reverting to distributed setup:\n%s',ME.message)
+        end
+      end
     end
     function trackThru(obj,cmd)
       % Asking for intermediate track locations?
@@ -217,6 +279,7 @@ classdef Track < handle
       if ~isempty(obj.centerZInd)
         interele=unique([interele obj.centerZInd]);
       end
+      interele=interele(interele<=obj.finishInd & interele>=obj.startInd);
       % Asking for single-ray tracking?
       if exist('cmd','var') && isequal(cmd,'singleRay')
         doSingleRay=true;
@@ -230,7 +293,7 @@ classdef Track < handle
       end
       doplas=obj.doPlasmaTrack;
       % tracking in parallel across possibly multiple workers
-      if obj.isDistrib
+      if obj.isDistrib || obj.isPTrack
         % If asynchronous, submit jobs and return
         if ~obj.DL.synchronous
           % Can't store beams or re-center z distributions in this mode
@@ -254,6 +317,7 @@ classdef Track < handle
           useWorkers=obj.DL.workers;
           spmd
             if ismember(labindex,useWorkers)
+              bstore=[];
               if isempty(interele)
                 [stat, beamout, instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
               else
@@ -283,9 +347,6 @@ classdef Track < handle
                 end
               end
             end
-            if ~isempty(bsind)
-              obj.beamStore=bstore;
-            end
             if doplas
               try
                 [bunchProfile, plas_sx, plas_sy]=Track.plasmaTrack(beamout,4);
@@ -303,6 +364,7 @@ classdef Track < handle
             obj.plasmaData.sx=plas_sx;
             obj.plasmaData.sy=plas_sy;
           end
+          obj.beamStore=bstore;
         end
       else % local tracking
         if isempty(interele)
@@ -350,6 +412,82 @@ classdef Track < handle
         end
       end
     end
+    function pTrackThru(obj)
+      % Perform parallel tracking through the BEAMLINE lattice
+      global BEAMLINE
+      
+      % Check for correct setup
+      if ~obj.isPTrack
+        error('setupPTrackThru not done')
+      end
+      
+      % - If no collective effects requested, can simply proceed with
+      % tracking of already distributed particles
+      se=obj.pTrackStopElements;
+      se(se<obj.startInd)=[];
+      se(se>obj.finishInd)=[];
+      if isempty(se)
+        obj.trackThru;
+        return
+      end
+      
+      % Otherwise must pause at stop points then redistribute
+      mindist=obj.minPTrackDist;
+      istart=obj.startInd;
+      ifinish=obj.finishInd;
+      ibeam=obj.beamIn;
+      if se(1)<=mindist
+        obj.isPTrack=false;
+        obj.beamIn=obj.lBeamIn;
+        obj.finishInd=se(1)-1;
+        obj.trackThru;
+      else
+        obj.finishInd=se(1)-1;
+        obj.trackThru;
+      end
+      beamout=obj.beamOut;
+      ise=2;
+      while ise<=length(se) && se(ise)<=ifinish && ise<=length(se)
+        obj.startInd=obj.finishInd+1;
+        obj.finishInd=se(ise)-1;
+        if obj.isPTrack
+          while se(ise+1)==se(ise)+1 && ise<length(se)
+            ise=ise+1;
+            obj.finishInd=se(ise)-1;
+            continue;
+          end
+          obj.isPTrack=false;
+          ise=ise+1;
+        else
+          obj.isPTrack=true;
+        end
+        obj.beamIn=beamout;
+        obj.trackThru;
+        beamout=obj.beamOut;
+      end
+      if se(ise)>ifinish || ise<=length(se)
+        ise=ise-1;
+      end
+      if se(ise)==ifinish
+        obj.isPTrack=true;
+        obj.startInd=istart;
+        obj.finishInd=ifinish;
+        obj.beamIn=ibeam;
+        return
+      end
+      % --- now track through to the end (in parallel if there is far
+      % enough to go)
+      obj.startInd=obj.finishInd+1;
+      obj.finishInd=ifinish;
+      obj.isPTrack=se(end)<(length(BEAMLINE)-mindist);
+      obj.beamIn=beamout;
+      obj.trackThru;
+      % -- return original properties
+      obj.isPTrack=true;
+      obj.startInd=istart;
+      obj.finishInd=ifinish;
+      obj.beamIn=ibeam;
+    end
     function beamData=getBeamData(obj,dims)
       if isempty(obj.beamOut); error('No tracking has taken place yet!'); end;
       if ~exist('dims','var'); dims='xyz'; end;
@@ -375,6 +513,54 @@ classdef Track < handle
       else
         beamData=Track.procBeamData(bo,dims);
       end
+    end
+    function setupPTrackThru(obj,beam)
+      % setupPTrackThru - Setup parallel config for parallel tracking
+      %  de-selects distributed mode, copies current lattice acorss all
+      %  worker nodes and splits up beam definition across nodes for
+      %  parallel tracking of beam. Must have instantiated Track object
+      %  with distributedLucretia object set in synchronous mode
+      %  (DL.synchronous=true)
+      %
+      % beam: Lucretia Beam structure
+      global BEAMLINE
+      if isempty(obj.DL)
+        error('No distributedLucretia object attached to this Track object')
+      end
+      if ~obj.DL.synchronous
+        error('DL object attached to Track object must be type ''synchronous''')
+      end
+      if ~exist('beam','var')
+        error('Must supply Lucretia beam to distribute')
+      end
+      obj.isDistrib=false;
+      obj.isPTrack=true;
+      obj.beamIn=beam;
+      obj.DL.latticeCopy;
+      % Get locations where parallel tracking must pause and send rays back
+      % for central tracking (i.e. when collective effects need to be
+      % applied. i.e. CSR or Wakefield calculations)
+      tf=findcells(BEAMLINE,'TrackFlag');
+      stopele=[];
+      stopfields={'SRWF_Z' 'SRWF_T' 'LRWF_T' 'LRWF_ERR'};
+      noptfields={'CSR'};
+      mindist=obj.minPTrackDist;
+      for iele=tf
+        fn=fieldnames(BEAMLINE{iele}.TrackFlag);
+        for ifn=1:length(fn)
+          if ismember(fn{ifn},noptfields) && BEAMLINE{iele}.TrackFlag.(fn{ifn})
+            error('BEAMLINE contains element with Tracking Flag ''%s'' set, this is not currently supported by this parallel tracking code',fn{ifn})
+          end
+          if ismember(fn{ifn},stopfields) && BEAMLINE{iele}.TrackFlag.(fn{ifn})
+            if ~isempty(stopele) && (iele-stopele(end))<=mindist
+              stopele=[stopele (stopele(end)+1):iele];
+            else
+              stopele(end+1)=iele;
+            end
+          end
+        end
+      end
+      obj.pTrackStopElements=stopele;
     end
   end
   
