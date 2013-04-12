@@ -95,6 +95,7 @@ classdef Match < handle & physConsts
     useFitData=false; % Use fit data instead of Twiss calculation / tracking
     matchWeights=[]; % Vector of weights for match entries
     userFitFun % function handle for user supplied fitting routine (must take Lucretia beam structure as only argument)
+    userOutputFn % User mimiser output function
   end
   properties(SetAccess=protected)
     matchType={}; % Cell array of match type descriptors (see allowedMatchTypes property)
@@ -361,7 +362,7 @@ classdef Match < handle & physConsts
         opts=gaoptimset('Display',obj.optimDisplay,...
           'TolCon',1e-6,'TolFun',1e-6,'Generations',100000,'PopulationSize',100,'UseParallel','never','Vectorized','off');
       elseif strcmp(obj.optim,'lsqnonlin')
-        opts=optimset('Display',obj.optimDisplay,'MaxFunEvals',200000,'MaxIter',100000,'TolX',1e-5,'TolFun',1e-5,...
+        opts=optimset('Display',obj.optimDisplay,'MaxFunEvals',100000,'MaxIter',100000,'TolX',1e-5,'TolFun',1e-5,...
           'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state));
       elseif strcmp(obj.optim,'fmincon')
         opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
@@ -369,6 +370,11 @@ classdef Match < handle & physConsts
       else
         opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
           'MaxIter',1500,'TolX',1e-6,'TolFun',1e-6,'UseParallel','never');
+      end
+      
+      % Output function supplied?
+      if ~isempty(obj.userOutputFn)
+        opts.OutputFcn=obj.userOutputFn;
       end
       
       % Perform fit
