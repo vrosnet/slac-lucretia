@@ -129,12 +129,12 @@ classdef FlIndex < handle & FlGui & FlUtils
         if isfield(BEAMLINE{indx(wind)},'Slices') && ~isempty(BEAMLINE{indx(wind)}.Slices)
           slices=BEAMLINE{indx(wind)}.Slices;
           if length(slices)==1
-            indx_out=[indx(wind) indx(wind) indx(wind)];
+            indx_out(wind,:)=[indx(wind) indx(wind) indx(wind)];
           else
-            indx_out=[slices(1) slices(1)+1 slices(2)];
+            indx_out(wind,:)=[slices(1) slices(1)+1 slices(2)];
           end
         else
-          indx_out=[indx(wind) indx(wind) indx(wind)];
+          indx_out(wind,:)=[indx(wind) indx(wind) indx(wind)];
         end
       end
     end
@@ -144,7 +144,8 @@ classdef FlIndex < handle & FlGui & FlUtils
       if ~isempty(obj.MasterInd)
         INDXnames=[obj.PS_names obj.GIRDER_names obj.KLYSTRON_names];
         inds=[find(obj.MasterRef(:,1)); find(obj.MasterRef(:,2)); find(obj.MasterRef(:,3))];
-        INDXnames=INDXnames(sort(inds));
+        [~,I]=sort(inds);
+        INDXnames=INDXnames(I);
       else
         INDXnames={};
       end
@@ -250,6 +251,65 @@ classdef FlIndex < handle & FlGui & FlUtils
         end
       end
       obj.Ampl=curAmpl;
+    end
+    function chk=checkLimits(obj)
+      % checkLimits
+      % Check hi/lo limits of all SetPt's
+      % return 0=OK, -1=low, +1=high
+      global PS GIRDER KLYSTRON
+      pslist=obj.PS_list;
+      psind=obj.PS;
+      girlist=obj.GIRDER_list;
+      girind=obj.GIRDER;
+      klylist=obj.KLYSTRON_list;
+      klyind=obj.KLYSTRON;
+      chk=cell(1,length(obj.MasterInd));
+      if ~isempty(pslist)
+        for ips=1:length(pslist)
+          chk{pslist(ips)}=[0;0];
+          for ipv=1:2
+            if PS(psind(ips)).SetPt<PS(psind(ips)).low(ipv)
+              chk{pslist(ips)}(ipv)=-1;
+            end
+            if PS(psind(ips)).SetPt>PS(psind(ips)).high(ipv)
+              chk{pslist(ips)}(ipv)=1;
+            end
+          end
+        end
+      end
+      if ~isempty(girlist)
+        for igir=1:length(girlist)
+          for ipv=1:2
+            for idof=1:6
+              chk{girlist(igir)}(ipv,idof)=0;
+              if GIRDER{girind(igir)}.MoverSetPt<GIRDER{girind(igir)}.low(ipv,idof)
+                chk{girlist(igir)}(ipv,idof)=-1;
+              elseif GIRDER{girind(igir)}.MoverSetPt>GIRDER{girind(igir)}.high(ipv,idof)
+                chk{girlist(igir)}(ipv,idof)=1;
+              end
+            end
+          end
+        end
+      end
+      if ~isempty(klylist)
+        for ikly=1:length(klylist)
+          for ipv=1:2
+            chk{klylist(ikly)}(ipv,:)=[0 0];
+            if KLYSTRON(klyind(ikly)).AmplSetPt<KLYSTRON(klyind(ikly)).low(ipv,1)
+              chk{klylist(ikly)}(ipv,1)=-1;
+            end
+            if KLYSTRON(klyind(ikly)).AmplSetPt>KLYSTRON(klyind(ikly)).high(ipv,1)
+              chk{klylist(ikly)}(ipv,1)=1;
+            end
+            if KLYSTRON(klyind(ikly)).PhaseSetPt<KLYSTRON(klyind(ikly)).low(ipv,2)
+              chk{klylist(ikly)}(ipv,2)=-1;
+            end
+            if KLYSTRON(klyind(ikly)).PhaseSetPt>KLYSTRON(klyind(ikly)).high(ipv,2)
+              chk{klylist(ikly)}(ipv,2)=1;
+            end
+          end
+        end
+      end
     end
     function vals=get.SetPt(obj)
       % SetPt list
@@ -875,7 +935,7 @@ classdef FlIndex < handle & FlGui & FlUtils
         if ~isfield(BEAMLINE{mList{im}(1)},'Girder') || ~BEAMLINE{mList{im}(1)}.Girder
           stat = AssignToGirder(mList{im}, length(GIRDER)+1, 1) ;
           if stat{1}~=1; error('GIRDER assignment error:\n%s\n',stat{2}); end;
-          [stat,G]=AddMoverToGirder(1:6,GIRDER{end});
+          [~,G]=AddMoverToGirder(1:6,GIRDER{end});
           ind=length(GIRDER);
           GIRDER{end}=G;
         else
@@ -1084,7 +1144,7 @@ classdef FlIndex < handle & FlGui & FlUtils
       end
       obj.updateIndexGui;
     end
-    function guiIndexChanSelCallback(obj,src,~) %#ok<MANU>
+    function guiIndexChanSelCallback(~,src,~)
       if get(src,'Value')
         set(src,'String','UnSelect Channel(s)')
       else
@@ -1181,11 +1241,11 @@ classdef FlIndex < handle & FlGui & FlUtils
       displayStr2=displayStr2(~ismember(mI,find(obj.indexChoiceFromGui)));
       mI2=mI(~ismember(mI,find(obj.indexChoiceFromGui)));
       if get(obj.gui.display_alpha,'Value')
-        [Y I]=sort(name2);
-        [Y I1]=sort(name1);
+        [~, I]=sort(name2);
+        [~, I1]=sort(name1);
       else
-        [Y I]=sort(s2);
-        [Y I1]=sort(s1);
+        [~, I]=sort(s2);
+        [~, I1]=sort(s1);
       end
       set(obj.gui.indexCbox2,'String',displayStr2(I))
       set(obj.gui.indexCbox2,'UserData',mI2(I))

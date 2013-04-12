@@ -328,7 +328,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
       while ~nanCheck && ntry<3
         ntry=ntry+1;
         obj.INSTR.acquire(obj.FL,obj.bpmNAve);
-        [md sd]=obj.INSTR.meanstd;
+        [md, sd]=obj.INSTR.meanstd;
         obj.data.(sname).date=now;
         obj.data.(sname).x(:,ival)=md(obj.bpmChoice,1);
         nanCheck=true;
@@ -350,12 +350,12 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
       try
         sname=obj.sextID;
         sz=size(obj.data.(sname).x);
-        [scanvals bI]=sort(obj.data.(sname).scanvals.(obj.sextDimSelect)(1:sz(2)));
+        [scanvals, bI]=sort(obj.data.(sname).scanvals.(obj.sextDimSelect)(1:sz(2)));
         % Which bpms to analyse for?
         str=get(obj.gui.plotSel,'String'); thisBpmName=str{get(obj.gui.plotSel,'Value')};
         for ibpm=1:length(obj.data.(sname).name)
           [~, ~, chi2]=noplot_polyfit(scanvals,obj.data.(sname).x(ibpm,bI),obj.data.(sname).x_err(ibpm,bI),2);
-          [q dq]=noplot_parab(scanvals,obj.data.(sname).x(ibpm,bI),obj.data.(sname).x_err(ibpm,bI)*sqrt(chi2));
+          [q, dq]=noplot_parab(scanvals,obj.data.(sname).x(ibpm,bI),obj.data.(sname).x_err(ibpm,bI)*sqrt(chi2));
           obj.data.(sname).anal.fit_A(ibpm)=q(1);
           obj.data.(sname).anal.fit_B(ibpm)=q(2);
           obj.data.(sname).anal.fit_C(ibpm)=q(3);
@@ -369,7 +369,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
           usebpm=ismember(obj.data.(sname).name,thisBpmName);
         end
         if sum(usebpm)>1
-          [q dq]=noplot_polyfit(1:sum(usebpm),obj.data.(sname).anal.fit_B(usebpm),obj.data.(sname).anal.fit_B_err(usebpm),0);
+          [q, dq]=noplot_polyfit(1:sum(usebpm),obj.data.(sname).anal.fit_B(usebpm),obj.data.(sname).anal.fit_B_err(usebpm),0);
           obj.data.(sname).anal.BBA.(obj.sextDimSelect)=q;
           obj.data.(sname).anal.BBA.(sprintf('%c_err',obj.sextDimSelect))=dq;
         else
@@ -660,7 +660,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
     function guiMenuFileCallback(obj,src,~)
       switch src
         case obj.gui.menuSaveData
-          [filename pathname]=uiputfile(sprintf('FlSextBBA_data_%s.mat',datestr(now,30)));
+          [filename, pathname]=uiputfile(sprintf('FlSextBBA_data_%s.mat',datestr(now,30)));
           if filename
             data=obj.data; %#ok<NASGU>
             guiMessageData=obj.guiMessageData; %#ok<NASGU>
@@ -668,7 +668,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
             save(fullfile(pathname,filename),'data','guiMessageData','guiMessageDataOrder');
           end
         case obj.gui.menuLoadData
-          [filename pathname]=uigetfile;
+          [filename, pathname]=uigetfile;
           if ~filename
             return
           end
@@ -834,7 +834,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
     function guiDisplayAllPlotsCallback(obj,~,~)
       for ibpm=1:length(obj.bpmChoice)
         if ~ismember(obj.bpmName{ibpm},obj.bpmIgnore)
-          figure('Name',obj.bpmName{ibpm},'NumberTitle','off'); ah=axes;
+          figure('Name',obj.bpmName{ibpm},'NumberTitle','off'); ah=axes; %#ok<LAXES>
           obj.doPlot(ah,obj.bpmName{ibpm});
         end
       end
@@ -933,7 +933,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
         sname=obj.sextID;
         if ~isfield(obj.data,sname) || isempty(obj.data.(sname)); return; end;
         sz=size(obj.data.(sname).x);
-        [sv bI]=sort(obj.data.(sname).scanvals.(obj.sextDimSelect)(1:sz(2)));
+        [sv, bI]=sort(obj.data.(sname).scanvals.(obj.sextDimSelect)(1:sz(2)));
         data=obj.data.(sname);
         if strcmp(bpmName,'All')
           for ibpm=1:length(data.name)
@@ -1005,7 +1005,7 @@ classdef FlSextBBA < handle & FlApp & FlGui & matlab.mixin.Copyable
             obj.INSTR.acquire(obj.FL,1);
             obj.FL.hwGet(obj.FLI);
           end
-          [meanData stdData] = obj.INSTR.meanstd;
+          [meanData, stdData] = obj.INSTR.meanstd;
           if isempty(meanData)
             meanData=squeeze(obj.INSTR.Data(:,1,:));
             stdData=zeros(size(meanData));
