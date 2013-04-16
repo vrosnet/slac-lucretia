@@ -94,7 +94,6 @@ function beamout = MakeBeamPZGauss( Initial, nsigmas, nray )
                                   + Pcorrel ;
                               
   end
-
+beamout = CheckBeamMomenta(beamout) ;
 end
 
-beamout = CheckBeamMomenta(beamout) ;

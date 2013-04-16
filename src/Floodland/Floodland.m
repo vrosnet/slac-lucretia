@@ -442,7 +442,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if isempty(pvname{2}) || isequal(PS(ips).conv{1},0) || isempty(PS(ips).conv{1})
           continue
         end
-        if ~isecell(PS(ips).protocol)
+        if ~iscell(PS(ips).protocol)
           proto=PS(ips).protocol;
         else
           proto=PS(ips).protocol{1};
@@ -458,8 +458,8 @@ classdef Floodland < handle & matlab.mixin.Copyable
           trimVal=0;
           if ~isempty(PS(ips).trimpv{1})
             try
-              trimpv=PS(ips).trimpv{1};
-              trimconv=PS(ips).trimconv{1};
+              trimpv=PS(ips).trimpv;
+              trimconv=PS(ips).trimconv;
               comstack_get{end+1,1}=trimpv{1};
               comstackProto_get{end+1,1}=proto;
               comstack_conv{end+1,1}=trimconv{1};
@@ -467,6 +467,8 @@ classdef Floodland < handle & matlab.mixin.Copyable
               comstack_ps(end+1)=ips;
               comstack_pconv{end+1,1}=PS(ips).conv2{1};
             catch ME
+              disp(PS(ips).trimpv{1})
+              disp(ips)
               error('Trim Controls not available:\n%s',ME.message)
             end
             if isnan(trimVal) || ~isnumeric(trimVal)
@@ -499,11 +501,11 @@ classdef Floodland < handle & matlab.mixin.Copyable
       % - sum returned (converted) values from control system, then apply a
       % final conversion
       for ival=1:length(cvals)
-        if ~isnan(cvals{ival})
+        if ~any(isnan(cvals{ival}))
           cntrlVal=0;
           for ival2=find(ismember(comstack_ps,comstack_ps(ival)))
             if ~isnan(cvals{ival2})
-              cntrlVal=cntrlVal+cvals{x};
+              cntrlVal=cntrlVal+cvals{ival2};
             end
           end
           conv=comstack_pconv{ival};
@@ -512,7 +514,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
           else
             cntrlVal=interp1(conv(1,:),conv(2,:),cntrlVal,'linear');
           end
-          PS(comstack_ps(ival)).Ampl=cntrlVal/comstack_B(x);
+          PS(comstack_ps(ival)).Ampl=(length(PS(comstack_ps(ival)).Element)/2)*(cntrlVal/comstack_B(ival));
         end
       end
     end
@@ -533,7 +535,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
         if isempty(pvname{2}) || isequal(PS(ips).conv{2},0) || isempty(PS(ips).conv{2})
           continue
         end
-         if ~isecell(PS(ips).protocol)
+         if ~iscell(PS(ips).protocol)
           proto=PS(ips).protocol;
         else
           proto=PS(ips).protocol{2};
@@ -840,10 +842,17 @@ classdef Floodland < handle & matlab.mixin.Copyable
       end
       % Do conversion
       for ival=1:length(cvals)
-        if length(conv{ival})==1
-          cvals{ival}=cvals{ival}.*conv{ival};
-        else
-          cvals{ival}=interp1(conv{ival}(1,:),conv{ival}(2,:),cvals{ival},'linear');
+        if ~any(isnan(cvals{ival}))
+          if length(conv{ival})==1
+            cvals{ival}=cvals{ival}.*conv{ival};
+          else
+            try
+              cvals{ival}=interp1(conv{ival}(1,:),conv{ival}(2,:),cvals{ival},'linear');
+            catch ME
+              ME.getReport
+              error(ME.message)
+            end
+          end
         end
       end
     end
