@@ -2,7 +2,7 @@ function [h0,h1] = AddMagnetPlot( istart, iend, han, opt )
 %
 % ADDMAGNETPLOT -- add a MAD-style bar schematic of magnets to a plot.
 %
-% [h0,h1] = AddMagnetPlot( istart, iend ) adds a bar over the current plot
+% [h0,h1] = AddMagnetPlot( istart, iend [,han,opt]) adds a bar over the current plot
 %    showing, schematically, the magnets which are in the plot in a style
 %    familiar to users of MAD and other such accelerator simulations.
 %    Arguments istart and iend are the index numbers of the first and last
@@ -30,7 +30,7 @@ if ~exist('han','var') || isempty(han) ,han=gcf;end
 if ishandle(istart) && isempty(iend)
   fhan=get((get(istart,'Parent')),'Parent');
   if isprop(fhan,'ButtonDownFcn') && ~isempty(get(fhan,'ButtonDownfcn'))
-    hObject=fhan; set(fhan,'UserData',str2double(get(istart,'Tag'))); %#ok<NASGU>
+    hObject=fhan; set(fhan,'UserData',str2double(get(istart,'Tag')));
     callbackfun=get(fhan,'ButtonDownfcn');
     callbackfun(hObject,[]);
   end
@@ -157,6 +157,7 @@ top=[];
 frac=1;
 if exist('opt','var') && isequal(lower(opt),'replace')
   h0=get(han,'Children');
+  if isprop(han,'XLim'); h0=han; end;
   v=get(h0(1),'Position');
   bottom=min([bottom,v(2)]);
   top=max([top,v(2)+v(4)]);
@@ -185,7 +186,6 @@ end % if ~han
 % get horizontal position and width, horizontal axis limits, and title
 found=0;
 p0=get(h0(1),'Position');
-axes(h0(1));
 v0=axis(h0(1));
 n=0;
 while ((n<length(h0))&&(~found))
@@ -210,7 +210,7 @@ set(h1,'Visible','off');
 
 % plot the magnet schematic
 
-hold on
+hold(h1,'on');
 
 for count = 1:nElem
 
@@ -226,14 +226,14 @@ for count = 1:nElem
       y = -barHeight(count) ; h = barHeight(count) ;
   end
   color = barColor(count) ;
-  rhan=rectangle('Position',[x,y,w,h],'FaceColor',color) ;
+  rhan=rectangle('Position',[x,y,w,h],'FaceColor',color,'Parent',h0) ;
   % Set internal data identifying this object if clicked on
   set(rhan,'ButtonDownFcn',@AddMagnetPlot)
   set(rhan,'Tag',num2str(eletag(count)));
 
 end
 
-hold off
+hold(h1,'off');
 
 % stick the title over everything
 
