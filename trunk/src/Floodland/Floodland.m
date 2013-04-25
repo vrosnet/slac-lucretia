@@ -35,7 +35,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
     repRate=10; % repetition rate of machine
     latticeName % Name of lattice associated with this Floodland instance
     latticeDate % Date of lattice, datenum format
-    magTrimStyle='PTRB'; % PTRB or TRIM (implemented by low level controls)
+    magTrimStyle='TRIM'; % PTRB or TRIM (implemented by low level controls)
     timezone % hours east GMT (set by constructor)
   end
   properties(Access=private)
@@ -546,6 +546,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
           comstackVals(end+1,1)=PS(ips).preCommand{2}{2};
           comstackProto{end+1,1}=proto;
         end
+        conv2=PS(ips).conv2{2};
         if chanindx{n}(1) && ~isempty(hwindx{n})
           % Get trim or main pv names to use and vals to set
           trimVal=0;
@@ -558,21 +559,23 @@ classdef Floodland < handle & matlab.mixin.Copyable
             if isnan(trimVal) || ~isnumeric(trimVal)
               error('Lucretia:Floodland:psTrim:noTrimControls','Bad response from Trim controls for PS %d',ips)
             end % if bad val returned
+            if PS(ips).trimUnipolar; trimVal=abs(trimVal); end;
+            if length(conv2)>1
+              trimVal=interp1(conv2(1,:),conv2(2,:),trimVal,'linear')/B(n);
+            else
+              trimVal=(trimVal*conv2)/B(n);
+            end
           end % if 2 pv's (main and trim)
-          mainVal=cell2mat(obj.cntrlGet(PS(ips).pvname{1},proto,PS(ips).conv{2}),'force');
-          conv2=PS(ips).conv2{2};
-          if PS(ips).trimUnipolar; trimVal=abs(trimVal); end;
-          if PS(ips).unipolar; mainVal=abs(mainVal); end;
-          if length(conv2)>1
-            trimVal=interp1(conv2(1,:),conv2(2,:),trimVal,'linear')/B(n);
-            mainVal=interp1(conv2(1,:),conv2(2,:),mainVal,'linear')/B(n);
-          else
-            trimVal=(trimVal*conv2)/B(n);
-            mainVal=(mainVal*conv2)/B(n);
-          end
           % Use trim PV if available and in range, else use main
           if ~isempty(PS(ips).trimpv{2}) && (isempty(PS(ips).trimHigh(1)) || (PS(ips).SetPt-mainVal)<PS(ips).trimHigh(1)) && ...
               (isempty(PS(ips).trimLow(1)) || (PS(ips).SetPt-mainVal)>PS(ips).trimLow(1))
+            mainVal=cell2mat(obj.cntrlGet(PS(ips).pvname{1},proto,PS(ips).conv{2}),'force');
+            if PS(ips).unipolar; mainVal=abs(mainVal); end;
+            if length(conv2)>1
+              mainVal=interp1(conv2(1,:),conv2(2,:),mainVal,'linear')/B(n);
+            else
+              mainVal=(mainVal*conv2)/B(n);
+            end
             comstack{end+1}=PS(ips).trimpv{2};
             comstackProto{end+1}=proto;
             val=PS(ips).SetPt-mainVal;
@@ -588,8 +591,8 @@ classdef Floodland < handle & matlab.mixin.Copyable
               conv=-conv;
             end
           % else use the main curret control device
-          elseif (isempty(PS(ips).high) || (PS(ips).SetPt-trimVal)<PS(ips).high) && ...
-              (isempty(PS(ips).low) || (PS(ips).SetPt-trimVal)>PS(ips).low)
+          elseif (isempty(PS(ips).high(2)) || (PS(ips).SetPt-trimVal)<PS(ips).high(2)) && ...
+              (isempty(PS(ips).low(2)) || (PS(ips).SetPt-trimVal)>PS(ips).low(2))
             comstack{end+1}=PS(ips).pvname{2};
             comstackProto{end+1}=proto;
             val=PS(ips).SetPt-trimVal;
@@ -634,6 +637,9 @@ classdef Floodland < handle & matlab.mixin.Copyable
               comstackVals(end,1)=interp1(conv(2,:),conv(1,:),comstackVals(end,1),'linear');
             end
           end
+          % If multiple magnets sharing same boost, set average B field to
+          % each magnet
+          comstackVals(end)=comstackVals(end)/length(PS(ips).auxbst);
         end
         % Any post processing commands?
         if ~isempty(PS(ips).postCommand{2})

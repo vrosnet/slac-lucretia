@@ -127,7 +127,8 @@ classdef Match < handle & physConsts
   end
   properties(Constant)
     allowedMatchTypes={'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'NEmit_x' 'NEmit_y' 'eta_x' ...
-      'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'SigmaFit' 'User' 'Sigma' 'R' 'T' 'U' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y'};
+      'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'SigmaGauss' 'SigmaFit' 'User' 'Sigma' 'R' ...
+      'T' 'U' 'Waist_x' 'Waist_y' 'Disp_x' 'Disp_y' 'SumBeta' 'MinBeta' 'MaxBeta'};
     allowedVariableTypes={'PS' 'GIRDER' 'KLYSTRON' 'BEAMLINE' 'BUMP' 'INITIAL'};
     allowedOptimMethods={'gradDrop' 'fminsearch' 'fmincon' 'lsqnonlin' 'genetic' 'fgoalattain'};
   end
@@ -447,8 +448,8 @@ classdef Match < handle & physConsts
       end
     end
     function out=get.dotwiss(obj)
-      % Check for match requirements to see if tracking is required
-      if any(ismember(obj.matchType,{'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'eta_x' 'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'R'}))
+      % Check for match requirements to see if twiss calculation is required
+      if any(ismember(obj.matchType,{'alpha_x' 'alpha_y' 'beta_x' 'beta_y' 'eta_x' 'etap_x' 'eta_y' 'etap_y' 'nu_x' 'nu_y' 'R' 'SumBeta'}))
         out=true;
       else
         out=false;
@@ -789,6 +790,12 @@ classdef Match < handle & physConsts
           for itype=1:length(obj.matchType)
             if obj.matchInd(itype)~=obj.iMatch(itrack); continue; end;
             switch obj.matchType{itype}
+              case 'SumBeta'
+                F(itype)=T.betax(end)+T.betay(end);
+              case 'MinBeta'
+                F(itype)=min([T.betax(end),T.betay(end)]);
+              case 'MaxBeta'
+                F(itype)=max([T.betax(end),T.betay(end)]);
               case 'R'
                 [~,R]=RmatAtoB(obj.iInitial,obj.iMatch(itrack));
                 F(itype)=R(str2double(obj.matchTypeQualifiers{itype}(1)),str2double(obj.matchTypeQualifiers{itype}(2)));

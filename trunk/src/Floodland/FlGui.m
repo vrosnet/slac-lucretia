@@ -240,7 +240,7 @@ classdef FlGui < handle
       end
     end
     function guiLoadMessageboxData(obj,data,dataOrder)
-      [dat nI]=sort(dataOrder);
+      [~, nI]=sort(dataOrder);
       obj.guiAddToMessagebox('<<>>clear<<>>');
       if ~isempty(data)
         for idata=1:length(nI)

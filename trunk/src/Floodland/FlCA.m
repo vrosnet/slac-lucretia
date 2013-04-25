@@ -130,18 +130,20 @@ while ismissing && ~isempty(pvlist)
       uType=unique(type);
       uType=uType(~cellfun(@(x) isempty(x),uType));
       for itype=1:length(uType)
-        query = sprintf('MAGNETSET%s',uType{itype});
-        da.setParam('MAGFUNC', trimStyle);
+%         daV=DaValue;
+%         daV.type=0;
         stringsParam = pvname(ismember(type,uType));
         setValues = varargin{3}(ismember(type,uType));
-        daV=DaValue;
-        daV.type=0;
-        daV.addElement(DaValue(stringsParam));
-        daV.addElement(DaValue(setValues));
+%         daV.addElement(DaValue(stringsParam{1}));
+%         daV.addElement(DaValue(single(setValues(1))));
+%         da.reset;
+%         query = sprintf('MAGNETSET%s',uType{itype});
+%         da.setParam('MAGFUNC', trimStyle);
+%         da.setParam('LIMITCHECK','SOME');
         ntries=0;
-        while ntries<10
+        while ntries<3
           try
-            da.setDaValue(query, daV);
+            control_magnetSet(stringsParam, setValues);
             break
           catch
             ntries=ntries+1;
