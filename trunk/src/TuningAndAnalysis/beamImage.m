@@ -132,14 +132,14 @@ else
 end
 warning on MATLAB:rankDeficientMatrix
 warning on MATLAB:nearlySingularMatrix
-sigy=q(4);
+sigE=q(4);
 h1=barh(u,v);
 ylim=get(gca,'YLim');
 set(h1,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
 hold on
 plot(yfit,u,'r-')
 hold off
-title(sprintf('\\sigma_E = %.1f %% RMS = %.1f %%',abs(sigy),100*(std(E)/mean(E))))
+title(sprintf('\\sigma_E = %.1f %% RMS = %.1f %%',abs(sigE),100*(std(E)/mean(E))))
 ylabel('dP (%)')
 
 subplot(224)
@@ -172,8 +172,6 @@ end
 
 subplot(222)
 id=intersect(idz,iddp);
-rmsx=std(z(id));
-rmsy=std(dp(id));
 beamprof=hist2(z(id),dp(id), ...
   linspace(xlim(1),xlim(2),npix),linspace(ylim(1),ylim(2),npix));
 imagesc(xlim,ylim,beamprof)
