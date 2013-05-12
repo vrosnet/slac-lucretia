@@ -37,6 +37,7 @@ classdef Floodland < handle & matlab.mixin.Copyable
     latticeDate % Date of lattice, datenum format
     magTrimStyle='TRIM'; % PTRB or TRIM (implemented by low level controls)
     timezone % hours east GMT (set by constructor)
+    serverMode=false; % Operating in text only (possibly bg) mode (supress GUI operations)
   end
   properties(Access=private)
     seed % random number seed
