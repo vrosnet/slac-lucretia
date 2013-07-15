@@ -226,7 +226,7 @@ for count = 1:nElem
       y = -barHeight(count) ; h = barHeight(count) ;
   end
   color = barColor(count) ;
-  rhan=rectangle('Position',[x,y,w,h],'FaceColor',color,'Parent',h0) ;
+  rhan=rectangle('Position',[x,y,w,h],'FaceColor',color,'Parent',h1) ;
   % Set internal data identifying this object if clicked on
   set(rhan,'ButtonDownFcn',@AddMagnetPlot)
   set(rhan,'Tag',num2str(eletag(count)));

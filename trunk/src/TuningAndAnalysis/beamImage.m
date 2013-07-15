@@ -15,9 +15,9 @@ rays=beam.Bunch.x(:,id)';
 
 name={'X (um)','PX (ur)','Y (um)','PY (ur)','Z (um)','dP (%)'};
 conv=[1e6,1e6,1e6,1e6,1e6,1e2];
-nbin=100;
+nbin=150;
 asym=true;
-npix=750;
+npix=250;
 
 x=conv(1)*rays(:,1);
 px=conv(2)*rays(:,2);
@@ -143,6 +143,7 @@ title(sprintf('\\sigma_E = %.1f %% RMS = %.1f %%',abs(sigE),100*(std(E)/mean(E))
 ylabel('dP (%)')
 
 subplot(224)
+% [v,u]=hist(z(z>337),nbin);
 [v,u]=hist(z,nbin);
 warning off MATLAB:rankDeficientMatrix
 warning off MATLAB:nearlySingularMatrix
