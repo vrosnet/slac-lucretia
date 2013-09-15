@@ -11,32 +11,32 @@
 #  - type "make" to build mex executable files
 #  - type "make install" to move mex files to their correct
 #    installation directories
+#  - type "make gpu" to build mex files which support GPU operation
+#    requires >R2013a, compiled mex files have _gpu suffix
 #
 # Auth: GW: Aug 4 2011
-# Mod: 
+# Mod: GW: July 17 2013
+#         - Added GPU compile steps
 #
 #===================================================================
 
 # Link to matlab installation directory
- MATPATH = /var/MATLAB/R2012a
-# Name of mex file extension for this architecture (mexglx or mexa64)
+ MATPATH = /var/MATLAB/R2013a
+# Name of mex file extension for this architecture (mexglx or mexa64 or mexmaci64)
  MEXEXT = mexa64
 
-  MCOMP = $(MATPATH)/bin/mex
-  CCOMP = gcc
-# Include "-DGPU" if compiling with cuda libraries
-  CFLAGS= -v -c -fPIC -ansi -D_GNU_SOURCE -pthread 
-#-I/var/MATLAB/R2011a/extern/include
-#-D__CUDA_ARCH__
-# Use this for release code
-  COPTIMFLAGS= -O3 -DNDEBUG
-# Use this for debugging code
-#  COPTIMFLAGS = -g
+ MCOMP = $(MATPATH)/bin/mex
+ CCOMP = $(MATPATH)/bin/mex -c
+ CFLAGS = -DLUCRETIA_DPREC # include -DLUCRETIA_DPREC to compile for double precision, else single
+ MFLAGS = -DLUCRETIA_DPREC
+ NVCC = nvcc # Cuda compiler
 
  LMAIN  = libLucretiaMain.a
  LMATL  = libLucretiaMatlab.a
 
-all : GetRmats.$(MEXEXT) GetTwiss.$(MEXEXT) RmatAtoB.$(MEXEXT) TrackThru.$(MEXEXT)  VerifyLattice.$(MEXEXT)
+cpu : cpu_init GetRmats.$(MEXEXT) GetTwiss.$(MEXEXT) RmatAtoB.$(MEXEXT) TrackThru.$(MEXEXT)  VerifyLattice.$(MEXEXT)
+
+gpu : gpu_init TrackThru_gpu.$(MEXEXT)
 
 release::
 	-mv GetRmats.$(MEXEXT) ../RMatrix
@@ -45,29 +45,41 @@ release::
 	-mv TrackThru.$(MEXEXT) ../Tracking
 	-mv VerifyLattice.$(MEXEXT) ../LatticeVerification
 
+cpu_init::
+	-cp mexopts_gcc.sh mexopts.sh
+
+gpu_init::
+	-cp mexopts-gpu.sh mexopts.sh
+
 # Mex files:
  GetRmats.$(MEXEXT) : $(LMAIN) $(LMATL) GetRmats.c
-	$(MCOMP) GetRmats.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) $(MFLAGS) GetRmats.c -L. -lLucretiaMatlab -lLucretiaMain
  GetTwiss.$(MEXEXT) : $(LMAIN) $(LMATL) GetTwiss.c
-	$(MCOMP) GetTwiss.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) $(MFLAGS) GetTwiss.c -L. -lLucretiaMatlab -lLucretiaMain
  RmatAtoB.$(MEXEXT) : $(LMAIN) $(LMATL) RmatAtoB.c
-	$(MCOMP) RmatAtoB.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) $(MFLAGS) RmatAtoB.c -L. -lLucretiaMatlab -lLucretiaMain
  TrackThru.$(MEXEXT) : $(LMAIN) $(LMATL) TrackThru.c
-	$(MCOMP) -v TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) $(MFLAGS) -v TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
  VerifyLattice.$(MEXEXT) : $(LMAIN) $(LMATL) VerifyLattice.c
-	$(MCOMP) VerifyLattice.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) $(MFLAGS) VerifyLattice.c -L. -lLucretiaMatlab -lLucretiaMain
+ TrackThru_gpu.$(MEXEXT) : TrackThru_gpu.o GPULINK
+	g++ -O -pthread -shared -Wl,--version-script,$(MATPATH)/extern/lib/glnxa64/mexFunction.map -Wl,--no-undefined -o  "TrackThru_gpu.$(MEXEXT)"  TrackThru_gpu.o  "LucretiaMatlab_gpu.o"  "LucretiaMatlabErrMsg_gpu.o"  "LucretiaPhysics_gpu.o"  "LucretiaCommon_gpu.o" "gpulink.o"  -Wl,-rpath-link,$(MATPATH)/bin/glnxa64 -L$(MATPATH)/bin/glnxa64 -lmx -lmex -lmat -lm -lmwgpu $(MATPATH)/bin/glnxa64/libcudart.so.5.0
+
 
 # LucretiaMain library:
 
  $(LMAIN) : $(LMATL)\
 	$(LMAIN)(LucretiaCommon.o) \
-	$(LMAIN)(LucretiaPhysics.o) 
+	$(LMAIN)(LucretiaPhysics.o)
 
 # LucretiaMatlab library
 
  $(LMATL) : \
 	$(LMATL)(LucretiaMatlab.o) \
 	$(LMATL)(LucretiaMatlabErrMsg.o)
+
+GPULINK : LucretiaPhysics_gpu.o LucretiaCommon_gpu.o LucretiaMatlab_gpu.o LucretiaMatlabErrMsg_gpu.o TrackThru_gpu.o
+	$(NVCC) -gencode=arch=compute_20,code=sm_20 -dlink -rdc=true --compiler-options=-ansi,-D_GNU_SOURCE,-fPIC,-fno-omit-frame-pointer,-pthread LucretiaMatlab_gpu.o LucretiaMatlabErrMsg_gpu.o LucretiaPhysics_gpu.o LucretiaCommon_gpu.o TrackThru_gpu.o -o gpulink.o
 
 clean::
 	-rm -f *.o
@@ -84,7 +96,7 @@ $(LMAIN)(LucretiaCommon.o) : \
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaCommon.c
 	ar -ru $(LMAIN) LucretiaCommon.o
 	rm LucretiaCommon.o
-	sleep 1
+	
 
 $(LMAIN)(LucretiaPhysics.o) : \
    LucretiaPhysics.c LucretiaCommon.h LucretiaPhysics.h \
@@ -92,7 +104,7 @@ $(LMAIN)(LucretiaPhysics.o) : \
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaPhysics.c
 	ar -ru $(LMAIN) LucretiaPhysics.o
 	rm LucretiaPhysics.o
-	sleep 1
+	
 
 $(LMATL)(LucretiaMatlab.o) : \
    LucretiaMatlab.c LucretiaGlobalAccess.h LucretiaMatlab.h \
@@ -100,12 +112,52 @@ $(LMATL)(LucretiaMatlab.o) : \
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlab.c
 	ar -ru $(LMATL) LucretiaMatlab.o
 	rm LucretiaMatlab.o
-	sleep 1
+	
 
 $(LMATL)(LucretiaMatlabErrMsg.o) : \
    LucretiaMatlabErrMsg.c LucretiaGlobalAccess.h
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlabErrMsg.c
 	ar -ru $(LMATL) LucretiaMatlabErrMsg.o
 	rm LucretiaMatlabErrMsg.o
-	sleep 1
+	
 
+# GPU object file dependencies:
+
+LucretiaCommon_gpu.o : \
+   LucretiaCommon.c LucretiaCommon.h LucretiaPhysics.h \
+   LucretiaGlobalAccess.h LucretiaVersionProto.h \
+   LucretiaDictionary.h 
+	-cp LucretiaCommon.c LucretiaCommon_gpu.cu
+	sed -i 's/void TrackBunchThruDrift_kernel/__global__ void TrackBunchThruDrift_kernel/g' LucretiaCommon_gpu.cu
+	sed -i 's/void TrackBunchThruQSOS_kernel/__global__ void TrackBunchThruQSOS_kernel/g' LucretiaCommon_gpu.cu
+	sed -i 's/void TrackBunchThruMult_kernel/__global__ void TrackBunchThruMult_kernel/g' LucretiaCommon_gpu.cu
+	sed -i 's/void TrackBunchThruSBend_kernel/__global__ void TrackBunchThruSBend_kernel/g' LucretiaCommon_gpu.cu
+	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaCommon_gpu.cu
+	
+
+LucretiaPhysics_gpu.o : \
+   LucretiaPhysics.c LucretiaCommon.h LucretiaPhysics.h \
+   LucretiaGlobalAccess.h LucretiaVersionProto.h 
+	-cp LucretiaPhysics.c LucretiaPhysics_gpu.cu
+	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaPhysics_gpu.cu
+
+LucretiaMatlab_gpu.o : \
+   LucretiaMatlab.c LucretiaGlobalAccess.h LucretiaMatlab.h \
+   LucretiaVersionProto.h
+	-cp LucretiaMatlab.c LucretiaMatlab_gpu.cu
+	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlab_gpu.cu
+	
+
+LucretiaMatlabErrMsg_gpu.o : \
+   LucretiaMatlabErrMsg.c LucretiaGlobalAccess.h
+	-cp LucretiaMatlabErrMsg.c LucretiaMatlabErrMsg_gpu.cu
+	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlabErrMsg_gpu.cu
+	
+
+TrackThru_gpu.o : TrackThru_gpu.cu
+	$(NVCC) -c  -I$(MATPATH)/extern/include -I$(MATPATH)/simulink/include -DMATLAB_MEX_FILE --relocatable-device-code=true -gencode=arch=compute_20,code=sm_20 -I$(MATPATH)/toolbox/distcomp/gpu/extern/include --compiler-options=-ansi,-D_GNU_SOURCE,-fPIC,-fno-omit-frame-pointer,-pthread  -DLUCRETIA_DPREC -DMX_COMPAT_32 -O $(CFLAGS)  "TrackThru_gpu.cu"
+	
+
+TrackThru_gpu.cu : \
+   TrackThru.c
+	-cp TrackThru.c TrackThru_gpu.cu

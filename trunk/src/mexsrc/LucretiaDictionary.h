@@ -94,7 +94,7 @@ const int VerifyPars = 2 ;
 	int TrackFlagMaxValue[NUM_TRACK_FLAGS] = {
 		SR_HB, 1, 1, 1, 1, 
 		    1, 1, 1, 1, 1,
-		    1, 1, 1, 1000, 100, 1000, 1000
+		    1, 1, 1, 10000, 1000, 1000, 1000
 	} ;
 
 

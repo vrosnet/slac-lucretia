@@ -1,140 +1,143 @@
 /* LucretiaCommon.c
- This file contains routines which are common to the Matlab and Octave
- implementations of Lucretia, but which are "above" the level of physics
- operations.  Typically routines in here are called by procedures at the
- mexfile level, and call procedures at the physics level.
- 
- Contents:
- 
- LucretiaCommonVersion
- RmatCalculate
- RmatCopy
- RmatProduct
- TrackThruMain
- TrackBunchThruDrift
- TrackBunchThruQSOS
- TrackBunchThruMult
- TrackBunchThruSBend
- TrackBunchThruRF
- TrackBunchThruBPM
- TrackBunchThruInst
- TrackBunchThruCorrector
- TrackBunchThruCollimator
- TrackBunchThruCoord
- GetTrackingFlags
- CheckAperStopPart
- CheckP0StopPart
- CheckPperpStopPart
- GetTotalOffsetXfrms
- ApplyTotalXfrm
- BPMInstIndexingSetup
- BunchSlotSetup
- FreeAndNull
- BadElementMessage
- BadPSMessage
- BadKlystronMessage
- BadTwissMessage
- BadInverseTwissMessage
- BadTrackFlagMessage
- BadApertureMessage
- BadSROptionsMessage
- BadParticleMomentumMessage
- BadParticlePperpMessage
- BadInitMomentumMessage
- BadOffsetMessage
- BadBPMAllocMsg
- BadSliceAllocMessage
- BadSRWFAllocMsg
- BadSRWFMessage
- NonexistentLRWFmessage
- BadLRWFAllocMessage
- BadLRWFBunchOrder
- BunchStopMessage
- ClearTrackingVars
- LcavSliceSetup
- SBPMSetup
- SBPMSetS
- ComputeSBPMReadings
- ClearConvolvedSRWF
- ClearBinnedLRWFFreq
- GetDatabaseParameters
- GetSpecialSBendPar
- GetDesignLorentzDelay
- XYExchange
- InitialMomentumCheck
- GetLocalCoordPtrs
- CheckGirderMoverPars
- GetDBValue
- VerifyLattice
- VerifyParameters
- ElemIndexLookup 
- UnpackLRWFFreqData
- ComputeLRWFFreqDamping
- ComputeLRWFFreqPhase
- PrepareAllWF
- GetThisElemTLRFreqKick 
- PutThisElemTLRFreqKick
- ComputeTSRKicks
- AccumulateWFBinPositions
- ClearOldLRWFFreqKicks
- XGPU2CPU
- XCPU2GPU
- 
- /* AUTH:  PT, 03-aug-2004 */
+ * This file contains routines which are common to the Matlab and Octave
+ * implementations of Lucretia, but which are "above" the level of physics
+ * operations.  Typically routines in here are called by procedures at the
+ * mexfile level, and call procedures at the physics level.
+ *
+ * Contents:
+ *
+ * LucretiaCommonVersion
+ * RmatCalculate
+ * RmatCopy
+ * RmatProduct
+ * TrackThruMain
+ * TrackBunchThruDrift
+ * TrackBunchThruQSOS
+ * TrackBunchThruMult
+ * TrackBunchThruSBend
+ * TrackBunchThruRF
+ * TrackBunchThruBPM
+ * TrackBunchThruInst
+ * TrackBunchThruCorrector
+ * TrackBunchThruCollimator
+ * TrackBunchThruCoord
+ * GetTrackingFlags
+ * CheckAperStopPart
+ * CheckP0StopPart
+ * CheckPperpStopPart
+ * GetTotalOffsetXfrms
+ * ApplyTotalXfrm
+ * BPMInstIndexingSetup
+ * BunchSlotSetup
+ * FreeAndNull
+ * BadElementMessage
+ * BadPSMessage
+ * BadKlystronMessage
+ * BadTwissMessage
+ * BadInverseTwissMessage
+ * BadTrackFlagMessage
+ * BadApertureMessage
+ * BadSROptionsMessage
+ * BadParticleMomentumMessage
+ * BadParticlePperpMessage
+ * BadInitMomentumMessage
+ * BadOffsetMessage
+ * BadBPMAllocMsg
+ * BadSliceAllocMessage
+ * BadSRWFAllocMsg
+ * BadSRWFMessage
+ * NonexistentLRWFmessage
+ * BadLRWFAllocMessage
+ * BadLRWFBunchOrder
+ * BunchStopMessage
+ * ClearTrackingVars
+ * LcavSliceSetup
+ * SBPMSetup
+ * SBPMSetS
+ * ComputeSBPMReadings
+ * ClearConvolvedSRWF
+ * ClearBinnedLRWFFreq
+ * GetDatabaseParameters
+ * GetSpecialSBendPar
+ * GetDesignLorentzDelay
+ * XYExchange
+ * InitialMomentumCheck
+ * GetLocalCoordPtrs
+ * CheckGirderMoverPars
+ * GetDBValue
+ * VerifyLattice
+ * VerifyParameters
+ * ElemIndexLookup
+ * UnpackLRWFFreqData
+ * ComputeLRWFFreqDamping
+ * ComputeLRWFFreqPhase
+ * PrepareAllWF
+ * GetThisElemTLRFreqKick
+ * PutThisElemTLRFreqKick
+ * ComputeTSRKicks
+ * AccumulateWFBinPositions
+ * ClearOldLRWFFreqKicks
+ * XGPU2CPU
+ * XCPU2GPU
+ *
+ * /* AUTH:  PT, 03-aug-2004 */
 /* MOD:
- 02-aug-2007, PT:
- bugfix in CheckAperStopPart, code clean-up in 
- TrackBunchThruSBend, and minor correction to the handling of 
- synchrotron radiation in TrackBunchThruSBend.
- 24-May-2007, PT:
- bugfix: check for bad total or transverse momentum on 
- TrackThruMain entry was not performed correctly.  New arglist
- for CheckP0StopPart which differentiates between performing
- the check on the upstream vs downstream face of an element.
- 21-May-2007, PT:
- support for XYCOR element.
- 13-feb-2007, PT:
- bugfix:  correction to loop logic in CheckGirderMoverPars.
- Correct handling of COORD and DRIF elements in lattice 
- verification.
- 03-nov-2006, PT:
- bugfix:  correction to logic for finding the center
- S position of a long girder in GetTotalOffsetXfrms.
- 26-jun-2006, PT:
- bugfix:  multipole magnet power supplies not handled 
- correctly in RmatCalculate.
- 08-mar-2006, PT:
- support for coupled Twiss calculations and solenoids.
- 10-feb-2006, PT:
- support for COORD element type.
- 06-dec-2005, PT:
- support for synchrotron radiation; x/y correctors now
- produce dispersion in twiss/Rmat operation.
- 18-oct-2005, PT:
- support for BPM scale factors.
- 30-sep-2005, PT:
- support for transverse cavities (TCAVs).
- 29-sep-2005, PT:
- support for multiple power supplies and error factors for
- a sector bend magnet.
- 16-sep-2005, PT:
- change handling of sector bend transport -- use the new
- GetLucretiaSBendMap function rather than the old
- GetMADSBendMap.
- 09-Aug-2005, PT:
- bugfix to CheckGirderMoverPars and GetTotalOffsetXfrms:
- tracking would crash if a mover with roll DOF was specified
- due to an indexing problem in CheckGirderMoverPars coupled
- with an improperly-handled return status (==2) in the calling
- routine (GetTotalOffsetXfrms).
+ * 02-aug-2007, PT:
+ * bugfix in CheckAperStopPart, code clean-up in
+ * TrackBunchThruSBend, and minor correction to the handling of
+ * synchrotron radiation in TrackBunchThruSBend.
+ * 24-May-2007, PT:
+ * bugfix: check for bad total or transverse momentum on
+ * TrackThruMain entry was not performed correctly.  New arglist
+ * for CheckP0StopPart which differentiates between performing
+ * the check on the upstream vs downstream face of an element.
+ * 21-May-2007, PT:
+ * support for XYCOR element.
+ * 13-feb-2007, PT:
+ * bugfix:  correction to loop logic in CheckGirderMoverPars.
+ * Correct handling of COORD and DRIF elements in lattice
+ * verification.
+ * 03-nov-2006, PT:
+ * bugfix:  correction to logic for finding the center
+ * S position of a long girder in GetTotalOffsetXfrms.
+ * 26-jun-2006, PT:
+ * bugfix:  multipole magnet power supplies not handled
+ * correctly in RmatCalculate.
+ * 08-mar-2006, PT:
+ * support for coupled Twiss calculations and solenoids.
+ * 10-feb-2006, PT:
+ * support for COORD element type.
+ * 06-dec-2005, PT:
+ * support for synchrotron radiation; x/y correctors now
+ * produce dispersion in twiss/Rmat operation.
+ * 18-oct-2005, PT:
+ * support for BPM scale factors.
+ * 30-sep-2005, PT:
+ * support for transverse cavities (TCAVs).
+ * 29-sep-2005, PT:
+ * support for multiple power supplies and error factors for
+ * a sector bend magnet.
+ * 16-sep-2005, PT:
+ * change handling of sector bend transport -- use the new
+ * GetLucretiaSBendMap function rather than the old
+ * GetMADSBendMap.
+ * 09-Aug-2005, PT:
+ * bugfix to CheckGirderMoverPars and GetTotalOffsetXfrms:
+ * tracking would crash if a mover with roll DOF was specified
+ * due to an indexing problem in CheckGirderMoverPars coupled
+ * with an improperly-handled return status (==2) in the calling
+ * routine (GetTotalOffsetXfrms).
  */
-
+#ifdef __CUDACC__
+#include "curand_kernel.h"
+#include "gpu/mxGPUArray.h"
+#endif
 #include "LucretiaCommon.h"       /* data & prototypes for this file */
 #include "LucretiaDictionary.h"   /* dictionary data */
 #include "LucretiaPhysics.h"      /* data & prototypes for physics module */
 #include "LucretiaGlobalAccess.h" /* data & prototypes for global var access */
 #include "LucretiaVersionProto.h" /* prototypes of version functions */
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
@@ -142,7 +145,7 @@
 /* File-scoped variables: */
 
 char LucretiaCommonVers[] = "LucretiaCommon Version = 02-August-2007" ;
-Rmat Identity ={ 
+Rmat Identity ={
   {1,0,0,0,0,0},
   {0,1,0,0,0,0},
   {0,0,1,0,0,0},
@@ -151,18 +154,18 @@ Rmat Identity ={
   {0,0,0,0,0,1}
 }; /* identity matrix */
 double T5xxQuad[10] ;              /* T5xx elements from normal F quadrupole:
-                                    in order 11,12,13,14,
-                                    22,23,24,
-                                    33,34,
-                                    44 */
+ * in order 11,12,13,14,
+ * 22,23,24,
+ * 33,34,
+ * 44 */
 
 /*=====================================================================*/
 
-/* Return the version date of this file to a caller somewhere else 
- 
- /* RET:   pointer to string LucretiaCommonVers.
- /* ABORT: never.
- /* FAIL:  never.                                                       */
+/* Return the version date of this file to a caller somewhere else
+ *
+ * /* RET:   pointer to string LucretiaCommonVers.
+ * /* ABORT: never.
+ * /* FAIL:  never.                                                       */
 
 char* LucretiaCommonVersion( )
 {
@@ -172,33 +175,33 @@ char* LucretiaCommonVersion( )
 /*=====================================================================*/
 
 /* Perform calculations related to R-matrices, including returning of
- R-mats and of Twiss parameters */
+ * R-mats and of Twiss parameters */
 
 /* RET:   one of the following:
- -> a pointer to an Rmat, which contains the R-matrix for the
- region in question.
- -> a pointer to an Rstruc, which contains R-matrices for each
- element in the region of interest.
- -> a pointer to a Twiss, which contains twiss parameters for
- each point in the region of interest.
- -> a pointer to a double matrix, which contains coupled twiss
- parameters for each point in the region of interest.
- -> a NULL pointer if a dynamic memory allocation failed.
- Furthermore, the following conditions will cause an error:
- -> an ill-constructed element is detected.  This can happen if a
- critical field is missing or corrupted (ie, improper type).  For
- all elements the S position, energy, and Class string are critical
- (energy must be > 0).  For quads, L, B, Tilt are critical (L must
- be > 0).  
- -> A magnet points at a power supply which has a missing or corrupted
- Ampl field.
- -> A twiss propagation fails (there are several possible causes of
- such a problem).
- In GetTwiss or RmatAtoB, any of these will cause an immediate exit
- with Args->Status = 0 (fatal error).  GetRmats will continue but
- with Args->Status = -1 on exit.
- FAIL:  never.                                                      */
-void* RmatCalculate( struct RmatArgStruc* Args ) 
+ * -> a pointer to an Rmat, which contains the R-matrix for the
+ * region in question.
+ * -> a pointer to an Rstruc, which contains R-matrices for each
+ * element in the region of interest.
+ * -> a pointer to a Twiss, which contains twiss parameters for
+ * each point in the region of interest.
+ * -> a pointer to a double matrix, which contains coupled twiss
+ * parameters for each point in the region of interest.
+ * -> a NULL pointer if a dynamic memory allocation failed.
+ * Furthermore, the following conditions will cause an error:
+ * -> an ill-constructed element is detected.  This can happen if a
+ * critical field is missing or corrupted (ie, improper type).  For
+ * all elements the S position, energy, and Class string are critical
+ * (energy must be > 0).  For quads, L, B, Tilt are critical (L must
+ * be > 0).
+ * -> A magnet points at a power supply which has a missing or corrupted
+ * Ampl field.
+ * -> A twiss propagation fails (there are several possible causes of
+ * such a problem).
+ * In GetTwiss or RmatAtoB, any of these will cause an immediate exit
+ * with Args->Status = 0 (fatal error).  GetRmats will continue but
+ * with Args->Status = -1 on exit.
+ * FAIL:  never.                                                      */
+void* RmatCalculate( struct RmatArgStruc* Args )
 {
   /* local variables */
   int count ;                         /* loop variable */
@@ -208,147 +211,147 @@ void* RmatCalculate( struct RmatArgStruc* Args )
   Rmat Relem ;                        /* for capturing R from physics routines */
   static Rmat Rtot ;                  /* A-to-B rmat */
   static struct Rstruc Reach ;        /* structure for each Rij */
-	static struct twiss Tall ;          /* structure for all twiss */
-	static struct Ctwiss Call ;         /* structure for all coupled twiss */
+  static struct twiss Tall ;          /* structure for all twiss */
+  static struct Ctwiss Call ;         /* structure for all coupled twiss */
   
-  double *L, *Edes ;                  /* general parameters */ 
-	double *S ;                         /* S position */
-	double Bfull, Lfull ;               /* local vars */
-	double Egain;                       /* momentum gain of element */
+  double *L, *Edes ;                  /* general parameters */
+  double *S ;                         /* S position */
+  double Bfull, Lfull ;               /* local vars */
+  double Egain;                       /* momentum gain of element */
   int PS, PS2 ;                       /* x-referencing pointers */
   int ReturnEach ;                    /* A-to-B or each RMAT? */
-	int PropagateTwiss ;                /* do we propagate twiss? */
-	int stat1 ;                         /* general status indicator */
+  int PropagateTwiss ;                /* do we propagate twiss? */
+  int stat1 ;                         /* general status indicator */
   char* ElemClass ;                   /* What kind of element is it? */
-	double BScale,GScale ;              /* scale factors for sector bends */
-	int iplane ;                        /* counter for Wolski dimensions */
-	int i ;                             /* general purpose counting */
+  double BScale,GScale ;              /* scale factors for sector bends */
+  int iplane ;                        /* counter for Wolski dimensions */
+  int i ;                             /* general purpose counting */
   
   /* and now for some flags which indicate some sort of problem:*/
   
-	int BadAllocate = 0 ;
-	int TwissStat ;
+  int BadAllocate = 0 ;
+  int TwissStat ;
   
   /* start by unpacking argument information as needed */
   
   start          = Args->start ;
   stop           = Args->end ;
   ReturnEach     = Args->ReturnEach ;
-	PropagateTwiss = Args->PropagateTwiss ;
+  PropagateTwiss = Args->PropagateTwiss ;
   
   /* since we no longer permit backwards looping, the number of matrices and the
-   direction are easy to determine */
+   * direction are easy to determine */
   
-	step = 1 ;
+  step = 1 ;
   nmat = stop-start + 1 ;
   
   /* nullify some pointers so that if allocation occurs it will be obvious
-   which ones are allocated and which are not */
+   * which ones are allocated and which are not */
   
-	Reach.matrix = NULL ;
-	Tall.E = NULL ;
-	Tall.S = NULL ;
-	Tall.TwissPars = NULL ;
-	Call.E = NULL ;
-	Call.S = NULL ;
-	Call.Twiss = NULL ;
+  Reach.matrix = NULL ;
+  Tall.E = NULL ;
+  Tall.S = NULL ;
+  Tall.TwissPars = NULL ;
+  Call.E = NULL ;
+  Call.S = NULL ;
+  Call.Twiss = NULL ;
   
   /* Are we doing an A-to-B or returning each one?  Do appropriate setup and
-   allocation now.  If any allocation fails, go to the exit without adding
-   a message to the pile (the calling routine will add the message) */
+   * allocation now.  If any allocation fails, go to the exit without adding
+   * a message to the pile (the calling routine will add the message) */
   
   if (ReturnEach == 1) /* allocate RMATs */
-	{
+  {
     Reach.matrix = (double*)calloc(nmat*36,sizeof(double)) ;
     if (Reach.matrix == NULL)
     {
-			BadAllocate = 1 ;
-			Args->Status = 0 ;
-			goto egress ;
+      BadAllocate = 1 ;
+      Args->Status = 0 ;
+      goto egress ;
     }
-	}
+  }
   else                 /* initialize Rtot to the identity */
     RmatCopy(Identity,Rtot) ;
   
-	if (PropagateTwiss == 1) 
-	{
-		Tall.nentry = 0 ;
-		Tall.S     = (double *)calloc(nmat+1,sizeof(double)) ;
-		Tall.E     = (double *)calloc(nmat+1,sizeof(double)) ;
-		Tall.TwissPars = (struct beta0*)calloc(nmat+1,sizeof(struct beta0)) ;
-		if ( (Tall.S == NULL)    || (Tall.E == NULL)     || 
-        (Tall.TwissPars == NULL)                       )
-		{
-			BadAllocate = 1 ;
-			Args->Status = 0 ;
-			goto egress ;
-		}
+  if (PropagateTwiss == 1)
+  {
+    Tall.nentry = 0 ;
+    Tall.S     = (double *)calloc(nmat+1,sizeof(double)) ;
+    Tall.E     = (double *)calloc(nmat+1,sizeof(double)) ;
+    Tall.TwissPars = (struct beta0*)calloc(nmat+1,sizeof(struct beta0)) ;
+    if ( (Tall.S == NULL)    || (Tall.E == NULL)     ||
+            (Tall.TwissPars == NULL)                       )
+    {
+      BadAllocate = 1 ;
+      Args->Status = 0 ;
+      goto egress ;
+    }
     /* now initialize the first entry in each vector in Tall, except for S and E */
     
-		Tall.TwissPars[0].betx  = Args->InitialTwiss.betx ;
-		Tall.TwissPars[0].alfx  = Args->InitialTwiss.alfx ;
-		Tall.TwissPars[0].etax  = Args->InitialTwiss.etax ;
-		Tall.TwissPars[0].etapx = Args->InitialTwiss.etapx ;
-		Tall.TwissPars[0].nux   = Args->InitialTwiss.nux ;
+    Tall.TwissPars[0].betx  = Args->InitialTwiss.betx ;
+    Tall.TwissPars[0].alfx  = Args->InitialTwiss.alfx ;
+    Tall.TwissPars[0].etax  = Args->InitialTwiss.etax ;
+    Tall.TwissPars[0].etapx = Args->InitialTwiss.etapx ;
+    Tall.TwissPars[0].nux   = Args->InitialTwiss.nux ;
     
-		Tall.TwissPars[0].bety  = Args->InitialTwiss.bety ;
-		Tall.TwissPars[0].alfy  = Args->InitialTwiss.alfy ;
-		Tall.TwissPars[0].etay  = Args->InitialTwiss.etay ;
-		Tall.TwissPars[0].etapy = Args->InitialTwiss.etapy ;
-		Tall.TwissPars[0].nuy   = Args->InitialTwiss.nuy ;    
+    Tall.TwissPars[0].bety  = Args->InitialTwiss.bety ;
+    Tall.TwissPars[0].alfy  = Args->InitialTwiss.alfy ;
+    Tall.TwissPars[0].etay  = Args->InitialTwiss.etay ;
+    Tall.TwissPars[0].etapy = Args->InitialTwiss.etapy ;
+    Tall.TwissPars[0].nuy   = Args->InitialTwiss.nuy ;
     
-	}
+  }
   
-	if (PropagateTwiss == 2) /* coupled Twiss */
-	{
-		Call.nentry = 0 ;
-		Call.S     = (double *)calloc(nmat+1,sizeof(double)) ;
-		Call.E     = (double *)calloc(nmat+1,sizeof(double)) ;
-		Call.Twiss = (double *)calloc( (nmat+1)*6*6*Args->nWolskiDimensions,
-                                  sizeof(double)) ;
-		if ( (Call.S == NULL)    || (Call.E == NULL)     || 
-        (Call.Twiss == NULL)                       )
-		{
-			BadAllocate = 1 ;
-			Args->Status = 0 ;
-			goto egress ;
-		}
+  if (PropagateTwiss == 2) /* coupled Twiss */
+  {
+    Call.nentry = 0 ;
+    Call.S     = (double *)calloc(nmat+1,sizeof(double)) ;
+    Call.E     = (double *)calloc(nmat+1,sizeof(double)) ;
+    Call.Twiss = (double *)calloc( (nmat+1)*6*6*Args->nWolskiDimensions,
+            sizeof(double)) ;
+    if ( (Call.S == NULL)    || (Call.E == NULL)     ||
+            (Call.Twiss == NULL)                       )
+    {
+      BadAllocate = 1 ;
+      Args->Status = 0 ;
+      goto egress ;
+    }
     
     /* initialize the first matrix in Call.twiss from the initial values */
     
-		for (i=0 ; i<36*Args->nWolskiDimensions ; i++)
-			Call.Twiss[i] = Args->InitialWolski[i] ;
+    for (i=0 ; i<36*Args->nWolskiDimensions ; i++)
+      Call.Twiss[i] = Args->InitialWolski[i] ;
     
-	}
+  }
   
   /* without any further ado, begin the loop over elements,
-   remembering that while the elements are indexed from 1..N in the calling
-   space, they are from 0..N-1 here. */
+   * remembering that while the elements are indexed from 1..N in the calling
+   * space, they are from 0..N-1 here. */
   
   count2 = 0 ;
-	count = start-1-step ;
+  count = start-1-step ;
   
   /* initialize good status */
   
-	stat1 = 1 ;
+  stat1 = 1 ;
   
-	do
+  do
   {
     count += step ;
     count2++ ;
     
     /* If a bad element is detected, add a bad element message to the pile.
-     If we are doing a GetRmats, continue with status = -1, otherwise end
-     the loop with status = 0. */
+     * If we are doing a GetRmats, continue with status = -1, otherwise end
+     * the loop with status = 0. */
     /* get the element class out of the BEAMLINE array */
     
     ElemClass = GetElemClass( count ) ;
-		if (ElemClass == NULL)
-		{
-			BadElementMessage( count+1 ) ;
-			stat1 = 0 ;
-			goto HandleStat1 ;
-		}
+    if (ElemClass == NULL)
+    {
+      BadElementMessage( count+1 ) ;
+      stat1 = 0 ;
+      goto HandleStat1 ;
+    }
     
     /* get the momentum and make sure it's not zero; get the S position */
     
@@ -378,8 +381,8 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     
     else if (strcmp(ElemClass,"QUAD")==0) /* quadrupole */
     {
-      stat1 = GetDatabaseParameters( count, nQuadPar, 
-                                    QuadPar, RmatPars, ElementTable ) ;
+      stat1 = GetDatabaseParameters( count, nQuadPar,
+              QuadPar, RmatPars, ElementTable ) ;
       Lfull = GetDBValue( QuadPar+QuadL ) ;
       if ( (stat1 == 0) || (Lfull <= 0) )
       {
@@ -396,14 +399,14 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       }
       
       /* see if it has a power supply.  If so, get its amplitude.  If the
-       amplitude is corrupted, set a bad status and goto egress, otherwise
-       update the magnet B-field setting */
+       * amplitude is corrupted, set a bad status and goto egress, otherwise
+       * update the magnet B-field setting */
       
       PS = (int)(GetDBValue(QuadPar+QuadPS)) ;
       if (PS != 0)
       {
         stat1 = GetDatabaseParameters( PS-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS, count+1 ) ;
@@ -412,18 +415,18 @@ void* RmatCalculate( struct RmatArgStruc* Args )
         Bfull *= GetDBValue(PSPar+PSAmpl) ;
       }
       
-			GetQuadMap( *(QuadPar[QuadL].ValuePtr),
-                 Bfull,
-                 *(QuadPar[QuadTilt].ValuePtr),
-                 *(QuadPar[QuadP].ValuePtr),
-                 Relem, T5xxQuad         ) ;
+      GetQuadMap( *(QuadPar[QuadL].ValuePtr),
+              Bfull,
+              *(QuadPar[QuadTilt].ValuePtr),
+              *(QuadPar[QuadP].ValuePtr),
+              Relem, T5xxQuad         ) ;
       
     }
     
     else if (strcmp(ElemClass,"SOLENOID")==0) /* solenoid */
     {
-      stat1 = GetDatabaseParameters( count, nSolePar, 
-                                    SolePar, RmatPars, ElementTable ) ;
+      stat1 = GetDatabaseParameters( count, nSolePar,
+              SolePar, RmatPars, ElementTable ) ;
       Lfull = GetDBValue( SolePar+SoleL ) ;
       if ( (stat1 == 0) || (Lfull <= 0) )
       {
@@ -440,14 +443,14 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       }
       
       /* see if it has a power supply.  If so, get its amplitude.  If the
-       amplitude is corrupted, set a bad status and goto egress, otherwise
-       update the magnet B-field setting */
+       * amplitude is corrupted, set a bad status and goto egress, otherwise
+       * update the magnet B-field setting */
       
       PS = (int)(GetDBValue(SolePar+SolePS)) ;
       if (PS != 0)
       {
         stat1 = GetDatabaseParameters( PS-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS, count+1 ) ;
@@ -456,37 +459,37 @@ void* RmatCalculate( struct RmatArgStruc* Args )
         Bfull *= GetDBValue(PSPar+PSAmpl) ;
       }
       
-			GetSolenoidMap( *(SolePar[QuadL].ValuePtr),
-                     Bfull,
-                     *(SolePar[QuadP].ValuePtr),
-                     Relem, T5xxQuad         ) ;
+      GetSolenoidMap( *(SolePar[QuadL].ValuePtr),
+              Bfull,
+              *(SolePar[QuadP].ValuePtr),
+              Relem, T5xxQuad         ) ;
       
     }
     
     else if (strcmp(ElemClass,"MULT")==0) /* multipole */
     {
       int pole ;
-      RmatCopy(Identity,Relem) ;		  
-      stat1 = GetDatabaseParameters( count, nMultPar, 
-                                    MultPar, RmatPars, ElementTable ) ;
+      RmatCopy(Identity,Relem) ;
+      stat1 = GetDatabaseParameters( count, nMultPar,
+              MultPar, RmatPars, ElementTable ) ;
       Lfull = GetDBValue( MultPar+MultL ) ;
       Relem[0][1] = Lfull ;
       Relem[2][3] = Lfull ;
-      if (stat1 == 0) 
+      if (stat1 == 0)
       {
         BadElementMessage( count+1 ) ;
         goto HandleStat1 ;
       }
       
       /* see if it has a power supply.  If so, get its amplitude.  If the
-       amplitude is corrupted, set a bad status and goto egress, otherwise
-       update the magnet B-field setting */
+       * amplitude is corrupted, set a bad status and goto egress, otherwise
+       * update the magnet B-field setting */
       
       PS = (int)(GetDBValue(MultPar+MultPS)) ;
       if (PS != 0)
       {
         stat1 = GetDatabaseParameters( PS-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS, count+1 ) ;
@@ -497,8 +500,8 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       else
         Bfull = 1. ;
       
-      /* see if it has either bending or quadrupole fields, if so put them into the 
-       matrix */
+      /* see if it has either bending or quadrupole fields, if so put them into the
+       * matrix */
       
       for (pole=0 ; pole<MultPar[MultPoleIndex].Length ; pole++)
       {
@@ -507,9 +510,9 @@ void* RmatCalculate( struct RmatArgStruc* Args )
           double cst = cos(MultPar[MultTilt].ValuePtr[pole]) ;
           double snt = sin(MultPar[MultTilt].ValuePtr[pole]) ;
           Relem[1][5] = MultPar[MultB].ValuePtr[pole] * cst * Bfull
-          / *Edes / GEV2TM ;
+                  / *Edes / GEV2TM ;
           Relem[3][5] = MultPar[MultB].ValuePtr[pole] * snt * Bfull
-          / *Edes / GEV2TM ;
+                  / *Edes / GEV2TM ;
           Relem[0][5] = Relem[1][5] * Lfull / 2 ;
           Relem[2][5] = Relem[3][5] * Lfull / 2 ;
         }
@@ -528,15 +531,14 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     
     else if (strcmp(ElemClass,"SBEN")==0) /* sector bend */
     {
-      double intB, intG, L2 ;
+      double intB, intG;
       double E1, E2, H1, H2 ;
       double Hgap, Hgapx, Fint, Fintx ;
       double Theta ;
       Rmat Rface1, Rface2, Rbody, Rtemp ;
-      double Pdes, delta ;
       
-      stat1 = GetDatabaseParameters( count, nSBendPar, 
-                                    SBendPar, RmatPars, ElementTable ) ;
+      stat1 = GetDatabaseParameters( count, nSBendPar,
+              SBendPar, RmatPars, ElementTable ) ;
       if ( (stat1 == 0) || (GetDBValue(SBendPar+SBendL)<=0) )
       {
         BadElementMessage( count+1 ) ;
@@ -557,8 +559,8 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       }
       
       /* see if it has a power supply.  If so, get its amplitude.  If the
-       amplitude is corrupted, set a bad status and goto egress, otherwise
-       update the magnet B-field setting */
+       * amplitude is corrupted, set a bad status and goto egress, otherwise
+       * update the magnet B-field setting */
       
       PS = (int)(GetDBValue(SBendPar+SBendPS)) ;
       if (SBendPar[SBendPS].Length > 1)
@@ -571,32 +573,32 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       if (PS > 0)
       {
         stat1 = GetDatabaseParameters( PS-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS, count+1 ) ;
           goto HandleStat1 ;
         }
         /*		     intB *= (GetDBValue(PSPar+PSAmpl)) ;
-         intG *= (GetDBValue(PSPar+PSAmpl)) ;
+         * intG *= (GetDBValue(PSPar+PSAmpl)) ;
          */
         BScale = GetDBValue(PSPar+PSAmpl) ;
-			}
+      }
       
       if (PS2 > 0)
       {
         stat1 = GetDatabaseParameters( PS2-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS2, count+1 ) ;
           goto HandleStat1 ;
         }
         GScale = GetDBValue(PSPar+PSAmpl) ;
-			}
+      }
       
-			intB *= BScale ;
-			intG *= GScale ;
+      intB *= BScale ;
+      intG *= GScale ;
       
       /* get parameters related to the upstream / downstream faces */
       
@@ -620,10 +622,10 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       
       /* get the map for each face and for the body */
       
-      GetBendFringeMap( Lfull, intB, intG, *Edes, E1, H1, 
-                       Hgap, Fint, 1., Rface1, T5xxQuad ) ;
-      GetBendFringeMap( Lfull, intB, intG, *Edes, E2, H2, 
-                       Hgapx, Fintx, -1., Rface2, T5xxQuad ) ;
+      GetBendFringeMap( Lfull, intB, intG, *Edes, E1, H1,
+              Hgap, Fint, 1., Rface1, T5xxQuad ) ;
+      GetBendFringeMap( Lfull, intB, intG, *Edes, E2, H2,
+              Hgapx, Fintx, -1., Rface2, T5xxQuad ) ;
       
       GetLucretiaSBendMap( Lfull, Theta, intB, intG, *Edes, Rbody, NULL ) ;
       
@@ -642,9 +644,9 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     {
       double voltage, Vsin, phiall, nu ;
       
-      stat1 = GetDatabaseParameters( count, nLcavPar, 
-                                    LcavPar, RmatPars, ElementTable ) ;
-      if (stat1 == 0) 
+      stat1 = GetDatabaseParameters( count, nLcavPar,
+              LcavPar, RmatPars, ElementTable ) ;
+      if (stat1 == 0)
       {
         BadElementMessage( count+1 ) ;
         goto HandleStat1 ;
@@ -661,7 +663,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       {
         enum KlystronStatus* stat ;
         stat1 = GetDatabaseParameters( PS-1, nKlystronPar,
-                                      KlystronPar, RmatPars, KlystronTable ) ;
+                KlystronPar, RmatPars, KlystronTable ) ;
         stat  = GetKlystronStatus(PS-1) ;
         if ( (stat1 == 0) || (stat == NULL) )
         {
@@ -669,9 +671,9 @@ void* RmatCalculate( struct RmatArgStruc* Args )
           goto HandleStat1 ;
         }
         if ( (*stat == ON) || (*stat == TRIPPED) )
-					voltage *= (GetDBValue(KlystronPar+KlysAmpl))  ;
+          voltage *= (GetDBValue(KlystronPar+KlysAmpl))  ;
         else
-					voltage = 0. ;
+          voltage = 0. ;
         phiall += GetDBValue(KlystronPar+KlysPhase) ;
       }
       
@@ -681,7 +683,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       Vsin = -voltage*sin(PI*phiall/180) /1000 ;
       
       /* if the element decelerates the beam down to zero, or has zero length,
-       fail out now */
+       * fail out now */
       
       if ( (*Edes + Egain <= 0.) || (Lfull <= 0) )
       {
@@ -703,9 +705,9 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     {
       double ct, st ;
       
-      stat1 = GetDatabaseParameters( count, nCorrectorPar, 
-                                    CorrectorPar, RmatPars, ElementTable ) ;
-      if (stat1 == 0) 
+      stat1 = GetDatabaseParameters( count, nCorrectorPar,
+              CorrectorPar, RmatPars, ElementTable ) ;
+      if (stat1 == 0)
       {
         BadElementMessage( count+1 ) ;
         goto HandleStat1 ;
@@ -718,14 +720,14 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       st = sin( GetDBValue( CorrectorPar+CorTilt ) ) ;
       
       /* see if it has a power supply.  If so, get its amplitude.  If the
-       amplitude is corrupted, set a bad status and goto egress, otherwise
-       update the magnet B-field setting */
+       * amplitude is corrupted, set a bad status and goto egress, otherwise
+       * update the magnet B-field setting */
       
       PS = (int)(GetDBValue(CorrectorPar+CorPS)) ;
       if (PS != 0)
       {
         stat1 = GetDatabaseParameters( PS-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS, count+1 ) ;
@@ -749,15 +751,15 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     
     /* combined-function dipole corrector magnet */
     
-    else if(strcmp(ElemClass,"XYCOR")==0) 
+    else if(strcmp(ElemClass,"XYCOR")==0)
     {
       double ct, st ;
       double B1Full, B2Full ;
       int PS1, PS2 ;
       
-      stat1 = GetDatabaseParameters( count, nCorrectorPar, 
-                                    XYCorrectorPar, RmatPars, ElementTable ) ;
-      if (stat1 == 0) 
+      stat1 = GetDatabaseParameters( count, nCorrectorPar,
+              XYCorrectorPar, RmatPars, ElementTable ) ;
+      if (stat1 == 0)
       {
         BadElementMessage( count+1 ) ;
         goto HandleStat1 ;
@@ -771,15 +773,15 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       st = sin( GetDBValue( XYCorrectorPar+CorTilt ) ) ;
       
       /* see if it has power supplies.  If so, get their amplitude.  If the
-       amplitudes are corrupted, set a bad status and goto egress, otherwise
-       update the magnet B-field setting */
+       * amplitudes are corrupted, set a bad status and goto egress, otherwise
+       * update the magnet B-field setting */
       
       PS1 = (int)(GetDBValue(XYCorrectorPar+CorPS)) ;
       PS2 = (int)(*(XYCorrectorPar[CorPS].ValuePtr+1)) ;
       if (PS1 != 0)
       {
         stat1 = GetDatabaseParameters( PS1-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS1, count+1 ) ;
@@ -790,7 +792,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       if (PS2 != 0)
       {
         stat1 = GetDatabaseParameters( PS2-1, nPSPar, PSPar, RmatPars,
-				                              PSTable ) ;
+                PSTable ) ;
         if (stat1 == 0)
         {
           BadPSMessage( PS2, count+1 ) ;
@@ -805,21 +807,21 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     }
     
     
-    /* change in coordinates */	  
+    /* change in coordinates */
     
     else if (strcmp(ElemClass,"COORD")==0)
     {
       double dx[6] ;
       
-      stat1 = GetDatabaseParameters( count, nCoordPar, 
-                                    CoordPar, RmatPars, ElementTable ) ;
-      if (stat1 == 0) 
+      stat1 = GetDatabaseParameters( count, nCoordPar,
+              CoordPar, RmatPars, ElementTable ) ;
+      if (stat1 == 0)
       {
         BadElementMessage( count+1 ) ;
         goto HandleStat1 ;
       }
       stat1 = GetCoordMap( CoordPar[CoordChange].ValuePtr, dx, Relem ) ;
-      if (stat1 == 0) 
+      if (stat1 == 0)
       {
         BadElementMessage( count+1 ) ;
         goto HandleStat1 ;
@@ -827,7 +829,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     }
     
     /* if we made it this far it's something other than a marker or a quad,
-     so we can treat it as a drift element for now... */
+     * so we can treat it as a drift element for now... */
     
     
     else
@@ -841,48 +843,48 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     }
     
     /* Now we can either copy the Relem onto the structure of individual element
-     rmats, or else matrix-multiply it onto the A-to-B rmat */
+     * rmats, or else matrix-multiply it onto the A-to-B rmat */
     
     if (ReturnEach == 1)
     {
-      RmatCopy(Relem,Reach.matrix+36*(count2-1) )  ;
+      RmatCopy(Relem,(double (*)[6])Reach.matrix+36*(count2-1) )  ;
     }
     else if (PropagateTwiss == 0)
       RmatProduct(Relem,Rtot,Rtot) ;
     
     /* if we are doing twiss propagation, put the energy and S position into the
-     previous element's entries...*/
+     * previous element's entries...*/
     
     if (PropagateTwiss == 1)
-		{
-			Tall.S[count2-1] = *S    ;
-			Tall.E[count2-1] = *Edes ;
+    {
+      Tall.S[count2-1] = *S    ;
+      Tall.E[count2-1] = *Edes ;
       
       /* ...and propagate the twiss through the total matrix */
       
-			TwissStat = TwissThruRmat( Relem, Tall.TwissPars+count2-1,
-                                Tall.TwissPars+count2    ) ;
-			if (TwissStat == 0)
-			{
-				BadTwissMessage( count+1 ) ;
-				Args->Status = 0 ;
-				goto egress ;
-			}
-			Tall.nentry = count2 ; 
-		}
+      TwissStat = TwissThruRmat( Relem, Tall.TwissPars+count2-1,
+              Tall.TwissPars+count2    ) ;
+      if (TwissStat == 0)
+      {
+        BadTwissMessage( count+1 ) ;
+        Args->Status = 0 ;
+        goto egress ;
+      }
+      Tall.nentry = count2 ;
+    }
     
     /* if we are doing coupled twiss propagation, put the energy and S position into the
-     previous element's entries...*/
+     * previous element's entries...*/
     
     if (PropagateTwiss == 2)
-		{
-			Call.S[count2-1] = *S    ;
-			Call.E[count2-1] = *Edes ;
+    {
+      Call.S[count2-1] = *S    ;
+      Call.E[count2-1] = *Edes ;
       
       /* ...and propagate the twiss through the total matrix, bearing in mind that
-       Matlab has a different ordering for its indices than C so we need to
-       set the transpose flag; also we need to do this once for each dimension
-       which is included in the propagation */
+       * Matlab has a different ordering for its indices than C so we need to
+       * set the transpose flag; also we need to do this once for each dimension
+       * which is included in the propagation */
       
       for (iplane=0 ; iplane<Args->nWolskiDimensions ; iplane++)
       {
@@ -890,7 +892,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
         int newstart = 6*6*(Args->nWolskiDimensions*count2+iplane) ;
         
         TwissStat = CoupledTwissThruRmat( Relem, &(Call.Twiss[oldstart]),
-                                         &(Call.Twiss[newstart]), 1    ) ;
+                &(Call.Twiss[newstart]), 1    ) ;
         if (TwissStat == 0)
         {
           BadTwissMessage( count+1 ) ;
@@ -898,113 +900,113 @@ void* RmatCalculate( struct RmatArgStruc* Args )
           goto egress ;
         }
       }
-			Call.nentry = count2 ; 
-		}
+      Call.nentry = count2 ;
+    }
     
     /* if a bad element was detected on the last iteration, we may need to
-     address it now */
+     * address it now */
     
-  HandleStat1:
-    
-		if (stat1 != 1)
-			if (!ReturnEach) /* RmatAtoB or GetTwiss: fatal error */
-			{
-				Args->Status = 0 ;
-				goto egress ;
-			}
-			else /* GetRmats: one missing matrix != fatal error */
-			{
-				Args->Status = -1 ;
-				stat1 = 1 ;
-			}
-    
-    
-    
+    HandleStat1:
+      
+      if (stat1 != 1)
+        if (!ReturnEach) /* RmatAtoB or GetTwiss: fatal error */
+        {
+          Args->Status = 0 ;
+          goto egress ;
+        }
+        else /* GetRmats: one missing matrix != fatal error */
+        {
+          Args->Status = -1 ;
+          stat1 = 1 ;
+        }
+      
+      
+      
   } while ( count2 < nmat) ;
   
   /* end of loop over elements. */
   
   /* egress point:  check to see whether some disaster befell us during
-   execution.  If so, handle it. While on the topic, deallocate any
-   locally allocated memory. */
+   * execution.  If so, handle it. While on the topic, deallocate any
+   * locally allocated memory. */
   
-egress:
-	
-  
-  /* if we got here with bad status due to bad dynamic allocation, free
+  egress:
+    
+    
+    /* if we got here with bad status due to bad dynamic allocation, free
    anything which was successfully allocated and return a null pointer */
-  
-	if (BadAllocate != 0)
-	{
-		if (Reach.matrix != NULL)
-			free(Reach.matrix) ;
-		if (Tall.S != NULL)
-			free(Tall.S) ;
-		if (Tall.E != NULL)
-			free(Tall.E) ;
-		if (Tall.TwissPars != NULL)
-			free(Tall.TwissPars) ;
-		if (Call.S != NULL)
-			free(Call.S) ;
-		if (Call.E != NULL)
-			free(Call.E) ;
-		if (Call.Twiss != NULL)
-			free(Call.Twiss) ;
-		return NULL ;
-	}
-  
-  
-  /*	Now we just have to set the return value and
+    
+    if (BadAllocate != 0)
+    {
+      if (Reach.matrix != NULL)
+        free(Reach.matrix) ;
+      if (Tall.S != NULL)
+        free(Tall.S) ;
+      if (Tall.E != NULL)
+        free(Tall.E) ;
+      if (Tall.TwissPars != NULL)
+        free(Tall.TwissPars) ;
+      if (Call.S != NULL)
+        free(Call.S) ;
+      if (Call.E != NULL)
+        free(Call.E) ;
+      if (Call.Twiss != NULL)
+        free(Call.Twiss) ;
+      return NULL ;
+    }
+    
+    
+    /*	Now we just have to set the return value and
    exit.  If we are doing an eachelem, return a pointer to Relem; otherwise,
    return a pointer to Rtot. */
-  
-  if (ReturnEach == 1)            /* GetRmats operation */
-	{
-    Reach.Nmatrix = count2 ;
-    return &Reach ;
-	}
-  else if (PropagateTwiss==1)     /* GetTwiss operation */
-	{
-		Tall.S[Tall.nentry] = Tall.S[Tall.nentry-1] + Lfull ;
-		Tall.E[Tall.nentry] = Tall.E[Tall.nentry-1] + Egain ;
-		Tall.nentry++ ;
     
-    /* if the original request was for backwards-propagation, then
+    if (ReturnEach == 1)            /* GetRmats operation */
+    {
+      Reach.Nmatrix = count2 ;
+      return &Reach ;
+    }
+    else if (PropagateTwiss==1)     /* GetTwiss operation */
+    {
+      Tall.S[Tall.nentry] = Tall.S[Tall.nentry-1] + Lfull ;
+      Tall.E[Tall.nentry] = Tall.E[Tall.nentry-1] + Egain ;
+      Tall.nentry++ ;
+      
+      /* if the original request was for backwards-propagation, then
      we need to adjust the nu parameters */
-    
-		if (Args->Backwards == 1)
-		{
-			double nuxmax = Tall.TwissPars[Tall.nentry-1].nux ;
-			double nuymax = Tall.TwissPars[Tall.nentry-1].nuy ;
-			int nucount ;
-			for (nucount=0 ; nucount<Tall.nentry ; nucount++)
-			{
-				Tall.TwissPars[nucount].nux += 
-        Args->InitialTwiss.nux - nuxmax ;
-				Tall.TwissPars[nucount].nuy += 
-        Args->InitialTwiss.nuy - nuymax ;
-			}
-		}
-    
-		return &Tall ;
-	}
-	else if (PropagateTwiss == 2) /* coupled GetTwiss operation */
-	{
-		Call.S[Call.nentry] = Call.S[Call.nentry-1] + Lfull ;
-		Call.E[Call.nentry] = Call.E[Call.nentry-1] + Egain ;
-		Call.nentry++ ;
-		return &Call ;
-	}
-	else                            /* RmatAtoB operation */
-    return Rtot ;
+      
+      if (Args->Backwards == 1)
+      {
+        double nuxmax = Tall.TwissPars[Tall.nentry-1].nux ;
+        double nuymax = Tall.TwissPars[Tall.nentry-1].nuy ;
+        int nucount ;
+        for (nucount=0 ; nucount<Tall.nentry ; nucount++)
+        {
+          Tall.TwissPars[nucount].nux +=
+                  Args->InitialTwiss.nux - nuxmax ;
+          Tall.TwissPars[nucount].nuy +=
+                  Args->InitialTwiss.nuy - nuymax ;
+        }
+      }
+      
+      return &Tall ;
+    }
+    else if (PropagateTwiss == 2) /* coupled GetTwiss operation */
+    {
+      Call.S[Call.nentry] = Call.S[Call.nentry-1] + Lfull ;
+      Call.E[Call.nentry] = Call.E[Call.nentry-1] + Egain ;
+      Call.nentry++ ;
+      return &Call ;
+    }
+    else                            /* RmatAtoB operation */
+      return Rtot ;
 }
 
 /*=====================================================================*/
 
 /* Here are some variables which need to be preserved from one call to
- another of the tracker DLL, and which also need to be accessed by
- both the main tracker and the dynamic-allocation deleter.  Thus we
- put them into the file before the tracking function */
+ * another of the tracker DLL, and which also need to be accessed by
+ * both the main tracker and the dynamic-allocation deleter.  Thus we
+ * put them into the file before the tracking function */
 
 int nBunchInBeamOld=0 ;            /* total beam depth on last call */
 int FirstBunchOld=0 ;              /* which bunches tracked on last */
@@ -1016,7 +1018,7 @@ int maxNmodeOld = 0 ;
 
 /* backbones for BPM, instrument, and SBPM data structures */
 
-struct BPMdat**  bpmdata  = NULL ;     
+struct BPMdat**  bpmdata  = NULL ;
 struct INSTdat** instdata = NULL ;
 struct SBPMdat** sbpmdata = NULL ;
 
@@ -1046,323 +1048,327 @@ int InstElemnoLastCall ;
 int FirstSBPMElemno ;
 int SBPMElemnoLastCall ;
 
-/* here is a variable which needs to be seen by several functions, so 
- it has to have file scope */
-
-int StoppedParticles ;
-/* if CUDA, then also make a copy of this variable on device memory */  
-#ifdef __CUDA_ARCH__  
-int* StoppedParticles_gpu ;
-cudaMalloc(&StoppedParticles_gpu, sizeof(int)) ;
-#endif  
+/* here is a variable which needs to be seen by several functions, so
+ * it has to have file scope */
+int* StoppedParticles = NULL;
+#ifdef __CUDACC__
+int* StoppedParticles_gpu ; /* CUDA device pointer to StoppedParticles*/
+#endif
 
 /*=====================================================================*/
 
 /* Main procedure for looping through a beamline and tracking a beam
- through all of the elements, generating and saving data on BPM
- readings etc along the way. */
+ * through all of the elements, generating and saving data on BPM
+ * readings etc along the way. */
 
 /* RET:    none.  However, TrackArgs->Status is set as follows:
- +1 -> All OK.
- +2 -> failure before tracking attempted
- 0 -> failure during tracking
- -1 -> one or more particles stopped during tracking.
- /* ABORT:
- /* FAIL:         */
+ * +1 -> All OK.
+ * +2 -> failure before tracking attempted
+ * 0 -> failure during tracking
+ * -1 -> one or more particles stopped during tracking.
+ * /* ABORT:
+ * /* FAIL:         */
 
 void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 {
   
-	int OuterLoop, OuterStart, OuterStop, OuterStep ;
-	int InnerLoop, InnerStart, InnerStop, InnerStep ;
-	int* ElemLoop;
-	int* BunchLoop ;
-	int LastLoopElem = -1 ;
-	int* TFlag ;
-	char* ElemClass ;
-	int TrackStatus ;     /* status returned from functions */
-	int GlobalStatus = 1; /* overall status of this function */
-	int NewStopped = 0 ;
+  int OuterLoop, OuterStart, OuterStop, OuterStep ;
+  int InnerLoop, InnerStart, InnerStop, InnerStep ;
+  int* ElemLoop;
+  int* BunchLoop ;
+  int LastLoopElem = -1 ;
+  int* TFlag ;
+  char* ElemClass ;
+  int TrackStatus ;     /* status returned from functions */
+  int GlobalStatus = 1; /* overall status of this function */
+  int NewStopped = 0 ;
   int iter, csrSmoothFactor=0 ;
   double trackIter ;
-  double lastS, thisS, *sp ;
+  double lastS, thisS, *sp, *lp;
+  unsigned long long *rSeed=NULL ;
   
   /* initialize the pointers to freq-domain wakefield data */
-	TLRFreqData    = NULL ;
-	TLRErrFreqData = NULL ;
+  TLRFreqData    = NULL ;
+  TLRErrFreqData = NULL ;
   
   /* initialize StoppedParticles to the "none stopped" state */
+  StoppedParticles = (int*) calloc(1,sizeof(int)) ;
+  *StoppedParticles = 0 ;
   
-	StoppedParticles = 0 ;
-#ifdef __CUDA_ARCH__ 
-  cudaMemcpy(StoppedParticles_gpu, &StoppedParticles, sizeof(int), cudaMemcpyHostToDevice);
+  /* Get random number seed from Matlab workspace */
+  rSeed = (unsigned long long*) calloc(1,sizeof(unsigned long long)) ;
+  getLucretiaRandSeed(rSeed) ;
+  
+  /* Map StoppedParticles int onto both host and device memory for CUDA*/
+#ifdef __CUDACC__
+  cudaSetDeviceFlags(cudaDeviceMapHost);
+  cudaHostAlloc( (void**) &StoppedParticles, sizeof(int), cudaHostAllocMapped );
+  cudaHostGetDevicePointer ( &StoppedParticles_gpu, StoppedParticles, 0 ) ;
 #endif
   
   /* If the total number of elements in the beamline has not changed from
-   the last call, AND the total number of bunches in the beam has not
-   changed, AND the data backbones are allocated, then we do not need to
-   reallocate them.  Otherwise we need to clear them and reallocate */
+   * the last call, AND the total number of bunches in the beam has not
+   * changed, AND the data backbones are allocated, then we do not need to
+   * reallocate them.  Otherwise we need to clear them and reallocate */
   
   
   
-	if ( (bpmdata == NULL) ||                  /* already allocated */
-      (nElemOld != nElemInBeamline( )) )  /* # elts unchanged  */
+  if ( (bpmdata == NULL) ||                  /* already allocated */
+          (nElemOld != nElemInBeamline( )) )  /* # elts unchanged  */
     
-	{
-		ClearTrackingVars( ) ;
-		nElemOld = nElemInBeamline( ) ;
-		nBunchInBeamOld = TrackArgs->TheBeam->nBunch ;
-		bpmdata  = calloc(nElemOld,sizeof(struct BPMdata*)) ;
-		instdata = calloc(nElemOld,sizeof(struct INSTdata*)) ;
-		sbpmdata = calloc(nElemOld,sizeof(struct SBPMdata*)) ;
-		TLRFreqKickDat    = calloc(nElemOld,sizeof(struct LRWFFreqKick*)) ;
-		TLRErrFreqKickDat = calloc(nElemOld,sizeof(struct LRWFFreqKick*)) ;
-		FirstBunchAtRF = calloc(nElemOld,sizeof(int)) ;
-		LastBunchAtRF = calloc(nElemOld,sizeof(int)) ;
-		if ( (bpmdata==NULL)||(instdata==NULL)||(sbpmdata==NULL)
-        ||(TLRFreqKickDat==NULL)||(TLRErrFreqKickDat==NULL) 
-        ||(FirstBunchAtRF==NULL)||(FirstBunchAtRF==NULL)             )
-		{
-			GlobalStatus = 2 ;
-			AddMessage(
-                 "Unable to allocate data backbones in TrackThruMain",1) ;
-			goto egress ;
-		}
+  {
+    ClearTrackingVars( ) ;
+    nElemOld = nElemInBeamline( ) ;
+    nBunchInBeamOld = TrackArgs->TheBeam->nBunch ;
+    bpmdata  = (struct BPMdat**)calloc(nElemOld,sizeof(struct BPMdata*)) ;
+    instdata = (struct INSTdat**)calloc(nElemOld,sizeof(struct INSTdata*)) ;
+    sbpmdata = (struct SBPMdat**)calloc(nElemOld,sizeof(struct SBPMdata*)) ;
+    TLRFreqKickDat = (struct LRWFFreqKick **) calloc(nElemOld,sizeof(struct LRWFFreqKick*)) ;
+    TLRErrFreqKickDat = (struct LRWFFreqKick **) calloc(nElemOld,sizeof(struct LRWFFreqKick*)) ;
+    FirstBunchAtRF = (int *) calloc(nElemOld,sizeof(int)) ;
+    LastBunchAtRF = (int *) calloc(nElemOld,sizeof(int)) ;
+    if ( (bpmdata==NULL)||(instdata==NULL)||(sbpmdata==NULL)
+    ||(TLRFreqKickDat==NULL)||(TLRErrFreqKickDat==NULL)
+    ||(FirstBunchAtRF==NULL)||(FirstBunchAtRF==NULL)             )
+    {
+      GlobalStatus = 2 ;
+      AddMessage(
+              "Unable to allocate data backbones in TrackThruMain",1) ;
+      goto egress ;
+    }
     
     /* initialize the First/LastBunchAtRF array to -1, not zero */
     
     for (OuterLoop = 0 ; OuterLoop < nElemOld ; OuterLoop++)
-		{
+    {
       FirstBunchAtRF[OuterLoop] = -1 ;
-			LastBunchAtRF[OuterLoop] = -1 ;
-		}
+      LastBunchAtRF[OuterLoop] = -1 ;
+    }
     
-	}
+  }
   
   /* point the TrackArgs pointers at the newly-allocated backbones */
   
-	TrackArgs->bpmdata  = bpmdata ;
-	TrackArgs->instdata = instdata ;
-	TrackArgs->sbpmdata = sbpmdata ;
+  TrackArgs->bpmdata  = bpmdata ;
+  TrackArgs->instdata = instdata ;
+  TrackArgs->sbpmdata = sbpmdata ;
   
   /* initialize variables used by the BPM tracker to indicate that no BPM
-   tracking has yet occurred */
+   * tracking has yet occurred */
   
-	FirstBPMElemno = -1 ;              
-  BPMElemnoLastCall = -1 ; 
-	FirstInstElemno = -1 ;              
+  FirstBPMElemno = -1 ;
+  BPMElemnoLastCall = -1 ;
+  FirstInstElemno = -1 ;
   InstElemnoLastCall = -1 ;
   FirstSBPMElemno = -1 ;
   SBPMElemnoLastCall = -1 ;
-	TrackArgs->nBPM = 0 ;
-	TrackArgs->nINST = 0 ;
-	TrackArgs->nSBPM = 0 ;
-	maxNmode = 0 ;
+  TrackArgs->nBPM = 0 ;
+  TrackArgs->nINST = 0 ;
+  TrackArgs->nSBPM = 0 ;
+  maxNmode = 0 ;
   
-	dS = 1 ;
+  dS = 1 ;
   
   
   /* get the total # of wakes of all types */
   
-	numwakes = GetNumWakes( ) ;
+  numwakes = GetNumWakes( ) ;
   
   /* get pointers to the frequency-domain LRWFs and error LRWFs */
   
-	if ( numwakes[2] > 0)
-	{
-		TLRFreqData = UnpackLRWFFreqData(  numwakes[2], TLRTable, 
-                                     &maxNmode, &GlobalStatus ) ;
-		if (GlobalStatus != 1)
-		{
-			GlobalStatus = 2 ;
-			goto egress ;
-		}
-	}
+  if ( numwakes[2] > 0)
+  {
+    TLRFreqData = UnpackLRWFFreqData(  numwakes[2], TLRTable,
+            &maxNmode, &GlobalStatus ) ;
+    if (GlobalStatus != 1)
+    {
+      GlobalStatus = 2 ;
+      goto egress ;
+    }
+  }
   
-	if ( numwakes[3] > 0)
-	{
-		TLRErrFreqData = UnpackLRWFFreqData(  numwakes[3], TLRErrTable, 
-                                        &maxNmode, &GlobalStatus ) ;
-		if (GlobalStatus != 1)
-		{
-			GlobalStatus = 2 ;
-			goto egress ;
-		}
-	}
+  if ( numwakes[3] > 0)
+  {
+    TLRErrFreqData = UnpackLRWFFreqData(  numwakes[3], TLRErrTable,
+            &maxNmode, &GlobalStatus ) ;
+    if (GlobalStatus != 1)
+    {
+      GlobalStatus = 2 ;
+      goto egress ;
+    }
+  }
   
   /* if the maximum number of modes in the present implementation is different
-   from the max number from the last track operation, then all of the 
-   existing vectors of LRWF frequency-mode kicks are potentially out of date.
-   In that eventuality, clear them now */
+   * from the max number from the last track operation, then all of the
+   * existing vectors of LRWF frequency-mode kicks are potentially out of date.
+   * In that eventuality, clear them now */
   
-	if (maxNmode != maxNmodeOld)
-	{
-		ClearOldLRWFFreqKicks( 0 ) ;
-		ClearOldLRWFFreqKicks( 1 ) ;
-		if (maxNmodeOld != 0)
-			AddMessage("Change in max # of LRWF modes, old kick data discarded",0) ;
-	}
-	maxNmodeOld = maxNmode ;
+  if (maxNmode != maxNmodeOld)
+  {
+    ClearOldLRWFFreqKicks( 0 ) ;
+    ClearOldLRWFFreqKicks( 1 ) ;
+    if (maxNmodeOld != 0)
+      AddMessage("Change in max # of LRWF modes, old kick data discarded",0) ;
+  }
+  maxNmodeOld = maxNmode ;
   
   /* Depending on how the user wants to do things, we either want to have
-   an outer loop of elements and an inner loop over bunches (more
-   efficient) or an outer loop over bunches and an inner loop over 
-   elements (more flexible).  Set that up now. */
+   * an outer loop of elements and an inner loop over bunches (more
+   * efficient) or an outer loop over bunches and an inner loop over
+   * elements (more flexible).  Set that up now. */
   
-	if (TrackArgs->BunchwiseTracking == 0) /* default */
-	{
-		OuterStart = TrackArgs->FirstElem-1 ;
-		OuterStop  = TrackArgs->LastElem-1 ;
-		OuterStep = 1 ;
-		InnerStart = TrackArgs->FirstBunch-1 ;
-		InnerStop  = TrackArgs->LastBunch-1 ;
-		InnerStep  = 1;
-		ElemLoop  = &OuterLoop ;   /* tricky way to make sure that the two */
-		BunchLoop = &InnerLoop ;   /* loop vars are correctly configured */
-	}
-	else
-	{
-		InnerStart = TrackArgs->FirstElem-1 ;
-		InnerStop  = TrackArgs->LastElem-1 ;
-		InnerStep = 1 ;
-		OuterStart = TrackArgs->FirstBunch-1 ;
-		OuterStop  = TrackArgs->LastBunch-1 ;
-		OuterStep  = 1;
-		ElemLoop  = &InnerLoop ;   
-		BunchLoop = &OuterLoop ;   
-	}
+  if (TrackArgs->BunchwiseTracking == 0) /* default */
+  {
+    OuterStart = TrackArgs->FirstElem-1 ;
+    OuterStop  = TrackArgs->LastElem-1 ;
+    OuterStep = 1 ;
+    InnerStart = TrackArgs->FirstBunch-1 ;
+    InnerStop  = TrackArgs->LastBunch-1 ;
+    InnerStep  = 1;
+    ElemLoop  = &OuterLoop ;   /* tricky way to make sure that the two */
+    BunchLoop = &InnerLoop ;   /* loop vars are correctly configured */
+  }
+  else
+  {
+    InnerStart = TrackArgs->FirstElem-1 ;
+    InnerStop  = TrackArgs->LastElem-1 ;
+    InnerStep = 1 ;
+    OuterStart = TrackArgs->FirstBunch-1 ;
+    OuterStop  = TrackArgs->LastBunch-1 ;
+    OuterStep  = 1;
+    ElemLoop  = &InnerLoop ;
+    BunchLoop = &OuterLoop ;
+  }
   
   /* Check to see whether there are unstopped particles coming in with
-   bad momenta (total or transverse), raise a warning if so. */
+   * bad momenta (total or transverse), raise a warning if so. */
   
-	TrackStatus = InitialMomentumCheck( TrackArgs ) ; 
-	if (TrackStatus == 0)
-	{
-		BadInitMomentumMessage( )  ;
-		GlobalStatus = 2 ;
-		goto egress ;
-	}
+  TrackStatus = InitialMomentumCheck( TrackArgs ) ;
+  if (TrackStatus == 0)
+  {
+    BadInitMomentumMessage( )  ;
+    GlobalStatus = 2 ;
+    goto egress ;
+  }
   
   /* Copy bunch data over to GPU */
-#ifdef __CUDA_ARCH__
+#ifdef __CUDACC__
   XCPU2GPU( TrackArgs ) ;
-#endif  
+#endif
   
   /* without further ado, begin the two loops */
   
-	OuterLoop = OuterStart ;
-	do
-	{
+  OuterLoop = OuterStart ;
+  do
+  {
     
-		InnerLoop = InnerStart ;
+    InnerLoop = InnerStart ;
     
-		do
-		{
+    do
+    {
       
       /* if the local variable NewStopped and global variable StoppedParticles are
-       not in agreement, it indicates that some rays were stopped since the last
-       trip through the loop.  In which case, issue a message and update the local
-       variable (so that the message is only issued once).  Also update global
-       status */
+       * not in agreement, it indicates that some rays were stopped since the last
+       * trip through the loop.  In which case, issue a message and update the local
+       * variable (so that the message is only issued once).  Also update global
+       * status */
       
-#ifdef __CUDA_ARCH__ 
-      if (NewStopped != 1)
-        cudaMemcpy(&StoppedParticles, StoppedParticles_gpu, sizeof(int), cudaMemcpyDeviceToHost);
-#endif     
-			if (NewStopped != StoppedParticles)
-			{
-				GlobalStatus = -1 ;
-				AddMessage("Particles stopped during tracking",0) ;
-				NewStopped = StoppedParticles ;
-			}
+      if (NewStopped != *StoppedParticles)
+      {
+        GlobalStatus = -1 ;
+        AddMessage("Particles stopped during tracking",0) ;
+        NewStopped = *StoppedParticles ;
+      }
       
       /* if the bunch is out of good particles, issue a message, set a warning,
-       and set a flag on the bunch indicating that the appropriate authorities
-       have been notified. */
-#ifdef __CUDA_ARCH__ 
+       * and set a flag on the bunch indicating that the appropriate authorities
+       * have been notified. */
+#ifdef __CUDACC__
       cudaMemcpy(&TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray,
-                 TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray_gpu, sizeof(int), cudaMemcpyDeviceToHost);
+              TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray_gpu, sizeof(int), cudaMemcpyDeviceToHost);
 #endif
-			if (TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray <=0)
-			{
-				if (TrackArgs->TheBeam->bunches[*BunchLoop]->StillTracking==1)
-				{
-					BunchStopMessage( (*BunchLoop)+1, (*ElemLoop) ) ;
-					GlobalStatus = -1 ;
-					TrackArgs->TheBeam->bunches[*BunchLoop]->StillTracking=0 ;
-				}
-				InnerLoop += InnerStep ;
-				continue ;
-			}
+      if (TrackArgs->TheBeam->bunches[*BunchLoop]->ngoodray <=0)
+      {
+        if (TrackArgs->TheBeam->bunches[*BunchLoop]->StillTracking==1)
+        {
+          BunchStopMessage( (*BunchLoop)+1, (*ElemLoop) ) ;
+          GlobalStatus = -1 ;
+          TrackArgs->TheBeam->bunches[*BunchLoop]->StillTracking=0 ;
+        }
+        InnerLoop += InnerStep ;
+        continue ;
+      }
       
       /* get the tracking flags; if corrupted, send a warning message and
-       attempt to continue */
+       * attempt to continue */
       
-			if (LastLoopElem != *ElemLoop)
-			{
-				TFlag = GetTrackingFlags( *ElemLoop ) ;
-				if (TFlag[NUM_TRACK_FLAGS] == 0)
-				{
-					GlobalStatus = 0 ;
-					BadTrackFlagMessage( (*ElemLoop)+1 ) ;
-					goto egress ; 
-				}
+      if (LastLoopElem != *ElemLoop)
+      {
+        TFlag = GetTrackingFlags( *ElemLoop ) ;
+        if (TFlag[NUM_TRACK_FLAGS] == 0)
+        {
+          GlobalStatus = 0 ;
+          BadTrackFlagMessage( (*ElemLoop)+1 ) ;
+          goto egress ;
+        }
         
         
         /* get the element class string */
         
-				ElemClass = GetElemClass( *ElemLoop ) ;
-				if (ElemClass == NULL)
-				{
-					GlobalStatus = 0 ;
-					BadElementMessage( (*ElemLoop)+1 ) ;
-					goto egress ;
-				}
-			}
+        ElemClass = GetElemClass( *ElemLoop ) ;
+        if (ElemClass == NULL)
+        {
+          GlobalStatus = 0 ;
+          BadElementMessage( (*ElemLoop)+1 ) ;
+          goto egress ;
+        }
+      }
       
-			LastLoopElem = *ElemLoop ; /* only get track flags and ElemClass if ElemLoop has
-                                  changed from last loop execution */
-      
+      LastLoopElem = *ElemLoop ; /* only get track flags and ElemClass if ElemLoop has
+       * changed from last loop execution */
       
       /* track this bunch through this element */
-			if (strcmp(ElemClass,"QUAD")==0)
-			{
+      if (strcmp(ElemClass,"QUAD")==0)
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, thisS-lastS, lastS ) ;
+          while ( trackIter != 0 ) {
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, thisS-lastS, lastS, rSeed ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif    
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, 0, 0, rSeed ) ;
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif    
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if (strcmp(ElemClass,"SEXT")==0)
-			{
-				sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
+      }
+      else if (strcmp(ElemClass,"SEXT")==0)
+      {
+        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if (TrackStatus == 0) {
@@ -1370,143 +1376,155 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           goto egress ;
         }
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS ) ;
-#ifdef __CUDA_ARCH__        
+          while ( trackIter != 0 ) {
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS, rSeed ) ;
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0, rSeed ) ;
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if (strcmp(ElemClass,"OCTU")==0)
-			{
+      }
+      else if (strcmp(ElemClass,"OCTU")==0)
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, thisS-lastS, lastS ) ;
+          while ( trackIter != 0 ) {
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, thisS-lastS, lastS, rSeed ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0, rSeed ) ;
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if (strcmp(ElemClass,"SOLENOID")==0)
-			{
-				sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, thisS-lastS, lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-#ifdef __CUDA_ARCH__        
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
-            lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
-        }
-			}
-			else if (strcmp(ElemClass,"MULT")==0)
-			{
+      }
+      else if (strcmp(ElemClass,"SOLENOID")==0)
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
-            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS ) ;
+          while ( trackIter != 0 ) {
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, thisS-lastS, lastS, rSeed ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
-          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0, rSeed ) ;
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-				
-			}
-			else if (strcmp(ElemClass,"SBEN")==0)
-			{
+      }
+      else if (strcmp(ElemClass,"MULT")==0)
+      {
+        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
+        lastS = *sp ;
+        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+        if ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
+            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS, rSeed ) ;
+            if (TrackStatus == 0) {
+              GlobalStatus = TrackStatus ;
+              goto egress ;
+            }
+#ifdef __CUDACC__
+            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#else
+            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
+            lastS = thisS ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
+          }
+        }
+        else {
+          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, rSeed ) ;
+#ifdef __CUDACC__
+          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#else
+          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+        }
+        
+      }
+      else if (strcmp(ElemClass,"SBEN")==0)
+      {
         /* If CSR track flag set:
-         If no Split flag, iterate through 50 times, else iterate the number of
-         times specified by the Split flag
-         The value of the CSR flag if >0 determines number of computation bins to use (min 10) */
+         * If no Split flag, iterate through 50 times, else iterate the number of
+         * times specified by the Split flag
+         * The value of the CSR flag if >0 determines number of computation bins to use (min 10) */
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         thisS=*sp;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 1, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
@@ -1514,15 +1532,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         /* Track first split element with just upstream edge effects allowed */
         if ( TFlag[Split]>0 || trackIter > 0 ) {
           TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                                            TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0  ) ; 
+                  TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0, rSeed  ) ;
           
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif 
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
           /* Apply CSR if requested */
           if ( trackIter > 0 )
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
@@ -1532,15 +1550,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         if ( TFlag[Split] > 0 ) {
           for (iter = 0; iter < TFlag[Split]-2; iter++) {
             TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                                              TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1  ) ; 
+                    TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1, rSeed  ) ;
             
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif 
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1552,439 +1570,466 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         } /* If no splits or CSR requested, just track once as normal */
         else if ( TFlag[Split]==0 && trackIter==0 )
           TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                                            TrackArgs, TFlag, 1, 1, 1, 0  ) ; 
+                  TrackArgs, TFlag, 1, 1, 1, 0, rSeed  ) ;
         /* If tracking split then track last split with downstream edge allowed only now */
         if ( TFlag[Split] > 0 || trackIter > 0 )
           TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                                            TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
-#ifdef __CUDA_ARCH__        
+                  TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1, rSeed  ) ;
+#ifdef __CUDACC__
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif           
-    
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+        
         /* Apply CSR if requested */
         if ( trackIter > 0 )
           GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
         
         /* since the SBend has momentum compaction, clear the wakefields
-         which are available to the just-tracked bunch */
+         * which are available to the just-tracked bunch */
         
-				ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop], 
-                           -1,  0 ) ;
-				ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop], 
-                           -1,  1 ) ;
-				ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
-                            -1,  0 ) ;
-				ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
-                            -1,  1 ) ;
+        ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop],
+                -1,  0 ) ;
+        ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop],
+                -1,  1 ) ;
+        ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
+                -1,  0 ) ;
+        ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
+                -1,  1 ) ;
         
-			}
-			else if (strcmp(ElemClass,"LCAV")==0)
-			{
+      }
+      else if (strcmp(ElemClass,"LCAV")==0)
+      {
         /* Split status not supported for LCAV now- too damned complicated to figure out how to split up
-         and correctly deal with wakefield and BPM details */
-				TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDA_ARCH__        
+         * and correctly deal with wakefield and BPM details */
+        TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFlag, 0 ) ;
+#ifdef __CUDACC__
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif            
-			}
-			else if (strcmp(ElemClass,"TCAV")==0)
-			{
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+      }
+      else if (strcmp(ElemClass,"TCAV")==0)
+      {
         /* No split status treatment for TCAV's - see above */
-				TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1 ) ;
-#ifdef __CUDA_ARCH__        
+        TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1 ) ;
+#ifdef __CUDACC__
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif            
-			}
-			else if ( (strcmp(ElemClass,"HMON")==0) ||
-               (strcmp(ElemClass,"VMON")==0) ||
-               (strcmp(ElemClass,"MONI")==0)    )
-			{
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+      }
+      else if ( (strcmp(ElemClass,"HMON")==0) ||
+              (strcmp(ElemClass,"VMON")==0) ||
+              (strcmp(ElemClass,"MONI")==0)    )
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0;
           }
           TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, -1 ) ;
         }
         else {
           TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if ( (strcmp(ElemClass,"PROF")==0) ||
-               (strcmp(ElemClass,"WIRE")==0) ||
-               (strcmp(ElemClass,"BLMO")==0) ||
-               (strcmp(ElemClass,"SLMO")==0) ||
-               (strcmp(ElemClass,"IMON")==0) ||
-               (strcmp(ElemClass,"INST")==0)    )
-			{
+      }
+      else if ( (strcmp(ElemClass,"PROF")==0) ||
+              (strcmp(ElemClass,"WIRE")==0) ||
+              (strcmp(ElemClass,"BLMO")==0) ||
+              (strcmp(ElemClass,"SLMO")==0) ||
+              (strcmp(ElemClass,"IMON")==0) ||
+              (strcmp(ElemClass,"INST")==0)    )
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
           TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, -1 ) ;
         }
         else {
           TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
+      }
       
-			else if ( strcmp(ElemClass,"XCOR")==0 )
-			{
+      else if ( strcmp(ElemClass,"XCOR")==0 )
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XCOR, thisS-lastS, lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XCOR, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
+      }
       
-			else if ( strcmp(ElemClass,"YCOR")==0 )
-			{
-				sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
+      else if ( strcmp(ElemClass,"YCOR")==0 )
+      {
+        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, YCOR, thisS-lastS, lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, YCOR, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if ( strcmp(ElemClass,"XYCOR")==0 )
-			{
-				sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
+      }
+      else if ( strcmp(ElemClass,"XYCOR")==0 )
+      {
+        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XYCOR, thisS-lastS, lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0) 
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0;
           }
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XYCOR, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if ( strcmp(ElemClass,"COLL")==0 )
-			{
+      }
+      else if ( strcmp(ElemClass,"COLL")==0 )
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0;
           }
         }
         else {
           TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
-			else if ( strcmp(ElemClass,"COORD")==0 )
-			{
-				TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop, 
-                                          TrackArgs, TFlag ) ;
-#ifdef __CUDA_ARCH__        
+      }
+      else if ( strcmp(ElemClass,"COORD")==0 )
+      {
+        TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop,
+                TrackArgs, TFlag ) ;
+#ifdef __CUDACC__
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif            
-			}
+                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+      }
       
-			else if ( strcmp(ElemClass,"MARK")==0 )
-      {  
-				TrackStatus = 1 ; 
-			}
-			else /* default = drift */
-			{
+      else if ( strcmp(ElemClass,"MARK")==0 )
+      {
+        TrackStatus = 1 ;
+      }
+      else /* default = drift */
+      {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
+        lp = GetElemNumericPar( *ElemLoop, "L", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
-          while ( trackIter > 0 ) {
+          while ( trackIter != 0 ) {
             TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                       TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif                
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, trackIter, thisS-lastS ) ;
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
+            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
+            /*printf("ele: %d driftL: %f s: %f s_last %f\n",*ElemLoop,trackIter,thisS,lastS);*/
             lastS = thisS ;
-            trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            if (trackIter>0)
+              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
+            else
+              trackIter = 0 ;
           }
         }
         else {
           TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDA_ARCH__        
+#ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
 #else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif              
+                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#endif
         }
-			}
+        
+      }
       
       /* latch non-unity status from the tracking procedures.  If a fatal
-       error occurred, abort. */
+       * error occurred, abort. */
       
-			if (TrackStatus == -1)
-				GlobalStatus = TrackStatus ;
-			if (TrackStatus == 0)
-			{
-				GlobalStatus = TrackStatus ;
-				goto egress ;
-			}
+      if (TrackStatus == -1)
+        GlobalStatus = TrackStatus ;
+      if (TrackStatus == 0)
+      {
+        GlobalStatus = TrackStatus ;
+        goto egress ;
+      }
       
       /* increment the inner loop counter and close the do loop */
       
-			InnerLoop += InnerStep ;
-		} while (InnerLoop != InnerStop+InnerStep) ;
+      InnerLoop += InnerStep ;
+    } while (InnerLoop != InnerStop+InnerStep) ;
     
     /* increment the outer loop counter and close the do loop */
     
-		OuterLoop += OuterStep ;
+    OuterLoop += OuterStep ;
     
-	} while (OuterLoop != OuterStop+OuterStep) ;
+  } while (OuterLoop != OuterStop+OuterStep) ;
   
   
-egress:
-  
-  /* Copy GPU data over to CPU */
-#ifdef __CUDA_ARCH__
-  XGPU2CPU( TrackArgs ) ;
-#endif  
-  
-  /* put the latched status back into TrackArgs */
-  
-	TrackArgs->Status = GlobalStatus ;
-  
-  /* clear all wakefields on all bunches */
-  
-	for (OuterLoop = TrackArgs->FirstBunch-1 ;
-	     OuterLoop < TrackArgs->LastBunch ; 
-       OuterLoop++)
-	{
-		ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[OuterLoop], 
-                       -1,  0 ) ;
-		ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[OuterLoop], 
-                       -1,  1 ) ;
-		ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[OuterLoop],
-                        -1,  0 ) ;
-		ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[OuterLoop],
-                        -1,  1 ) ;
-	}
-  
-  /* discard the existing families of pointers to LRWF data */
-  
-	FreeAndNull( &TLRFreqData ) ;
-	FreeAndNull( &TLRErrFreqData ) ; 
-  
-  /* discard the damping factors */
-  
-	for (OuterLoop = 0 ; OuterLoop<numwakes[2] ; OuterLoop++)
-	{
-		FreeAndNull( &(TrackArgs->TheBeam->TLRFreqDamping[OuterLoop]) ) ;
-		FreeAndNull( &(TrackArgs->TheBeam->TLRFreqxPhase[OuterLoop]) ) ;
-		FreeAndNull( &(TrackArgs->TheBeam->TLRFreqyPhase[OuterLoop]) ) ;
-	}
-	for (OuterLoop = 0 ; OuterLoop<numwakes[3] ; OuterLoop++)
-	{
-		FreeAndNull( &(TrackArgs->TheBeam->TLRErrFreqDamping[OuterLoop]) ) ;
-		FreeAndNull( &(TrackArgs->TheBeam->TLRErrFreqxPhase[OuterLoop]) ) ;
-		FreeAndNull( &(TrackArgs->TheBeam->TLRErrFreqyPhase[OuterLoop]) ) ;
-	}
-  
-  /* clear out the existing pascal matrix and factorial vector */
-  
-	ClearMaxMultipoleStuff( ) ;
-  
-  /* Clear GPU allocated memory */
-#ifdef __CUDA_ARCH__
-  cudaFree(StoppedParticles_gpu) ;
+  egress:
+    
+    /* Copy GPU data over to CPU */
+#ifdef __CUDACC__
+    XGPU2CPU( TrackArgs ) ;
 #endif
-  
-	return ;
+    
+    /* put the latched status back into TrackArgs */
+    
+    TrackArgs->Status = GlobalStatus ;
+    
+    /* clear all wakefields on all bunches */
+    
+    for (OuterLoop = TrackArgs->FirstBunch-1 ;
+    OuterLoop < TrackArgs->LastBunch ;
+    OuterLoop++)
+    {
+      ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[OuterLoop],
+              -1,  0 ) ;
+      ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[OuterLoop],
+              -1,  1 ) ;
+      ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[OuterLoop],
+              -1,  0 ) ;
+      ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[OuterLoop],
+              -1,  1 ) ;
+    }
+    
+    /* discard the existing families of pointers to LRWF data */
+    
+    FreeAndNull( (void **) &TLRFreqData ) ;
+    FreeAndNull( (void **) &TLRErrFreqData ) ;
+    
+    /* discard the damping factors */
+    
+    for (OuterLoop = 0 ; OuterLoop<numwakes[2] ; OuterLoop++)
+    {
+      FreeAndNull( (void **) &(TrackArgs->TheBeam->TLRFreqDamping[OuterLoop]) ) ;
+      FreeAndNull( (void **) &(TrackArgs->TheBeam->TLRFreqxPhase[OuterLoop]) ) ;
+      FreeAndNull( (void **) &(TrackArgs->TheBeam->TLRFreqyPhase[OuterLoop]) ) ;
+    }
+    for (OuterLoop = 0 ; OuterLoop<numwakes[3] ; OuterLoop++)
+    {
+      FreeAndNull( (void **) &(TrackArgs->TheBeam->TLRErrFreqDamping[OuterLoop]) ) ;
+      FreeAndNull( (void **) &(TrackArgs->TheBeam->TLRErrFreqxPhase[OuterLoop]) ) ;
+      FreeAndNull( (void **) &(TrackArgs->TheBeam->TLRErrFreqyPhase[OuterLoop]) ) ;
+    }
+    
+    /* clear out the existing pascal matrix and factorial vector */
+    
+    ClearMaxMultipoleStuff( ) ;
+    
+    /* Clear GPU allocated memory */
+#ifdef __CUDACC__
+    free(rSeed);
+    cudaFreeHost(StoppedParticles) ;
+#endif
+    
+    return ;
 }
 
 /*=====================================================================*/
 
 /* perform tracking of one bunch through one drift matrix.  This
- procedure also acts as a default tracker, tracking through any
- elements with unrecognized class names.  If the element has no
- length field, the element will be treated as zero-length. */
+ * procedure also acts as a default tracker, tracking through any
+ * elements with unrecognized class names.  If the element has no
+ * length field, the element will be treated as zero-length. */
 
 /* RET:    Status = 1 (success), always.
- /* ABORT:  never.
- /* FAIL:   Will fail if ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno. */
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno. */
 
-int TrackBunchThruDrift( int elemno, int bunchno, 
-                        struct TrackArgsStruc* ArgStruc,
-                        int* TrackFlag, double splitScale )
+int TrackBunchThruDrift( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, double splitScale )
 {
-	double* L ;                  /* drift has only 2 pars of any */
-	int rayloop ;    
-	double dZmod ;               /* lorentz delay for P = Pmod */
-	double Lfull ;
-	struct Bunch* ThisBunch ;    /* a shortcut */
-	double* Pmod ;
+  double* L ;                  /* drift has only 2 pars of any */
+#ifndef __CUDACC__
+  int rayloop ;
+#endif
+  double dZmod ;               /* lorentz delay for P = Pmod */
+  double Lfull ;
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  double* Pmod ;
   
   /* get the length of the drift space */
   
@@ -2003,26 +2048,26 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   /* get the design Lorentz delay */
   
   Pmod = GetElemNumericPar( elemno, "P", NULL ) ;
-	dZmod = GetDesignLorentzDelay( Pmod ) ;
+  dZmod = GetDesignLorentzDelay( Pmod ) ;
   
   /* get the address of the bunch in question */
   
   ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* since about half of the coordinate data in the "output" bunch
-   is the same as the "input" bunch (px, py, p0), start by simply
-   exchanging the pointers of the input and output bunches */
-#ifdef __CUDA_ARCH__
-	XYExchange( &ThisBunch->x_gpu, &ThisBunch->y, ThisBunch->nray ) ;
+   * is the same as the "input" bunch (px, py, p0), start by simply
+   * exchanging the pointers of the input and output bunches */
+#ifdef __CUDACC__
+  XYExchange( &ThisBunch->x_gpu, &ThisBunch->y, ThisBunch->nray ) ;
 #else
-	XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
-#endif  
+  XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
+#endif
   
   /* execute ray tracking kernel (loop over rays) */
-#ifdef __CUDA_ARCH__
+#ifdef __CUDACC__
   int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
-  TrackBunchThruDrift_kernel<<blocksPerGrid, threadsPerBlock>>(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop_gpu, TrackFlag, ThisBunch->nray);
+  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
+  TrackBunchThruDrift_kernel<<<blocksPerGrid, threadsPerBlock>>>(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop_gpu, TrackFlag, ThisBunch->nray);
 #else
   for ( rayloop=0 ; rayloop<ThisBunch->nray ; rayloop++ )
     TrackBunchThruDrift_kernel(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop, TrackFlag, rayloop);
@@ -2033,15 +2078,10 @@ int TrackBunchThruDrift( int elemno, int bunchno,
 }
 
 /* The DRIFT tracking Kernels */
-
-#ifdef __CUDA_ARCH__
-__global__ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N)
-#else
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N)
-#endif
 {
   
-  double dZdL=0 ; 
+  double dZdL=0 ;
   int i;
   
 #ifdef __CUDA_ARCH__
@@ -2059,7 +2099,7 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
   
   if (TrackFlag[ZMotion] == 1)
     dZdL += 0.5*(yb[6*i+1] * yb[6*i+1] +
-                 yb[6*i+3] * yb[6*i+3]   ) ;
+            yb[6*i+3] * yb[6*i+3]   ) ;
   
   /* otherwise put in the change in x, y, z positions */
   
@@ -2072,115 +2112,120 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
 
 /*=====================================================================*/
 
-/* Perform tracking of one bunch through one magnet of types Quad, Sext, 
- Octu, Solenoid, including
- any transformations necessary to manage magnet, girder, or girder
- mover position offsets etc.  All strength errors are also included.
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno or if
- BEAMLINE{elemno} is not some sort of magnet.  */
+/* Perform tracking of one bunch through one magnet of types Quad, Sext,
+ * Octu, Solenoid, including
+ * any transformations necessary to manage magnet, girder, or girder
+ * mover position offsets etc.  All strength errors are also included.
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno or if
+ * BEAMLINE{elemno} is not some sort of magnet.  */
 
-int TrackBunchThruQSOS( int elemno, int bunchno, 
-                       struct TrackArgsStruc* ArgStruc,
-                       int* TrackFlag, int nPoleFlag, double splitScale, double splitS )
+int TrackBunchThruQSOS( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, int nPoleFlag, double splitScale, double splitS, unsigned long long *rSeed )
 {
   
-	double L,B,Tilt ;              /* some basic parameters */
-	double aper2 ;                 /* square of aperture radius */
-	double Xfrms[6][2] ;           /* upstream and downstream coordinate
-                                  xfrms from magnet + girder + mover
-                                  offset values */
-	double dZmod ;                 /* lorentz delay @ design momentum */
-	int PS ;
-	int ray ;              /* shortcut for 6*ray */
-	struct Bunch* ThisBunch ;    /* a shortcut */
-	int Stop ;                   /* did the ray stop? */
-	int stat = 1 ;
-	int skew ;
-	struct LucretiaParameter *ElemPar ;
-	int nPar ;
-  
+  double L,B,Tilt ;              /* some basic parameters */
+  double aper2 ;                 /* square of aperture radius */
+  double Xfrms[6][2] ;           /* upstream and downstream coordinate
+   * xfrms from magnet + girder + mover
+   * offset values */
+  double dZmod ;                 /* lorentz delay @ design momentum */
+  int PS ;
+#ifndef __CUDACC__
+  int ray ;              /* shortcut for 6*ray */
+#endif
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  int stat = 1 ;
+  int skew ;
+  struct LucretiaParameter *ElemPar ;
+  int nPar ;
+#ifdef __CUDACC__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = 1 ;
+  double *PascalMatrix, *Bang, *MaxMultInd ;
+#endif
   /* get the element parameters from BEAMLINE; exit with bad status if
-   parameters are missing or corrupted. */
-	if ( nPoleFlag != 0)
-	{
-		ElemPar = QuadPar ;
-		nPar = nQuadPar ;
-	}
-	else
-	{
-		ElemPar = SolePar ;
-		nPar = nSolePar ;
-	}
+   * parameters are missing or corrupted. */
+  if ( nPoleFlag != 0)
+  {
+    ElemPar = QuadPar ;
+    nPar = nQuadPar ;
+  }
+  else
+  {
+    ElemPar = SolePar ;
+    nPar = nSolePar ;
+  }
   
-	stat = GetDatabaseParameters( elemno, nPar, ElemPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nPar, ElemPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-	L = GetDBValue(ElemPar+QuadL) ;
+  L = GetDBValue(ElemPar+QuadL) ;
   if ( splitScale == 0 )
     splitScale = 1 ;
   else
     splitScale = splitScale / L ;
   L *= splitScale ;
-	if (L<=0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  if (L<=0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
-	B = GetDBValue(ElemPar+QuadB)  ;
-	dZmod = GetDesignLorentzDelay( ElemPar[QuadP].ValuePtr ) ;
-	if ( nPoleFlag != 0)
-		Tilt = GetDBValue(ElemPar+QuadTilt) ;
-	aper2 = GetDBValue(ElemPar+Quadaper) ;
-	aper2 *= aper2 ;
+  B = GetDBValue(ElemPar+QuadB)  ;
+  dZmod = GetDesignLorentzDelay( ElemPar[QuadP].ValuePtr ) ;
+  if ( nPoleFlag != 0)
+    Tilt = GetDBValue(ElemPar+QuadTilt) ;
+  aper2 = GetDBValue(ElemPar+Quadaper) ;
+  aper2 *= aper2 ;
   
-  /* if aperture is zero but aperture track flag is on, 
-   it's an error.  Set error status and exit. */
+  /* if aperture is zero but aperture track flag is on,
+   * it's an error.  Set error status and exit. */
   
-	if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
-	{
-		BadApertureMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
+  {
+    BadApertureMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
   /* now the error parameters */
   
-	B *= (1. + GetDBValue(ElemPar+QuaddB) ) ;
+  B *= (1. + GetDBValue(ElemPar+QuaddB) ) ;
   
   /* now get the power supply parameters, if any */
   
-	PS = (int)(GetDBValue(ElemPar+QuadPS)) ; 
-	if (PS > 0)
-	{
+  PS = (int)(GetDBValue(ElemPar+QuadPS)) ;
+  if (PS > 0)
+  {
     
     /* convert from Matlab to C indexing */
     
-		PS-- ;
-		stat = GetDatabaseParameters( PS, nPSPar, PSPar, 
-                                 TrackPars, PSTable ) ;
-		if (stat == 0)
-		{
-			BadPSMessage( elemno+1, PS+1 ) ;
-			goto egress ;
-		}
-		B *= (GetDBValue(PSPar+PSAmpl)) * 
-    (1. +  GetDBValue(PSPar+PSdAmpl) ) ;
-		
-	} /* end of PS interlude
-     
-     /* now we get the complete input- and output- transformations for the
-     element courtesy of the relevant function */
+    PS-- ;
+    stat = GetDatabaseParameters( PS, nPSPar, PSPar,
+            TrackPars, PSTable ) ;
+    if (stat == 0)
+    {
+      BadPSMessage( elemno+1, PS+1 ) ;
+      goto egress ;
+    }
+    B *= (GetDBValue(PSPar+PSAmpl)) *
+            (1. +  GetDBValue(PSPar+PSdAmpl) ) ;
+    
+  } /* end of PS interlude
+     *
+   * /* now we get the complete input- and output- transformations for the
+   * element courtesy of the relevant function */
   
   /* Apply split scale */
   
@@ -2188,76 +2233,84 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
   if ( splitS == 0 )
     splitS = *ElemPar[QuadS].ValuePtr ;
   
-	stat = GetTotalOffsetXfrms( ElemPar[QuadGirder].ValuePtr,
-                             &L,
-                             &splitS,
-                             ElemPar[QuadOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms( ElemPar[QuadGirder].ValuePtr,
+          &L,
+          &splitS,
+          ElemPar[QuadOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-  /* since the rotation transformation can be applied to the magnet 
-   rather than the beam, do that now; also figure out whether we are
-   dealing with a normal or partially skew magnet */
+  /* since the rotation transformation can be applied to the magnet
+   * rather than the beam, do that now; also figure out whether we are
+   * dealing with a normal or partially skew magnet */
   
-	if ( nPoleFlag != 0)
-	{
-		Tilt += Xfrms[5][0] ;
-		if  (fabs(sin(nPoleFlag*Tilt)) < MIN_TILT)
-			skew = 0 ;
-		else
-			skew = 1 ;
-	}
-	else /* solenoids are always "skew" magnets */
-		skew = 1 ; 
+  if ( nPoleFlag != 0)
+  {
+    Tilt += Xfrms[5][0] ;
+    if  (fabs(sin(nPoleFlag*Tilt)) < MIN_TILT)
+      skew = 0 ;
+    else
+      skew = 1 ;
+  }
+  else /* solenoids are always "skew" magnets */
+    skew = 1 ;
   
   /* if this is an octupole, we need to make sure that the infrastructure for
-   handling a thin-lens multipole is ready to go */
+   * handling a thin-lens multipole is ready to go */
   
-	if (nPoleFlag == 4)
-	{
-		if ( GetMaxMultipoleIndex( ) < nPoleFlag )
-			ComputeNewMultipoleStuff( nPoleFlag ) ;
-	}
+  if (nPoleFlag == 4)
+  {
+    if ( GetMaxMultipoleIndex( ) < nPoleFlag )
+      ComputeNewMultipoleStuff( nPoleFlag ) ;
+  }
   
   
   /* make a shortcut to get to the bunch of interest */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  
   
   /* execute ray tracking kernel (loop over rays) */
-#ifdef __CUDA_ARCH__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
-  TrackBunchThruQSOS_kernel<<blocksPerGrid, threadsPerBlock>>(ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->y, ThisBunch->x_gpu, TrackFlag,
-                                                              ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms, dZmod ) ;
+#ifdef __CUDACC__
+  PascalMatrix = GetPascalMatrix_gpu( ) ;
+  Bang         = GetFactorial_gpu( ) ;
+  MaxMultInd = GetMaxMultipoleIndex_gpu( ) ;
+  threadsPerBlock = 256 ; // Max = 1024
+  blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
+  TrackBunchThruQSOS_kernel<<<blocksPerGrid, threadsPerBlock>>>(ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->y, ThisBunch->x_gpu, TrackFlag,
+          ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms, dZmod, StoppedParticles_gpu,
+          PascalMatrix, Bang, MaxMultInd, *rSeed ) ;
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruQSOS_kernel(ray, ThisBunch->stop, ThisBunch->y, ThisBunch->x, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, nPoleFlag,
-                              B, L, Tilt, skew, Xfrms, dZmod) ;
-#endif  
+            B, L, Tilt, skew, Xfrms, dZmod, StoppedParticles) ;
+#endif
   
-egress:
-  
-	return stat;
-  
+  egress:
+    
+    return stat;
+    
 }
 
 
 /* Quad, Sext, Octu, Solenoid Tracking kernel */
-#ifdef __CUDA_ARCH__
-__global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-                                          int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod)
+#ifdef __CUDACC__
+void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
+        int skew, double Xfrms[6][2], double dZmod, int* stp, double* PascalMatrix, double* Bang,
+        double* MaxMultInd, unsigned long long rSeed)
 #else
-void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,
-                               double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod)
+        void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
+        int skew, double Xfrms[6][2], double dZmod, int* stp)
 #endif
 {
   int ray,coord,raystart,doStop,icount ;
@@ -2265,14 +2318,15 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   double SR_dP = 0. ;
   Rmat Rquad ;                 /* quad linear map */
   double T5xx[10] ;
-#ifndef __CUDA_ARCH__  
+#ifndef __CUDA_ARCH__
   double LastRayP = 0. ;
+#else
+  curandState_t *rState = NULL ;
 #endif
   double TijkTransv[4][10] ;
   double nPoleOctu = 3. ;
   double AngVecOctu[2] = {0,0} ;
   double r ;
-  
 #ifdef __CUDA_ARCH__
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
   if ( ray >= nray ) return;
@@ -2281,9 +2335,14 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
 #endif
   raystart = 6*ray ;
   
+  /* initialise random number sequence*/
+#ifdef __CUDA_ARCH__
+  curand_init(rSeed,(unsigned long long)ray,0,rState) ;
+#endif
+  
   /* if the ray was previously stopped just copy it over */
   
-  if (stop[ray] > 0.) 
+  if (stop[ray] > 0.)
   {
     for (coord=0 ; coord<6 ; coord++) {
       yb[raystart+coord] = xb[raystart+coord] ;
@@ -2291,7 +2350,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   }
   
   /* make ray coordinates into local ones, including offsets etc which
-   are demanded by the transformation structure. */
+   * are demanded by the transformation structure. */
   
   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
   ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
@@ -2303,15 +2362,15 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   if (TrackFlag[Aper] == 1)
   {
     doStop = CheckAperStopPart( xb, yb, stop, ngoodray,elemno,&aper2,ray,UPSTREAM,
-                               NULL, 0 ) ;
+            NULL, 0, stp ) ;
     if (doStop == 1)
       return ;
   }
   
   /* Compute the SR momentum loss, if required, and apply 1/2 of the
-   loss here at the entry face of the element; as long as we're here,
-   check to see whether the particle has lost all of its momentum,
-   and if so stop it. */
+   * loss here at the entry face of the element; as long as we're here,
+   * check to see whether the particle has lost all of its momentum,
+   * and if so stop it. */
   
   if (TrackFlag[SynRad] > SR_None)
   {
@@ -2319,23 +2378,26 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
     r = sqrt(*x * *x + *y * *y) ;
     rpow = r ;
     if ( nPoleFlag >= 3 )
-      rpow *= r / 2 ; 
-    if ( nPoleFlag >= 4 ) 
+      rpow *= r / 2 ;
+    if ( nPoleFlag >= 4 )
       rpow *= r / 3 ;
-    SR_dP = ComputeSRMomentumLoss( *p0,
-                                  rpow*fabs(B), L, TrackFlag[SynRad] ) ;
+#ifdef __CUDA_ARCH__
+    SR_dP = ComputeSRMomentumLoss_gpu( *p0, rpow*fabs(B), L, TrackFlag[SynRad], rState ) ;
+#else
+    SR_dP = ComputeSRMomentumLoss( *p0, rpow*fabs(B), L, TrackFlag[SynRad] ) ;
+#endif
     yb[raystart+5] = *p0 - SR_dP ;
-    doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM ) ;
-    if (doStop == 1) 
+    doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM, stp ) ;
+    if (doStop == 1)
       return ;
     *p0 -= SR_dP / 2 ;
   }
   else
-    yb[raystart+5] = *p0 ; 
+    yb[raystart+5] = *p0 ;
   
   /* now we switch on the element class which is being tracked through */
   
-  switch ( nPoleFlag ) 
+  switch ( nPoleFlag )
   {
     case 0 : case 2 : /* solenoid or quadrupole */
       
@@ -2343,22 +2405,22 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
 #ifndef __CUDA_ARCH__
       if (*p0 != LastRayP)
       {
-#endif  
-        if (nPoleFlag == 2) 
+#endif
+        if (nPoleFlag == 2)
           GetQuadMap( L, B, Tilt, xb[raystart+5], Rquad, T5xx ) ;
         else
           GetSolenoidMap( L, B, xb[raystart+5], Rquad, T5xx ) ;
-#ifndef __CUDA_ARCH     
+#ifndef __CUDA_ARCH__
       }
       LastRayP = *p0 ;
-#endif    
+#endif
       
       /* perform the matrix transformation; since we know that the quad has
-       no 5j or 6j terms, just do the 4x4 multiplication */
+       * no 5j or 6j terms, just do the 4x4 multiplication */
       
       
       yb[raystart]   = *x*Rquad[0][0] + *px * Rquad[0][1] ;
-      yb[raystart+1] = *x*Rquad[1][0] + *px * Rquad[1][1] ; 
+      yb[raystart+1] = *x*Rquad[1][0] + *px * Rquad[1][1] ;
       yb[raystart+2] = *y*Rquad[2][2] + *py * Rquad[2][3] ;
       yb[raystart+3] = *y*Rquad[3][2] + *py * Rquad[3][3] ;
       
@@ -2373,18 +2435,18 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
       
       /* now for the 5xx terms */
       if (TrackFlag[ZMotion] == 1)
-        yb[raystart+4] += 
-        T5xx[0] * xb[raystart+0] * xb[raystart+0]
-        +	     T5xx[1] * xb[raystart+0] * xb[raystart+1]
-        +	     T5xx[2] * xb[raystart+0] * xb[raystart+2]
-        +	     T5xx[3] * xb[raystart+0] * xb[raystart+3]
-        +	     T5xx[4] * xb[raystart+1] * xb[raystart+1]
-        +	     T5xx[5] * xb[raystart+1] * xb[raystart+2]
-        +	     T5xx[6] * xb[raystart+1] * xb[raystart+3]
-        +	     T5xx[7] * xb[raystart+2] * xb[raystart+2]
-        +	     T5xx[8] * xb[raystart+2] * xb[raystart+3]
-        +	     T5xx[9] * xb[raystart+3] * xb[raystart+3]
-        ;
+        yb[raystart+4] +=
+                T5xx[0] * xb[raystart+0] * xb[raystart+0]
+                +	     T5xx[1] * xb[raystart+0] * xb[raystart+1]
+                +	     T5xx[2] * xb[raystart+0] * xb[raystart+2]
+                +	     T5xx[3] * xb[raystart+0] * xb[raystart+3]
+                +	     T5xx[4] * xb[raystart+1] * xb[raystart+1]
+                +	     T5xx[5] * xb[raystart+1] * xb[raystart+2]
+                +	     T5xx[6] * xb[raystart+1] * xb[raystart+3]
+                +	     T5xx[7] * xb[raystart+2] * xb[raystart+2]
+                +	     T5xx[8] * xb[raystart+2] * xb[raystart+3]
+                +	     T5xx[9] * xb[raystart+3] * xb[raystart+3]
+                ;
       
       
       break ; /* end of quad operations */
@@ -2392,9 +2454,9 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
     case 3:   /* sextupole */
 #ifndef __CUDA_ARCH__
       if (*p0 != LastRayP)
-#endif      
-        GetSextMap( L, B, Tilt, xb[raystart+5], 
-                   TijkTransv ) ;
+#endif
+        GetSextMap( L, B, Tilt, xb[raystart+5],
+                TijkTransv ) ;
 #ifndef __CUDA_ARCH__
       LastRayP = *p0 ;
 #endif
@@ -2409,34 +2471,34 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
       for (icount=0 ; icount<2 ; icount++)
       {
         yb[raystart+icount] +=
-        TijkTransv[icount][0] * *x  * *x  + 
-        TijkTransv[icount][1] * *x  * *px + 
-        TijkTransv[icount][4] * *px * *px + 
-        TijkTransv[icount][7] * *y  * *y  + 
-        TijkTransv[icount][8] * *y  * *py + 
-        TijkTransv[icount][9] * *py * *py   ;
+                TijkTransv[icount][0] * *x  * *x  +
+                TijkTransv[icount][1] * *x  * *px +
+                TijkTransv[icount][4] * *px * *px +
+                TijkTransv[icount][7] * *y  * *y  +
+                TijkTransv[icount][8] * *y  * *py +
+                TijkTransv[icount][9] * *py * *py   ;
         
         yb[raystart+icount+2] +=
-        TijkTransv[icount+2][2] * *x  * *y  + 
-        TijkTransv[icount+2][3] * *x  * *py + 
-        TijkTransv[icount+2][5] * *px * *y  + 
-        TijkTransv[icount+2][6] * *px * *py   ;
+                TijkTransv[icount+2][2] * *x  * *y  +
+                TijkTransv[icount+2][3] * *x  * *py +
+                TijkTransv[icount+2][5] * *px * *y  +
+                TijkTransv[icount+2][6] * *px * *py   ;
         
         if (skew == 1)
         {
           yb[raystart+icount] +=
-          TijkTransv[icount][2] * *x  * *y  + 
-          TijkTransv[icount][3] * *x  * *py + 
-          TijkTransv[icount][5] * *px * *y  + 
-          TijkTransv[icount][6] * *px * *py   ;
+                  TijkTransv[icount][2] * *x  * *y  +
+                  TijkTransv[icount][3] * *x  * *py +
+                  TijkTransv[icount][5] * *px * *y  +
+                  TijkTransv[icount][6] * *px * *py   ;
           
           yb[raystart+icount+2] +=
-          TijkTransv[icount+2][0] * *x  * *x  + 
-          TijkTransv[icount+2][1] * *x  * *px + 
-          TijkTransv[icount+2][4] * *px * *px + 
-          TijkTransv[icount+2][7] * *y  * *y  + 
-          TijkTransv[icount+2][8] * *y  * *py + 
-          TijkTransv[icount+2][9] * *py * *py   ;
+                  TijkTransv[icount+2][0] * *x  * *x  +
+                  TijkTransv[icount+2][1] * *x  * *px +
+                  TijkTransv[icount+2][4] * *px * *px +
+                  TijkTransv[icount+2][7] * *y  * *y  +
+                  TijkTransv[icount+2][8] * *y  * *py +
+                  TijkTransv[icount+2][9] * *py * *py   ;
         }
       }
       
@@ -2452,14 +2514,22 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
       break ;
       
     case 4: /* octupole -- handled as a special case of the thin-lens
-             multipole, with SR disabled */
-      
-      PropagateRayThruMult( L, &B, &Tilt, &nPoleOctu, 1, AngVecOctu, 
-                           1.0, 0.0, 
-                           &(xb[raystart]), 
-                           &(yb[raystart]), 
-                           TrackFlag[ZMotion], SR_None, 0,
-                           stop,ngoodray,xb,yb, elemno, ray, 1 ) ;
+     * multipole, with SR disabled */
+#ifdef __CUDA_ARCH__
+      PropagateRayThruMult_gpu( L, &B, &Tilt, &nPoleOctu, 1, AngVecOctu,
+              1.0, 0.0,
+              &(xb[raystart]),
+              &(yb[raystart]),
+              TrackFlag[ZMotion], SR_None, 0,
+              stop,ngoodray,xb,yb, elemno, ray, 1, PascalMatrix, Bang, MaxMultInd, rState ) ;
+#else
+      PropagateRayThruMult( L, &B, &Tilt, &nPoleOctu, 1, AngVecOctu,
+              1.0, 0.0,
+              &(xb[raystart]),
+              &(yb[raystart]),
+              TrackFlag[ZMotion], SR_None, 0,
+              stop,ngoodray,xb,yb, elemno, ray, 1 ) ;
+#endif
       break ;
   }
   
@@ -2474,7 +2544,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   if (TrackFlag[Aper] == 1)
   {
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,DOWNSTREAM,
-                               NULL, 0 ) ;
+            NULL, 0, stp ) ;
     if (doStop == 1)
       return ;
   }
@@ -2487,72 +2557,78 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   
   /* check amplitude of outgoing angular momentum */
   
-  doStop = CheckPperpStopPart( stop, ngoodray , elemno, ray, 
-                              px, py ) ;
+  doStop = CheckPperpStopPart( stop, ngoodray , elemno, ray,
+          px, py, stp ) ;
   
 }
 
 /*=====================================================================*/
 
 /* Perform tracking of one bunch through one multipole magnet, including
- any transformations necessary to manage magnet, girder, or girder
- mover position offsets etc.  All strength errors are also included.
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno or if
- BEAMLINE{elemno} is not some sort of magnet.  */
+ * any transformations necessary to manage magnet, girder, or girder
+ * mover position offsets etc.  All strength errors are also included.
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno or if
+ * BEAMLINE{elemno} is not some sort of magnet.  */
 
-int TrackBunchThruMult( int elemno, int bunchno, 
-                       struct TrackArgsStruc* ArgStruc,
-                       int* TrackFlag, double splitScale, double splitS  )
+int TrackBunchThruMult( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, double splitScale, double splitS, unsigned long long *rSeed  )
 {
   
-	double dB, Tilt, L, B ;           /* some basic parameters */
-	double aper2 ;                 /* square of aperture radius */
-	double Xfrms[6][2] ;           /* upstream and downstream coordinate
-                                  xfrms from magnet + girder + mover
-                                  offset values */
-	double dZmod ;                 /* lorentz delay @ design momentum */
-	int PS ;
-	int ray ;                    /* shortcut for 6*ray */
-	struct Bunch* ThisBunch ;    /* a shortcut */
-	int Stop ;                   /* did the ray stop? */
-	int pole ;
-	double maxpole ;
-	double dmy ;
-	int stat = 1 ;
-	double Lrad ; 
+  double dB, Tilt, L ;           /* some basic parameters */
+  double aper2 ;                 /* square of aperture radius */
+  double Xfrms[6][2] ;           /* upstream and downstream coordinate
+   * xfrms from magnet + girder + mover
+   * offset values */
+  double dZmod ;                 /* lorentz delay @ design momentum */
+  int PS ;
+#ifndef __CUDACC__
+  int ray ;                    /* shortcut for 6*ray */
+#endif
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  int pole ;
+  double maxpole ;
+  double dmy ;
+  int stat = 1 ;
+  double Lrad ;
+#ifdef __CUDACC__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = 1;
+  double *PascalMatrix, *Bang, *MaxMultInd ;
+#endif
   
   /* get the element parameters from BEAMLINE; exit with bad status if
-   parameters are missing or corrupted. */
+   * parameters are missing or corrupted. */
   
-	stat = GetDatabaseParameters( elemno, nMultPar, MultPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nMultPar, MultPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* check to make sure that the B-field, tilt, and PoleIndex fields are all
-   equal in length */
+   * equal in length */
   
-	if ( (MultPar[MultB].Length != MultPar[MultTilt].Length )     ||
-      (MultPar[MultB].Length != MultPar[MultPoleIndex].Length)    )
-	{
-		stat = 0 ;
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if ( (MultPar[MultB].Length != MultPar[MultTilt].Length )     ||
+          (MultPar[MultB].Length != MultPar[MultPoleIndex].Length)    )
+  {
+    stat = 0 ;
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* check to make sure the pole indices are integer valued.  While we're
-   at it, find the maximum pole index value */
+   * at it, find the maximum pole index value */
   
-	maxpole = -1 ;
-	for (pole=0 ; pole<MultPar[MultPoleIndex].Length ; pole++)
-	{
+  maxpole = -1 ;
+  for (pole=0 ; pole<MultPar[MultPoleIndex].Length ; pole++)
+  {
     if ( modf(MultPar[MultPoleIndex].ValuePtr[pole],&dmy) != 0 )
     {
       stat = 0 ;
@@ -2561,138 +2637,146 @@ int TrackBunchThruMult( int elemno, int bunchno,
     }
     if (MultPar[MultPoleIndex].ValuePtr[pole] > maxpole)
       maxpole = MultPar[MultPoleIndex].ValuePtr[pole] ;
-	}
+  }
   
   /* generate the Pascal matrix and factorial vector, if needed */
   
-	if (GetMaxMultipoleIndex( ) < maxpole+1.)
-		ComputeNewMultipoleStuff(maxpole+1.) ;
+  if (GetMaxMultipoleIndex( ) < maxpole+1.)
+    ComputeNewMultipoleStuff(maxpole+1.) ;
   
-	L = GetDBValue(MultPar + MultL) ;
+  L = GetDBValue(MultPar + MultL) ;
   if ( splitScale ==0 )
     splitScale = 1 ;
   else
     splitScale = splitScale / L ;
   L *= splitScale ;
   
-	dZmod = GetDesignLorentzDelay( MultPar[MultP].ValuePtr ) ;
-	aper2 = GetDBValue(MultPar+Multaper) ;
-	aper2 *= aper2 ;
-	Lrad = GetDBValue(MultPar+MultLrad) ;
-	if (Lrad<=0)
-		Lrad = L ;
+  dZmod = GetDesignLorentzDelay( MultPar[MultP].ValuePtr ) ;
+  aper2 = GetDBValue(MultPar+Multaper) ;
+  aper2 *= aper2 ;
+  Lrad = GetDBValue(MultPar+MultLrad) ;
+  if (Lrad<=0)
+    Lrad = L ;
   
   Lrad *= splitScale ;
   
-  /* if aperture is zero but aperture track flag is on, 
-   it's an error.  Set error status and exit. */
+  /* if aperture is zero but aperture track flag is on,
+   * it's an error.  Set error status and exit. */
   
-	if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
-	{
-		BadApertureMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
+  {
+    BadApertureMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
   /* if SR is turned on, make sure there's a nonzero Lrad to be used! */
   
-	if ( (TrackFlag[SynRad]!=SR_None) &&
-      (Lrad<=0.)                       )
-	{
-		BadSROptionsMessage( elemno+1 ) ;
-		stat = 0 ; 
-		goto egress ;
-	}
+  if ( (TrackFlag[SynRad]!=SR_None) &&
+          (Lrad<=0.)                       )
+  {
+    BadSROptionsMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
   /* now the error parameters */
   
-	dB = 1. + GetDBValue(MultPar+MultdB) ;
+  dB = 1. + GetDBValue(MultPar+MultdB) ;
   
   /* now get the power supply parameters, if any */
   
-	PS = (int)(GetDBValue(MultPar+MultPS)) ; 
-	if (PS > 0)
-	{
+  PS = (int)(GetDBValue(MultPar+MultPS)) ;
+  if (PS > 0)
+  {
     
     /* convert from Matlab to C indexing */
     
-		PS-- ;
-		stat = GetDatabaseParameters( PS, nPSPar, PSPar, 
-                                 TrackPars, PSTable ) ;
-		if (stat == 0)
-		{
-			BadPSMessage( elemno+1, PS+1 ) ;
-			goto egress ;
-		}
-		dB *= (GetDBValue(PSPar+PSAmpl)) * 
-    (1. +  GetDBValue(PSPar+PSdAmpl) ) ;
-		
-	} /* end of PS interlude
-     
-     /* now we get the complete input- and output- transformations for the
-     element courtesy of the relevant function */
+    PS-- ;
+    stat = GetDatabaseParameters( PS, nPSPar, PSPar,
+            TrackPars, PSTable ) ;
+    if (stat == 0)
+    {
+      BadPSMessage( elemno+1, PS+1 ) ;
+      goto egress ;
+    }
+    dB *= (GetDBValue(PSPar+PSAmpl)) *
+            (1. +  GetDBValue(PSPar+PSdAmpl) ) ;
+    
+  } /* end of PS interlude
+     *
+   * /* now we get the complete input- and output- transformations for the
+   * element courtesy of the relevant function */
   
   if ( splitS == 0 )
     splitS = *MultPar[MultS].ValuePtr ;
   
-	stat = GetTotalOffsetXfrms( MultPar[MultGirder].ValuePtr,
-                             &L,
-                             &splitS,
-                             MultPar[MultOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms( MultPar[MultGirder].ValuePtr,
+          &L,
+          &splitS,
+          MultPar[MultOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-  /* since the rotation transformation can be applied to the magnet 
-   rather than the beam, do that now */
+  /* since the rotation transformation can be applied to the magnet
+   * rather than the beam, do that now */
   
-	Tilt = Xfrms[5][0] ;
+  Tilt = Xfrms[5][0] ;
   
   
   /* make a shortcut to get to the bunch of interest */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   
   /* execute ray tracking kernel (loop over rays) */
-#ifdef __CUDA_ARCH__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
-  TrackBunchThruMult_kernel<<blocksPerGrid, threadsPerBlock>>( ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->x_gpu, ThisBunch->y, TrackFlag,
-                                                              ThisBunch->ngoodray_gpu, elmno, aper2, L, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
-                                                              MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale) ;
+#ifdef __CUDACC__
+  PascalMatrix = GetPascalMatrix_gpu( ) ;
+  Bang = GetFactorial_gpu( ) ;
+  MaxMultInd = GetMaxMultipoleIndex_gpu( ) ;
+  threadsPerBlock = 256 ; // Max = 1024
+  blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
+  TrackBunchThruMult_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->x_gpu, ThisBunch->y, TrackFlag,
+          ThisBunch->ngoodray_gpu, elemno, aper2, L, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr,
+          MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
+          MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale,
+          StoppedParticles_gpu, PascalMatrix, Bang, MaxMultInd, *rSeed) ;
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruMult_kernel( ray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, L,
-                              MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
-                              MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale) ;
-#endif  
-  
-egress:
-  
-	return stat;
-  
-}
-#ifdef __CUDA_ARCH__
-__global__ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-                                          int elemno, double aper2, double L, double MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
-                                          double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale)
-#else
-void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray, int elemno, double aper2,
-                               double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength, double* MultAngleValue,
-                               double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale)
+            MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
+            MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale, StoppedParticles) ;
 #endif
-{   
+  
+  egress:
+    
+    return stat;
+    
+}
+#ifdef __CUDACC__
+void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
+        double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp,
+        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed)
+#else
+        void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
+        double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp)
+#endif
+        
+{
   int ray, raystart, coord, doStop ;
   double *x, *px, *y, *py, *z, *p0 ;
 #ifdef __CUDA_ARCH__
+  curandState_t *rState = NULL ;
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
   if ( ray >= nray ) return;
 #else
@@ -2700,9 +2784,14 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
 #endif
   raystart = 6*ray ;
   
+  /* initialise random number sequence*/
+#ifdef __CUDA_ARCH__
+  curand_init(rSeed,(unsigned long long)ray,0,rState) ;
+#endif
+  
   /* if the ray was previously stopped copy it over */
   
-  if (stop[ray] > 0.) 
+  if (stop[ray] > 0.)
   {
     for (coord=0 ; coord<6 ; coord++)
       yb[raystart+coord] = xb[raystart+coord] ;
@@ -2710,7 +2799,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   }
   
   /* make ray coordinates into local ones, including offsets etc which
-   are demanded by the transformation structure. */
+   * are demanded by the transformation structure. */
   
   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
   
@@ -2724,28 +2813,43 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   if (TrackFlag[Aper] == 1)
   {
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,UPSTREAM,
-                               NULL, 0 ) ;
+            NULL, 0, stp ) ;
     if (doStop == 1)
       return ;
   }
   
   /* Propagate through, and perform SR energy loss within the multipole
-   if required.  This is handled differently from the call to
-   PropagateRayThruMult in the QSO tracker by necessity. */
+   * if required.  This is handled differently from the call to
+   * PropagateRayThruMult in the QSO tracker by necessity. */
   
   /*		ThisBunch->y[raystart+4] = ThisBunch->x[raystart+4] ; */
+#ifdef __CUDA_ARCH__
+  PropagateRayThruMult_gpu( L,
+          MultBValue,
+          MultTiltValue,
+          MultPoleIndex,
+          MultPoleIndexLength,
+          MultAngleValue,
+          dB, Tilt,
+          &(xb[raystart]),
+          &(yb[raystart]),
+          TrackFlag[ZMotion],
+          TrackFlag[SynRad], Lrad,stop,ngoodray,xb,yb,
+          elemno, ray, splitScale, PascalMatrix, Bang, MaxMultInd, rState ) ;
+#else
   PropagateRayThruMult( L,
-                       MultBValue, 
-                       MultTiltValue,
-                       MultPoleIndex,
-                       MultPoleIndexLength,
-                       MultAngleValue,
-                       dB, Tilt, 
-                       &(xb[raystart]), 
-                       &(yb[raystart]),
-                       TrackFlag[ZMotion], 
-                       TrackFlag[SynRad], Lrad,stop,ngoodray,xb,yb,
-                       elemno, ray, splitScale ) ;
+          MultBValue,
+          MultTiltValue,
+          MultPoleIndex,
+          MultPoleIndexLength,
+          MultAngleValue,
+          dB, Tilt,
+          &(xb[raystart]),
+          &(yb[raystart]),
+          TrackFlag[ZMotion],
+          TrackFlag[SynRad], Lrad,stop,ngoodray,xb,yb,
+          elemno, ray, splitScale ) ;
+#endif
   
   if (TrackFlag[LorentzDelay] == 1)
     yb[raystart+4] += L*(LORENTZ_DELAY((*p0)) - dZmod) ;
@@ -2756,7 +2860,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   if (TrackFlag[Aper] == 1)
   {
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,DOWNSTREAM,
-                               NULL, 0 ) ;
+            NULL, 0, stp ) ;
     if (doStop == 1)
       return ;
   }
@@ -2769,257 +2873,259 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   
   /* check amplitude of outgoing angular momentum */
   
-  doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py ) ;
+  doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py, stp ) ;
 }
 
 
 /*=====================================================================*/
 
 /* Perform tracking of one bunch through one bend magnet, including
- any transformations necessary to manage magnet, girder, or girder
- mover position offsets etc.  All strength errors are also included.
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno; if
- BEAMLINE{elemno} is not some sort of magnet; or if a ray
- is encountered with momentum <=0 which was not stopped 
- (ie, if some previous procedure degraded a ray's momentum
- to zero but forgot to stop it). */
+ * any transformations necessary to manage magnet, girder, or girder
+ * mover position offsets etc.  All strength errors are also included.
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno; if
+ * BEAMLINE{elemno} is not some sort of magnet; or if a ray
+ * is encountered with momentum <=0 which was not stopped
+ * (ie, if some previous procedure degraded a ray's momentum
+ * to zero but forgot to stop it). */
 
-int TrackBunchThruSBend( int elemno, int bunchno, 
-                        struct TrackArgsStruc* ArgStruc,
-                        int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit )
+int TrackBunchThruSBend( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit, unsigned long long *rSeed )
 {
   
-	double L,Tilt ;                /* some basic parameters */
-	double intB, intG ;
-	double BScale, GScale ;
-	double E1, E2, H1, H2 ;
-	double Theta, thisS ;
-	double hgap,hgapx,fint,fintx ;
-	double hgap2,hgapx2 ;
-	double TotalTilt ;
-	double cTT, sTT, cT, sT ;
-	double Tx, Ty ;
-	double Xfrms[6][2] ;           /* upstream and downstream coordinate
-                                  xfrms from magnet + girder + mover
-                                  offset values */
-	double dZmod ;                 /* lorentz delay @ design momentum */
-	int PS, PS2, i1, i2 ;
-	int ray ;              /* shortcut for 6*ray */
-	struct Bunch* ThisBunch ;    /* a shortcut */
-	int Stop ;                   /* did the ray stop? */
-	
-	
-	int QuadLoopCount ;
-	int stat = 1 ;
-	int FirstCall = 1 ;
-	double TijkTransv[4][10] ;
-	double OffsetFromTiltError ;
-	double AngleFromTiltError ;
-	
+  double L,Tilt ;                /* some basic parameters */
+  double intB, intG ;
+  double BScale, GScale ;
+  double E1, E2, H1, H2 ;
+  double Theta, thisS ;
+  double hgap,hgapx,fint,fintx ;
+  double hgap2,hgapx2 ;
+  double TotalTilt ;
+  double cTT, sTT, cT, sT ;
+  double Tx, Ty ;
+  double Xfrms[6][2] ;           /* upstream and downstream coordinate
+   * xfrms from magnet + girder + mover
+   * offset values */
+  int PS, PS2 ;
+#ifndef __CUDACC__
+  int ray ;              /* shortcut for 6*ray */
+#endif
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  
+  int stat = 1 ;
+  double OffsetFromTiltError ;
+  double AngleFromTiltError ;
+  
+#ifdef __CUDACC__
+  int threadsPerBlock = 256 ; // Max = 1024
+  int blocksPerGrid = 1;
+#endif
+  
   
   /* get the element parameters from BEAMLINE; exit with bad status if
-   parameters are missing or corrupted. */
+   * parameters are missing or corrupted. */
   
-	stat = GetDatabaseParameters( elemno, nSBendPar, SBendPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nSBendPar, SBendPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-	L = GetDBValue(SBendPar+SBendL) * splitScale ;
-	if (L<=0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  L = GetDBValue(SBendPar+SBendL) * splitScale ;
+  if (L<=0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
-	intB = GetDBValue(SBendPar+SBendB) * splitScale ;
-	if (SBendPar[SBendB].Length > 1)
-		intG = *(SBendPar[SBendB].ValuePtr+1) * splitScale ;
-	else
-		intG = 0. ;
+  intB = GetDBValue(SBendPar+SBendB) * splitScale ;
+  if (SBendPar[SBendB].Length > 1)
+    intG = *(SBendPar[SBendB].ValuePtr+1) * splitScale ;
+  else
+    intG = 0. ;
   
-	Theta = GetDBValue(SBendPar+SBendAngle) * splitScale ;
-	dZmod = GetDesignLorentzDelay( SBendPar[SBendP].ValuePtr ) * splitScale ; 
-	Tilt = GetDBValue(SBendPar+SBendTilt) ;
+  Theta = GetDBValue(SBendPar+SBendAngle) * splitScale ;
+  Tilt = GetDBValue(SBendPar+SBendTilt) ;
   
-	E1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),0) * supEdgeEffect1 ;
-	E2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),1) * supEdgeEffect2 ;
-	if ( (cos(E1)==0.) || (cos(E2)==0.) )
-	{
-		stat = 0 ;
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  E1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),0) * supEdgeEffect1 ;
+  E2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeAngle]),1) * supEdgeEffect2 ;
+  if ( (cos(E1)==0.) || (cos(E2)==0.) )
+  {
+    stat = 0 ;
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-	H1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),0) * supEdgeEffect1 ;
-	H2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),1) * supEdgeEffect2 ;
+  H1 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),0) * supEdgeEffect1 ;
+  H2 = GetSpecialSBendPar(&(SBendPar[SBendEdgeCurvature]),1) * supEdgeEffect2 ;
   
-	hgap  = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),0) ;
-	hgapx = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),1) ;
+  hgap  = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),0) ;
+  hgapx = GetSpecialSBendPar(&(SBendPar[SBendHGAP]),1) ;
   
-	fint  = GetSpecialSBendPar(&(SBendPar[SBendFINT]),0) * supEdgeEffect1 ;
-	fintx = GetSpecialSBendPar(&(SBendPar[SBendFINT]),1) * supEdgeEffect2 ;
-	hgap2 = hgap * hgap ;
-	hgapx2 = hgapx * hgapx ;
-	
-  /* if aperture is zero but aperture track flag is on, 
-   it's an error.  Set error status and exit. */
+  fint  = GetSpecialSBendPar(&(SBendPar[SBendFINT]),0) * supEdgeEffect1 ;
+  fintx = GetSpecialSBendPar(&(SBendPar[SBendFINT]),1) * supEdgeEffect2 ;
+  hgap2 = hgap * hgap ;
+  hgapx2 = hgapx * hgapx ;
   
-	if ( ( (hgap2 == 0.)  && (TrackFlag[Aper] == 1) )
-      ||
-      ( (hgapx2 == 0.) && (TrackFlag[Aper] == 1) ) )
-	{
-		BadApertureMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  /* if aperture is zero but aperture track flag is on,
+   * it's an error.  Set error status and exit. */
+  
+  if ( ( (hgap2 == 0.)  && (TrackFlag[Aper] == 1) )
+  ||
+          ( (hgapx2 == 0.) && (TrackFlag[Aper] == 1) ) )
+  {
+    BadApertureMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
   /* now the error parameters */
   
-	BScale = 1. + GetDBValue(SBendPar+SBenddB) ;
-	if (SBendPar[SBenddB].Length > 1)
-		GScale = 1. + *(SBendPar[SBenddB].ValuePtr+1) ;
-	else
-		GScale = BScale ;
+  BScale = 1. + GetDBValue(SBendPar+SBenddB) ;
+  if (SBendPar[SBenddB].Length > 1)
+    GScale = 1. + *(SBendPar[SBenddB].ValuePtr+1) ;
+  else
+    GScale = BScale ;
   
-	intB *= BScale ;
-	intG *= GScale ;
+  intB *= BScale ;
+  intG *= GScale ;
   
   /* now get the power supply parameters, if any */
   
-	BScale = 1. ;
-	GScale = 1. ;
-	PS = (int)(GetDBValue(SBendPar+SBendPS)) ;
-	if (SBendPar[SBendPS].Length > 1)
-		PS2 = (int)(*(SBendPar[SBendPS].ValuePtr + 1)) ;
-	else
-		PS2 = PS ;
-	if (PS > 0)
-	{
+  BScale = 1. ;
+  GScale = 1. ;
+  PS = (int)(GetDBValue(SBendPar+SBendPS)) ;
+  if (SBendPar[SBendPS].Length > 1)
+    PS2 = (int)(*(SBendPar[SBendPS].ValuePtr + 1)) ;
+  else
+    PS2 = PS ;
+  if (PS > 0)
+  {
     
     /* convert from Matlab to C indexing */
     
-		PS -= 1 ;
-		stat = GetDatabaseParameters( PS, nPSPar, PSPar, 
-                                 TrackPars, PSTable ) ;
-		if (stat == 0)
-		{
-			BadPSMessage( elemno+1, PS+1 ) ;
-			goto egress ;
-		}
-		BScale = GetDBValue(PSPar+PSAmpl) * (1.+ GetDBValue(PSPar+PSdAmpl) ) ;
-	} 
-	if (PS2 > 0)
-	{
+    PS -= 1 ;
+    stat = GetDatabaseParameters( PS, nPSPar, PSPar,
+            TrackPars, PSTable ) ;
+    if (stat == 0)
+    {
+      BadPSMessage( elemno+1, PS+1 ) ;
+      goto egress ;
+    }
+    BScale = GetDBValue(PSPar+PSAmpl) * (1.+ GetDBValue(PSPar+PSdAmpl) ) ;
+  }
+  if (PS2 > 0)
+  {
     
     /* convert from Matlab to C indexing */
     
-		PS2 -= 1 ;
-		stat = GetDatabaseParameters( PS2, nPSPar, PSPar, 
-                                 TrackPars, PSTable ) ;
-		if (stat == 0)
-		{
-			BadPSMessage( elemno+1, PS2+1 ) ;
-			goto egress ;
-		}
-		GScale = GetDBValue(PSPar+PSAmpl) * (1.+ GetDBValue(PSPar+PSdAmpl) ) ;
-	} 
-	intB *= BScale ; 
-	intG *= GScale ;
+    PS2 -= 1 ;
+    stat = GetDatabaseParameters( PS2, nPSPar, PSPar,
+            TrackPars, PSTable ) ;
+    if (stat == 0)
+    {
+      BadPSMessage( elemno+1, PS2+1 ) ;
+      goto egress ;
+    }
+    GScale = GetDBValue(PSPar+PSAmpl) * (1.+ GetDBValue(PSPar+PSdAmpl) ) ;
+  }
+  intB *= BScale ;
+  intG *= GScale ;
   
   /* now we get the complete input- and output- transformations for the
-   element courtesy of the relevant function */
+   * element courtesy of the relevant function */
   if ( SBendPar[SBendS].ValuePtr == NULL )
     thisS = nSplit*L ;
   else
     thisS = *SBendPar[SBendS].ValuePtr + nSplit*L ;
-	stat = GetTotalOffsetXfrms( SBendPar[SBendGirder].ValuePtr,
-                             &L,
-                             &thisS,
-                             SBendPar[SBendOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms( SBendPar[SBendGirder].ValuePtr,
+          &L,
+          &thisS,
+          SBendPar[SBendOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* compute the total tilt of the magnet */
   
-	TotalTilt = Xfrms[5][0] + Tilt  ;
+  TotalTilt = Xfrms[5][0] + Tilt  ;
   
   /* precompute some trig functions */
   
-	cTT = cos(TotalTilt) ;
-	sTT = sin(TotalTilt) ;
-	cT = 1-cos(TotalTilt - Tilt) ;
-	sT = sin(TotalTilt - Tilt) ;
-	Tx = cT*cos(Tilt) + sT*sin(Tilt) ;
-	Ty = -sT*cos(Tilt) + cT*sin(Tilt) ;
-	if (Theta != 0.)
-		OffsetFromTiltError = L/Theta*(1-cos(Theta)) ;
-	else
-		OffsetFromTiltError = 0. ;
-	AngleFromTiltError = sin(Theta) ;
+  cTT = cos(TotalTilt) ;
+  sTT = sin(TotalTilt) ;
+  cT = 1-cos(TotalTilt - Tilt) ;
+  sT = sin(TotalTilt - Tilt) ;
+  Tx = cT*cos(Tilt) + sT*sin(Tilt) ;
+  Ty = -sT*cos(Tilt) + cT*sin(Tilt) ;
+  if (Theta != 0.)
+    OffsetFromTiltError = L/Theta*(1-cos(Theta)) ;
+  else
+    OffsetFromTiltError = 0. ;
+  AngleFromTiltError = sin(Theta) ;
   
   
   /* make a shortcut to get to the bunch of interest */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* execute ray tracking kernel (loop over rays) */
-#ifdef __CUDA_ARCH__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;  
-  TrackBunchThruSBend_kernel<<blocksPerGrid, threadsPerBlock>>( ThisBunch->nray, ThisBunch->x_gpu, ThisBunch->y, ThisBunch->stop_gpu,
-                                                               TrackFlag, Xfrms, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
-                                                               elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2) ;
+#ifdef __CUDACC__
+  threadsPerBlock = 256 ; // Max = 1024
+  blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
+  TrackBunchThruSBend_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->x_gpu, ThisBunch->y, ThisBunch->stop_gpu,
+          TrackFlag, Xfrms, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
+          elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed) ;
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
-    TrackBunchThruSBend_kernel(ray, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, Xfrms, cTT, sTT, Tx, Ty, 
-                               OffsetFromTiltError, AngleFromTiltError, &ThisBunch->ngoodray, hgap2, intB, intG, L, elemno, E1, H1, hgap, fint, Theta,
-                               E2, H2, hgapx, fintx, hgapx2) ;
-#endif  
+    TrackBunchThruSBend_kernel(ray, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, Xfrms, cTT, sTT, Tx, Ty,
+            OffsetFromTiltError, AngleFromTiltError, &ThisBunch->ngoodray, hgap2, intB, intG, L, elemno, E1, H1, hgap, fint, Theta,
+            E2, H2, hgapx, fintx, hgapx2, StoppedParticles) ;
+#endif
   
-egress:
-  
-	return stat;
-  
+  egress:
+    
+    return stat;
+    
 }
-
-#ifdef __CUDA_ARCH__
-__global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
-                                           double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
-                                           double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-                                           double H2, double hgapx, double fintx, double hgapx2)
-#else
+#ifdef __CUDACC__
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
-                                double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
-                                double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-                                double H2, double hgapx, double fintx, double hgapx2)
+        double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
+        double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
+        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed)
+#else
+        void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
+        double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
+        double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
+        double H2, double hgapx, double fintx, double hgapx2, int* stp)
 #endif
 {
   int ray, coord, doStop, raystart ;
   double ctemp ;
   double SR_dP = 0 ;
   double *x, *px, *y, *py, *z, *p0 ;
-#ifndef __CUDA_ARCH__    
+#ifndef __CUDA_ARCH__
   double LastRayP = 0. ;
+#else
+  curandState_t *rState = NULL ;
 #endif
   Rmat Rface1, Rface2, Rbody ; /* linear maps */
   double T5xx1[10], T5xx2[10], T5xxbody[10] ; /* 2nd order maps */
+  double* temp;
   
 #ifdef __CUDA_ARCH__
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
@@ -3028,11 +3134,15 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   ray = nray;
 #endif
   
+#ifdef __CUDA_ARCH__
+  curand_init(rSeed,(unsigned long long)ray,0,rState) ;
+#endif
+  
   raystart = 6*ray ;
   
   /* if the ray was previously stopped copy it over */
   
-  if (stop[ray] > 0.) 
+  if (stop[ray] > 0.)
   {
     for (coord=0 ; coord<6 ; coord++)
       yb[raystart+coord] = xb[raystart+coord] ;
@@ -3040,16 +3150,16 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   }
   
   /* make ray coordinates into local ones, including offsets etc which
-   are demanded by the transformation structure. */
+   * are demanded by the transformation structure. */
   
   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
   
   ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
   
   /* rotate particles into the coordinate frame of the magnet.  Note that the
-   offsets are performed first, indicating that both rotation and translation
-   of each magnet is in the global coordinate system (ie, the translation is
-   not in the rotated local magnet coordinate system) */
+   * offsets are performed first, indicating that both rotation and translation
+   * of each magnet is in the global coordinate system (ie, the translation is
+   * not in the rotated local magnet coordinate system) */
   
   ctemp = (*x) ;
   (*x) = (*x) * cTT + (*y) * sTT ;
@@ -3063,7 +3173,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   if (TrackFlag[Aper] == 1)
   {
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&hgap2,ray,UPSTREAM,
-                               NULL, 0 ) ;
+            NULL, 0, stp ) ;
     if (doStop == 1)
       return ;
   }
@@ -3071,9 +3181,9 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   yb[raystart+5] = *p0 ;
   
   /* Compute the SR momentum loss, if required, and apply 1/2 of the
-   loss here at the entry face of the element; as long as we're here,
-   check to see whether the particle has lost all of its momentum,
-   and if so stop it. */
+   * loss here at the entry face of the element; as long as we're here,
+   * check to see whether the particle has lost all of its momentum,
+   * and if so stop it. */
   
   if (TrackFlag[SynRad] > SR_None)
   {
@@ -3081,10 +3191,13 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
     By = intB + intG * (*x) ;
     Bx = intG * (*y) ;
     Beff = sqrt(Bx*Bx + By*By) ;
-    SR_dP = ComputeSRMomentumLoss( *p0,
-                                  Beff, L, TrackFlag[SynRad] ) ;
-    doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM ) ;
-    if (doStop == 1) 
+#ifdef __CUDA_ARCH__
+    SR_dP = ComputeSRMomentumLoss_gpu( *p0, Beff, L, TrackFlag[SynRad], rState ) ;
+#else
+    SR_dP = ComputeSRMomentumLoss( *p0, Beff, L, TrackFlag[SynRad] ) ;
+#endif
+    doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM, stp ) ;
+    if (doStop == 1)
       return ;
     *p0 -= SR_dP / 2 ;
   }
@@ -3092,29 +3205,32 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   /* entrance face transformation : */
 #ifndef __CUDA_ARCH__
   if (*p0 != LastRayP)
-#endif      
-    GetBendFringeMap( L, intB, intG, *p0, E1, H1, 
-                     hgap, fint, 1., Rface1, T5xx1 ) ;
+#endif
+    GetBendFringeMap( L, intB, intG, *p0, E1, H1,
+            hgap, fint, 1., Rface1, T5xx1 ) ;
   
   /* make use of the fact that the map is rather sparse */
   
-  yb[raystart] = (*x) + T5xx1[0] * (*x) * (*x) 
+  yb[raystart] = (*x) + T5xx1[0] * (*x) * (*x)
   + T5xx1[1] * (*y) * (*y) ;
-  yb[raystart+1] = Rface1[1][0] * (*x) + (*px) 
-  + T5xx1[2] * (*x) * (*x) 
+  yb[raystart+1] = Rface1[1][0] * (*x) + (*px)
+  + T5xx1[2] * (*x) * (*x)
   + T5xx1[3] * (*x) * (*px)
-  + T5xx1[4] * (*y) * (*y) 
+  + T5xx1[4] * (*y) * (*y)
   + T5xx1[5] * (*y) * (*py) ;
   yb[raystart+2] = (*y) + T5xx1[6] * (*x) * (*y) ;
-  yb[raystart+3] = Rface1[3][2] * (*y) + (*py) 
-  + T5xx1[7] * (*x) * (*y) 
+  yb[raystart+3] = Rface1[3][2] * (*y) + (*py)
+  + T5xx1[7] * (*x) * (*y)
   + T5xx1[8] * (*x) * (*py)
   + T5xx1[9] * (*px) * (*y) ;
   yb[raystart+4] = *z ;
   yb[raystart+5] = *p0 ;
   
   /* exchange x and y */
-  XYExchange( &xb, &yb, nray ) ;
+  /*XYExchange( &xb, &yb, nray ) ;*/
+  temp = xb ;
+  xb = yb ;
+  yb = temp ;
   
   /* reassign the pointers to the "new" x  */
   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
@@ -3123,51 +3239,54 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
 #ifndef __CUDA_ARCH__
   if (*p0 != LastRayP)
 #endif
-    GetLucretiaSBendMap( L, Theta, intB, intG, *p0, Rbody, T5xxbody ) ; 
+    GetLucretiaSBendMap( L, Theta, intB, intG, *p0, Rbody, T5xxbody ) ;
   
-  /* apply the map; since we rotated the coordinates, we know that the cross-plane 
-   terms of the map are zero and can be neglected */
+  /* apply the map; since we rotated the coordinates, we know that the cross-plane
+   * terms of the map are zero and can be neglected */
   
-  yb[raystart] = *x*Rbody[0][0] + *px * Rbody[0][1]  
-  + Rbody[0][5] ;
-  yb[raystart+1] = *x*Rbody[1][0] + *px * Rbody[1][1] 
-  + Rbody[1][5] ;
-  yb[raystart+2] = *y*Rbody[2][2] + *py * Rbody[2][3] ; 
+  yb[raystart] = *x*Rbody[0][0] + *px * Rbody[0][1]
+          + Rbody[0][5] ;
+  yb[raystart+1] = *x*Rbody[1][0] + *px * Rbody[1][1]
+          + Rbody[1][5] ;
+  yb[raystart+2] = *y*Rbody[2][2] + *py * Rbody[2][3] ;
   yb[raystart+3] = *y*Rbody[3][2] + *py * Rbody[3][3] ;
-  yb[raystart+4] = *z + *x * Rbody[4][0] + *px * Rbody[4][1] 
-  + Rbody[4][5] 
-  + (*x) * (*x) * T5xxbody[0]
-  + (*x) * (*px) * T5xxbody[1]
-  + (*px) * (*px) * T5xxbody[2]
-  + (*y) * (*y) * T5xxbody[3]
-  + (*y) * (*py) * T5xxbody[4]
-  + (*py) * (*py) * T5xxbody[5] ;
+  yb[raystart+4] = *z + *x * Rbody[4][0] + *px * Rbody[4][1]
+          + Rbody[4][5]
+          + (*x) * (*x) * T5xxbody[0]
+          + (*x) * (*px) * T5xxbody[1]
+          + (*px) * (*px) * T5xxbody[2]
+          + (*y) * (*y) * T5xxbody[3]
+          + (*y) * (*py) * T5xxbody[4]
+          + (*py) * (*py) * T5xxbody[5] ;
   yb[raystart+5] = *p0 ;
   
   /* now we have to do the coordinate exchange again */
-  XYExchange( &xb, &yb, nray ) ;
+  /*XYExchange( &xb, &yb, nray ) ;*/
+  temp = xb ;
+  xb = yb ;
+  yb = temp ;
   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
   
   /* exit-face map */
 #ifndef __CUDA_ARCH__
   if (*p0 != LastRayP)
-#endif      
-    GetBendFringeMap( L, intB, intG, *p0, E2, H2, 
-                     hgapx, fintx, -1., Rface2, T5xx2 ) ;
+#endif
+    GetBendFringeMap( L, intB, intG, *p0, E2, H2,
+            hgapx, fintx, -1., Rface2, T5xx2 ) ;
   
-
+  
   /* make use of the fact that the map is rather sparse */
   
-  yb[raystart] = (*x) + T5xx2[0] * (*x) * (*x) 
+  yb[raystart] = (*x) + T5xx2[0] * (*x) * (*x)
   + T5xx2[1] * (*y) * (*y) ;
-  yb[raystart+1] = Rface2[1][0] * (*x) + (*px) 
-  + T5xx2[2] * (*x) * (*x) 
+  yb[raystart+1] = Rface2[1][0] * (*x) + (*px)
+  + T5xx2[2] * (*x) * (*x)
   + T5xx2[3] * (*x) * (*px)
-  + T5xx2[4] * (*y) * (*y) 
+  + T5xx2[4] * (*y) * (*y)
   + T5xx2[5] * (*y) * (*py) ;
   yb[raystart+2] = (*y) + T5xx2[6] * (*x) * (*y) ;
-  yb[raystart+3] = Rface2[3][2] * (*y) + (*py) 
-  + T5xx2[7] * (*x) * (*y) 
+  yb[raystart+3] = Rface2[3][2] * (*y) + (*py)
+  + T5xx2[7] * (*x) * (*y)
   + T5xx2[8] * (*x) * (*py)
   + T5xx2[9] * (*px) * (*y) ;
   yb[raystart+4] = *z ;
@@ -3185,7 +3304,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   if (TrackFlag[Aper] == 1)
   {
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&hgapx2,ray,DOWNSTREAM,
-                               NULL, 0 ) ;
+            NULL, 0, stp ) ;
     if (doStop == 1)
       return ;
   }
@@ -3197,15 +3316,15 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   /* undo the coordinate rotations */
   
   ctemp = yb[raystart] ;
-  yb[raystart] = yb[raystart] * cTT 
-  - yb[raystart+2] * sTT ;
-  yb[raystart+2] = yb[raystart+2] * cTT 
-  + ctemp * sTT ;
+  yb[raystart] = yb[raystart] * cTT
+          - yb[raystart+2] * sTT ;
+  yb[raystart+2] = yb[raystart+2] * cTT
+          + ctemp * sTT ;
   ctemp = yb[raystart+1] ;
-  yb[raystart+1] = yb[raystart+1] * cTT 
-  - yb[raystart+3] * sTT ;
-  yb[raystart+3] = yb[raystart+3] * cTT 
-  + ctemp * sTT ;
+  yb[raystart+1] = yb[raystart+1] * cTT
+          - yb[raystart+3] * sTT ;
+  yb[raystart+3] = yb[raystart+3] * cTT
+          + ctemp * sTT ;
   
   /* undo the coordinate transformations */
   
@@ -3214,7 +3333,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
   
   /* if the bend magnet has an error rotation, this will cause a deflection of the
-   beam wrt the design coordinate axis.  Apply this deflection now */
+   * beam wrt the design coordinate axis.  Apply this deflection now */
   
   yb[raystart] += Tx * OffsetFromTiltError ;
   yb[raystart+1] += Tx * AngleFromTiltError ;
@@ -3223,535 +3342,528 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   
   /* finally, if the transverse momentum has gotten too high, stop the particle */
   
-  doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py ) ;
+  doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py, stp ) ;
   
-}    
+}
 
 /*=====================================================================*/
 
 /* Perform tracking of one bunch through one RF structure, including
- any transformations necessary to manage magnet, girder, or girder
- mover position offsets etc.  All strength errors are also included.
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno; if
- BEAMLINE{elemno} is not an Lcav; if a ray is encountered
- with momentum <= 0 but which has not been STOPped.  */
+ * any transformations necessary to manage magnet, girder, or girder
+ * mover position offsets etc.  All strength errors are also included.
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno; if
+ * BEAMLINE{elemno} is not an Lcav; if a ray is encountered
+ * with momentum <= 0 but which has not been STOPped.  */
 
-int TrackBunchThruRF( int elemno, int bunchno, 
-                     struct TrackArgsStruc* ArgStruc,
-                     int* TrackFlag, int Mode )
+int TrackBunchThruRF( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, int Mode )
 {
   
-	double L,dL,V ;                /* some basic parameters */
-	double phi1, freq ;            /* more basic parameters */
-	double A, dA ;                 /* Klys amplitude and its error */
-	double phi2 ;                  /* Klys phase  */
-	double aper2 ;                 /* square of aperture */
-	double Xfrms[6][2] ;           /* upstream and downstream coordinate
-                                  xfrms from magnet + girder + mover
-                                  offset values */
-	double dZmod ;                 /* lorentz delay @ design momentum */
-	int Klys ;
-	int ray,coord ;
-	int raystart ;               /* shortcut for 6*ray */
-	struct Bunch* ThisBunch ;    /* a shortcut */
-	Rmat Rcav ;                  /* structure linear map */
-	int Stop ;                   /* did the ray stop? */
-	double LastRayP = 0. ;
-	double LastRaydP = 0. ;
-	double *Q ;
-	double *xout, *yout ;
-	double dP, Krf ;
-	int ZSRno, TSRno, NSBPM ;
-	int TLRno, TLRErrno ;
-	int TLRClass, TLRErrClass ;
-	static int SBPMCounter, SBPMcount2 ;
-	double S0 ;
-	struct SRWF* ThisZSR ;
-	struct SRWF* ThisTSR ;
-	int stat = 1 ;
-	double phibunch, ddmy ;
-	double tbunch  ;
-	struct LRWFFreq* ThisTLRFreq ;
-	struct LRWFFreq* ThisTLRErrFreq ;
-	struct LRWFFreqKick* ThisStrucTLRFreqKick = NULL   ;
-	struct LRWFFreqKick* ThisStrucTLRErrFreqKick = NULL ;
+  double L,dL,V ;                /* some basic parameters */
+  double phi1, freq ;            /* more basic parameters */
+  double aper2 ;                 /* square of aperture */
+  double Xfrms[6][2] ;           /* upstream and downstream coordinate
+   * xfrms from magnet + girder + mover
+   * offset values */
+  int Klys ;
+  int ray,coord ;
+  int raystart ;               /* shortcut for 6*ray */
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  Rmat Rcav ;                  /* structure linear map */
+  int Stop ;                   /* did the ray stop? */
+  double LastRayP = 0. ;
+  double LastRaydP = 0. ;
+  double *Q ;
+  double *xout, *yout ;
+  double dP, Krf ;
+  int ZSRno, TSRno, NSBPM ;
+  int TLRno, TLRErrno ;
+  int TLRClass, TLRErrClass ;
+  static int SBPMCounter, SBPMcount2 ;
+  double S0 ;
+  struct SRWF* ThisZSR ;
+  struct SRWF* ThisTSR ;
+  int stat = 1 ;
+  double phibunch, ddmy ;
+  double tbunch  ;
+  struct LRWFFreq* ThisTLRFreq ;
+  struct LRWFFreq* ThisTLRErrFreq ;
+  struct LRWFFreqKick* ThisStrucTLRFreqKick = NULL   ;
+  struct LRWFFreqKick* ThisStrucTLRErrFreqKick = NULL ;
   
   
   /* variables related to slicing the structure for SBPMs or wakefields */
   
-	static int nslice = 0 ; 
-	static int nslicealloc = 0 ;
-	static int* doSBPM = NULL ;
-	static double* Lfrac = NULL ;
-	int TWFSliceno ;
-	int slicecount ;
+  static int nslice = 0 ;
+  static int nslicealloc = 0 ;
+  static int* doSBPM = NULL ;
+  static double* Lfrac = NULL ;
+  int TWFSliceno ;
+  int slicecount ;
   
   double *x, *px, *y, *py, *z, *p0 ;
   
   /* Pointer which allows us to re-use most of this code for either LCAV or
-   TCAV */
+   * TCAV */
   
-	struct LucretiaParameter* CavPar ;
+  struct LucretiaParameter* CavPar ;
   
   /* rotation parameters, only used for TCAV */
   
-	double Tilt, CosTilt, SinTilt ;
-	double dPKick ;
+  double Tilt, CosTilt, SinTilt ;
+  double dPKick ;
   
   /* get the element parameters from BEAMLINE; exit with bad status if
-   parameters are missing or corrupted. */
+   * parameters are missing or corrupted. */
   
-	if ( Mode == 0 ) /* LCAV */
-	{
-		stat = GetDatabaseParameters( elemno, nLcavPar, LcavPar, 
-                                 TrackPars, ElementTable ) ;
-		CavPar = LcavPar ;
-	}
-	else if ( Mode == 1 ) /* TCAV */
-	{
-		stat = GetDatabaseParameters( elemno, nTcavPar, TcavPar, 
-                                 TrackPars, ElementTable ) ;
-		CavPar = TcavPar ;
-	}
+  if ( Mode == 0 ) /* LCAV */
+  {
+    stat = GetDatabaseParameters( elemno, nLcavPar, LcavPar,
+            TrackPars, ElementTable ) ;
+    CavPar = LcavPar ;
+  }
+  else if ( Mode == 1 ) /* TCAV */
+  {
+    stat = GetDatabaseParameters( elemno, nTcavPar, TcavPar,
+            TrackPars, ElementTable ) ;
+    CavPar = TcavPar ;
+  }
   
-	if (stat==0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat==0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-	L = GetDBValue( CavPar+LcavL ) ;
-	if (L<=0)
-	{
-		stat = 0 ;
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  L = GetDBValue( CavPar+LcavL ) ;
+  if (L<=0)
+  {
+    stat = 0 ;
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-	V = GetDBValue( CavPar+LcavVolt ) ;
-	phi1 = GetDBValue( CavPar+LcavPhase ) ;
+  V = GetDBValue( CavPar+LcavVolt ) ;
+  phi1 = GetDBValue( CavPar+LcavPhase ) ;
   
   /* now for optional parameters */
   
-	dZmod = GetDesignLorentzDelay( CavPar[LcavP].ValuePtr ) ;
-	aper2 = GetDBValue( CavPar+Lcavaper ) ;
-	freq = GetDBValue( CavPar+LcavFreq ) ;
-	freq = freq * 1e6 ;                /* convert to Hz */
-	Krf = 2* PI * freq / CLIGHT ;      /* wave # in 1/m */
+  aper2 = GetDBValue( CavPar+Lcavaper ) ;
+  freq = GetDBValue( CavPar+LcavFreq ) ;
+  freq = freq * 1e6 ;                /* convert to Hz */
+  Krf = 2* PI * freq / CLIGHT ;      /* wave # in 1/m */
   
-  /* compute the time interval since the first bunch, 
-   and the resulting RF phase error */
+  /* compute the time interval since the first bunch,
+   * and the resulting RF phase error */
   
-	if (FirstBunchAtRF[elemno] == -1)
-		FirstBunchAtRF[elemno] = bunchno ;
-	if (bunchno < LastBunchAtRF[elemno])
-		FirstBunchAtRF[elemno] = bunchno ;
-	LastBunchAtRF[elemno] = bunchno ;
-	tbunch = (bunchno - FirstBunchAtRF[elemno]) 
+  if (FirstBunchAtRF[elemno] == -1)
+    FirstBunchAtRF[elemno] = bunchno ;
+  if (bunchno < LastBunchAtRF[elemno])
+    FirstBunchAtRF[elemno] = bunchno ;
+  LastBunchAtRF[elemno] = bunchno ;
+  tbunch = (bunchno - FirstBunchAtRF[elemno])
   * ArgStruc->TheBeam->interval ;
-	phibunch = modf( tbunch * freq, &ddmy ) ;
-	phibunch *= 2 * PI ;
+  phibunch = modf( tbunch * freq, &ddmy ) ;
+  phibunch *= 2 * PI ;
   
-  /* if aperture is zero but aperture track flag is on, 
-   it's an error.  Set error status and exit. */
+  /* if aperture is zero but aperture track flag is on,
+   * it's an error.  Set error status and exit. */
   
-	if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
-	{
-		BadApertureMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
+  {
+    BadApertureMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
   /* do all wakefield preparation work */
   
-	stat = PrepareAllWF(CavPar[LcavWakes].ValuePtr, 
-                      CavPar[LcavWakes].Length, 
-                      TrackFlag, elemno, bunchno, 
-                      ArgStruc->TheBeam, 
-                      &ZSRno, &TSRno, &TLRno, &TLRErrno, 
-                      &TLRClass, &TLRErrClass, 
-                      &ThisZSR, &ThisTSR, 
-                      &ThisTLRFreq, &ThisTLRErrFreq,
-                      &ThisStrucTLRFreqKick,
-                      &ThisStrucTLRErrFreqKick ) ;
-	if (stat==0)
-		goto egress ;
+  stat = PrepareAllWF(CavPar[LcavWakes].ValuePtr,
+          CavPar[LcavWakes].Length,
+          TrackFlag, elemno, bunchno,
+          ArgStruc->TheBeam,
+          &ZSRno, &TSRno, &TLRno, &TLRErrno,
+          &TLRClass, &TLRErrClass,
+          &ThisZSR, &ThisTSR,
+          &ThisTLRFreq, &ThisTLRErrFreq,
+          &ThisStrucTLRFreqKick,
+          &ThisStrucTLRErrFreqKick ) ;
+  if (stat==0)
+    goto egress ;
   
   /* now the error parameters */
   
-	V *= (1. + GetDBValue( CavPar+LcavdV ) ) ;
-	phi1 += GetDBValue( CavPar+LcavdPhase ) ;
+  V *= (1. + GetDBValue( CavPar+LcavdV ) ) ;
+  phi1 += GetDBValue( CavPar+LcavdPhase ) ;
   
   /* now get the klystron parameters, if any */
   
-	Klys = (int)GetDBValue( CavPar+LcavKlystron ) ;
-	if (Klys > 0)
-	{
+  Klys = (int)GetDBValue( CavPar+LcavKlystron ) ;
+  if (Klys > 0)
+  {
     
     /* convert from Matlab to C indexing */
     
     enum KlystronStatus* kstat ;
-		Klys -= 1 ;
-		A = 1. ;
-		dA = 0. ;
-		phi2 = 0. ;
-		stat = GetDatabaseParameters( Klys, nKlystronPar, KlystronPar,
-                                 TrackPars, KlystronTable ) ;
-		if (stat==0)
-		{
-			BadKlystronMessage( elemno+1, Klys+1 ) ;
-			goto egress ;
-		}
-		V *= GetDBValue( KlystronPar+KlysAmpl ) 
+    Klys -= 1 ;
+    stat = GetDatabaseParameters( Klys, nKlystronPar, KlystronPar,
+            TrackPars, KlystronTable ) ;
+    if (stat==0)
+    {
+      BadKlystronMessage( elemno+1, Klys+1 ) ;
+      goto egress ;
+    }
+    V *= GetDBValue( KlystronPar+KlysAmpl )
     * (1. + GetDBValue( KlystronPar+KlysdAmpl ) ) ;
-		phi1 += GetDBValue( KlystronPar+KlysPhase ) 
+    phi1 += GetDBValue( KlystronPar+KlysPhase )
     + GetDBValue( KlystronPar+KlysdPhase ) ;
-		kstat = GetKlystronStatus( Klys ) ;
-		if (kstat != NULL)
-		{
-			if ( (*kstat == TRIPPED) || (*kstat == STANDBY) || 
-          (*kstat == STANDBYTRIP)                       )
+    kstat = GetKlystronStatus( Klys ) ;
+    if (kstat != NULL)
+    {
+      if ( (*kstat == TRIPPED) || (*kstat == STANDBY) ||
+              (*kstat == STANDBYTRIP)                       )
         V = 0. ;
-		}
-		else  /* null kstat */
-		{
-			BadKlystronMessage( elemno+1, Klys+1 ) ;
-			stat = 0 ;
-			goto egress ;
-		}
+    }
+    else  /* null kstat */
+    {
+      BadKlystronMessage( elemno+1, Klys+1 ) ;
+      stat = 0 ;
+      goto egress ;
+    }
     
-		
-	} /* end of klystron interlude */
+    
+  } /* end of klystron interlude */
   
-	phi1 *= PI / 180. ; /* convert degrees to radians */
-	phi1 += phibunch ;   /* add bunch arrival-time offset */
-	V /= 1e3 ;          /* convert to GeV */
+  phi1 *= PI / 180. ; /* convert degrees to radians */
+  phi1 += phibunch ;   /* add bunch arrival-time offset */
+  V /= 1e3 ;          /* convert to GeV */
   
   /* now we get the complete input- and output- transformations for the
-   element courtesy of the relevant function */
+   * element courtesy of the relevant function */
   
-	stat = GetTotalOffsetXfrms(             CavPar[LcavGirder].ValuePtr,
-                             CavPar[LcavL].ValuePtr,
-                             CavPar[LcavS].ValuePtr,
-                             CavPar[LcavOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms(             CavPar[LcavGirder].ValuePtr,
+          CavPar[LcavL].ValuePtr,
+          CavPar[LcavS].ValuePtr,
+          CavPar[LcavOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* if this is a transverse cavity, construct the full tilt now */
   
-	if ( Mode == 1 )
-	{
-		Tilt = GetDBValue(CavPar + TcavTilt) + Xfrms[5][0] ;
-		CosTilt = cos(Tilt) ;
-		SinTilt = sin(Tilt) ;
-	}
+  if ( Mode == 1 )
+  {
+    Tilt = GetDBValue(CavPar + TcavTilt) + Xfrms[5][0] ;
+    CosTilt = cos(Tilt) ;
+    SinTilt = sin(Tilt) ;
+  }
   
   /* figure out how many slices we need, and what we need to do on each of them */
   
-	stat = LcavSliceSetup( ArgStruc, elemno, TrackFlag, &nslice, &nslicealloc, 
-                        &NSBPM, &doSBPM, &Lfrac, &TWFSliceno ) ;
+  stat = LcavSliceSetup( ArgStruc, elemno, TrackFlag, &nslice, &nslicealloc,
+          &NSBPM, &doSBPM, &Lfrac, &TWFSliceno ) ;
   
   /* if the status is 1 then we can continue; if it's 0 something is very wrong and
-   we need to abort */
+   * we need to abort */
   
-	if (stat == 0)
-		goto egress ;
+  if (stat == 0)
+    goto egress ;
   
   /* figure out which slot in the SBPM data array we need to use, and do some
-   initialization if we are on bunch 1 */
+   * initialization if we are on bunch 1 */
   
-	if (NSBPM > 0)
-	{
-		stat = SBPMSetup( ArgStruc, elemno, bunchno, NSBPM, &SBPMCounter ) ;
-		if (stat == 0)
-			goto egress ;
-	}
+  if (NSBPM > 0)
+  {
+    stat = SBPMSetup( ArgStruc, elemno, bunchno, NSBPM, &SBPMCounter ) ;
+    if (stat == 0)
+      goto egress ;
+  }
   
   /* on the first bunch, set the S positions of the SBPMs within the structure: */
   
-	if ( (bunchno+1 == ArgStruc->FirstBunch) && (NSBPM > 0) )
-	{
-		S0 = GetDBValue( CavPar+LcavS ) ;
-		SBPMSetS( SBPMCounter, S0, L, nslice, doSBPM, Lfrac ) ;
-	}
+  if ( (bunchno+1 == ArgStruc->FirstBunch) && (NSBPM > 0) )
+  {
+    S0 = GetDBValue( CavPar+LcavS ) ;
+    SBPMSetS( SBPMCounter, S0, L, nslice, doSBPM, Lfrac ) ;
+  }
   
   /* make a shortcut to get to the bunch of interest */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* loop over structure longitudinal slices */
   
-	SBPMcount2 = 0 ;
-	for (slicecount=0 ; slicecount<nslice ; slicecount++)
-	{
-		dL = L * Lfrac[slicecount] ;
+  SBPMcount2 = 0 ;
+  for (slicecount=0 ; slicecount<nslice ; slicecount++)
+  {
+    dL = L * Lfrac[slicecount] ;
     
     /* if this is a transverse cavity, the slice has a drift matrix ; get that now */
     
-		if ( Mode == 1 )
-			GetDriftMap( dL, Rcav ) ;
+    if ( Mode == 1 )
+      GetDriftMap( dL, Rcav ) ;
     
     /* if this is the slice on which we apply transverse wakes, do the transverse
-     wake calculations now */
+     * wake calculations now */
     
-		if (slicecount == TWFSliceno)
-		{
+    if (slicecount == TWFSliceno)
+    {
       if (ThisTSR != NULL)
         ComputeTSRKicks( ThisTSR, L ) ;
       if (ThisTLRFreq != NULL)
       {
         stat = ComputeTLRFreqKicks( ThisTLRFreq, L, 0, ThisStrucTLRFreqKick,
-                                   TLRFreqData[TLRno].nModes, bunchno, 
-                                   ArgStruc->TheBeam->TLRFreqDamping[TLRno],
-                                   ArgStruc->TheBeam->TLRFreqxPhase[TLRno],
-                                   ArgStruc->TheBeam->TLRFreqyPhase[TLRno],
-                                   TLRFreqData[TLRno].Tilt,
-                                   Xfrms[5][0]
-                                   ) ;
+                TLRFreqData[TLRno].nModes, bunchno,
+                ArgStruc->TheBeam->TLRFreqDamping[TLRno],
+                ArgStruc->TheBeam->TLRFreqxPhase[TLRno],
+                ArgStruc->TheBeam->TLRFreqyPhase[TLRno],
+                TLRFreqData[TLRno].Tilt,
+                Xfrms[5][0]
+                ) ;
         if (stat != 1)
           goto egress ;
       }
       if (ThisTLRErrFreq != NULL)
       {
         stat = ComputeTLRFreqKicks( ThisTLRErrFreq, L, 1, ThisStrucTLRErrFreqKick,
-                                   TLRErrFreqData[TLRErrno].nModes, bunchno, 
-                                   ArgStruc->TheBeam->TLRErrFreqDamping[TLRErrno],
-                                   ArgStruc->TheBeam->TLRErrFreqxPhase[TLRErrno],
-                                   ArgStruc->TheBeam->TLRErrFreqyPhase[TLRErrno],
-                                   TLRErrFreqData[TLRErrno].Tilt,
-                                   Xfrms[5][0]
-                                   ) ;
+                TLRErrFreqData[TLRErrno].nModes, bunchno,
+                ArgStruc->TheBeam->TLRErrFreqDamping[TLRErrno],
+                ArgStruc->TheBeam->TLRErrFreqxPhase[TLRErrno],
+                ArgStruc->TheBeam->TLRErrFreqyPhase[TLRErrno],
+                TLRErrFreqData[TLRErrno].Tilt,
+                Xfrms[5][0]
+                ) ;
         if (stat != 1)
           goto egress ;
       }
-		}
+    }
     
     /* loop over rays in the bunch */
     
-		for (ray=0 ;ray<ThisBunch->nray ; ray++)
-		{
+    for (ray=0 ;ray<ThisBunch->nray ; ray++)
+    {
       
-			raystart = 6*ray ;
+      raystart = 6*ray ;
       
       /* if the ray was previously stopped copy it over */
       
-			if (ThisBunch->stop[ray] > 0.) 
-			{
-				for (coord=0 ; coord<6 ; coord++)
-					ThisBunch->y[raystart+coord] = ThisBunch->x[raystart+coord] ;
-				continue ;
-			}
+      if (ThisBunch->stop[ray] > 0.)
+      {
+        for (coord=0 ; coord<6 ; coord++)
+          ThisBunch->y[raystart+coord] = ThisBunch->x[raystart+coord] ;
+        continue ;
+      }
       
       /* make ray coordinates into local ones, including offsets etc which
-       are demanded by the transformation structure. */
+       * are demanded by the transformation structure. */
       
-			GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
-			Q = &(ThisBunch->Q[ray]) ;
+      GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
+      Q = &(ThisBunch->Q[ray]) ;
       
       /* if this is the first slice, transform the ray coords to the reference
-       frame of the element and check the aperture */
+       * frame of the element and check the aperture */
       
-			if ( slicecount==0 )
-			{
+      if ( slicecount==0 )
+      {
         
-				ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
+        ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
         
         /* entrance-face aperture test, if requested */
         
-				if (TrackFlag[Aper] == 1)
-				{
-					Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray,elemno,&aper2,ray,UPSTREAM,
-                                   NULL, 0 ) ;
-					if (Stop == 1)
-						continue ;
-				}
+        if (TrackFlag[Aper] == 1)
+        {
+          Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray,elemno,&aper2,ray,UPSTREAM,
+                  NULL, 0, StoppedParticles ) ;
+          if (Stop == 1)
+            continue ;
+        }
         
-			} /* end of first-slice activities */
+      } /* end of first-slice activities */
       
       /* if this slice starts with a structure-BPM, accumulate the needed data
-       now */
+       * now */
       
-			if (doSBPM[slicecount] > 0)
-			{
-				ArgStruc->sbpmdata[SBPMCounter]->Q[SBPMcount2] += (*Q) ;
-				ArgStruc->sbpmdata[SBPMCounter]->x[SBPMcount2] += (*x) * (*Q) ;
-				ArgStruc->sbpmdata[SBPMCounter]->y[SBPMcount2] += (*y) * (*Q);
-			}
+      if (doSBPM[slicecount] > 0)
+      {
+        ArgStruc->sbpmdata[SBPMCounter]->Q[SBPMcount2] += (*Q) ;
+        ArgStruc->sbpmdata[SBPMCounter]->x[SBPMcount2] += (*x) * (*Q) ;
+        ArgStruc->sbpmdata[SBPMCounter]->y[SBPMcount2] += (*y) * (*Q);
+      }
       
       /* if this is the SRWF_T slice, add the deflections to the beam position */
       
-			if (slicecount==TWFSliceno)
-			{
-				if (ThisTSR != NULL)
-				{
-					(*px) += ThisTSR->binVx[ThisTSR->binno[ray]] / (*p0) ;
-					(*py) += ThisTSR->binVy[ThisTSR->binno[ray]] / (*p0) ;
-				}
-				if (ThisTLRFreq != NULL)
-				{
-					(*px) += ThisTLRFreq->binVx[ThisTLRFreq->binno[ray]] / (*p0) ;
-					(*py) += ThisTLRFreq->binVy[ThisTLRFreq->binno[ray]] / (*p0) ;
-				}
-				if (ThisTLRErrFreq != NULL)
-				{
-					(*px) += ThisTLRErrFreq->binVx[ThisTLRErrFreq->binno[ray]] / (*p0) ;
-					(*py) += ThisTLRErrFreq->binVy[ThisTLRErrFreq->binno[ray]] / (*p0) ;
-				}
-			}
+      if (slicecount==TWFSliceno)
+      {
+        if (ThisTSR != NULL)
+        {
+          (*px) += ThisTSR->binVx[ThisTSR->binno[ray]] / (*p0) ;
+          (*py) += ThisTSR->binVy[ThisTSR->binno[ray]] / (*p0) ;
+        }
+        if (ThisTLRFreq != NULL)
+        {
+          (*px) += ThisTLRFreq->binVx[ThisTLRFreq->binno[ray]] / (*p0) ;
+          (*py) += ThisTLRFreq->binVy[ThisTLRFreq->binno[ray]] / (*p0) ;
+        }
+        if (ThisTLRErrFreq != NULL)
+        {
+          (*px) += ThisTLRErrFreq->binVx[ThisTLRErrFreq->binno[ray]] / (*p0) ;
+          (*py) += ThisTLRErrFreq->binVy[ThisTLRErrFreq->binno[ray]] / (*p0) ;
+        }
+      }
       
-      /* compute momentum gain for the particle based on its z position, the 
-       phase of the RF, the wave #, and the voltage.  Remember that the 
-       particle momenta are in GeV, the voltage in GV, the phase in radians,
-       and the wave # in 1/m: */
+      /* compute momentum gain for the particle based on its z position, the
+       * phase of the RF, the wave #, and the voltage.  Remember that the
+       * particle momenta are in GeV, the voltage in GV, the phase in radians,
+       * and the wave # in 1/m: */
       
-			dP = V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
-			if ( Mode == 1)
-			{
-				dPKick = dP ;
-				dP = 0 ;
-				if ( TrackFlag[SynRad] != SR_None )
-					dP -= ComputeSRMomentumLoss( *p0,
-                                      fabs(dPKick)*GEV2TM ,
-                                      dL, 
-                                      TrackFlag[SynRad] ) ;
-				dPKick /= *p0 ;
-			}
-			if (ThisZSR != NULL)
-				dP -= dL * ThisZSR->K[ThisZSR->binno[ray]]  ;
-			ThisBunch->y[raystart+5] = ThisBunch->x[raystart+5] + dP ;
+      dP = V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
+      if ( Mode == 1)
+      {
+        dPKick = dP ;
+        dP = 0 ;
+        if ( TrackFlag[SynRad] != SR_None )
+          dP -= ComputeSRMomentumLoss( *p0,
+                  fabs(dPKick)*GEV2TM ,
+                  dL,
+                  TrackFlag[SynRad] ) ;
+        dPKick /= *p0 ;
+      }
+      if (ThisZSR != NULL)
+        dP -= dL * ThisZSR->K[ThisZSR->binno[ray]]  ;
+      ThisBunch->y[raystart+5] = ThisBunch->x[raystart+5] + dP ;
       
       /* if the exit-momentum is < 0, stop the particle */
       
-			Stop = CheckP0StopPart( ThisBunch->stop,&ThisBunch->ngoodray,ThisBunch->x,ThisBunch->y, elemno, ray, 
-                             ThisBunch->y[raystart+5], DOWNSTREAM ) ;
-			if (Stop != 0)
-				continue ;
+      Stop = CheckP0StopPart( ThisBunch->stop,&ThisBunch->ngoodray,ThisBunch->x,ThisBunch->y, elemno, ray,
+              ThisBunch->y[raystart+5], DOWNSTREAM, StoppedParticles ) ;
+      if (Stop != 0)
+        continue ;
       
       /* get the structure map for the x-plane only */
       
-			if ( Mode == 0 ) /* Track through linac cavity */
-			{
+      if ( Mode == 0 ) /* Track through linac cavity */
+      {
         if ( (*p0 != LastRayP) || (dP != LastRaydP) )
           GetLcavMap( dL, *p0, 0., dP, 0., Rcav, 1 ) ;
         LastRayP = *p0 ;
         LastRaydP = dP ;
-			}
+      }
       
       /* perform the matrix transformation; since we know the RF structure has rotational
-       symmetry use the x-plane 2x2 matrix on both x and y  planes.  Do this for both
-       types of cavity */
+       * symmetry use the x-plane 2x2 matrix on both x and y  planes.  Do this for both
+       * types of cavity */
       
-			ThisBunch->y[raystart]   = *x*Rcav[0][0] + *px * Rcav[0][1] ;
-			ThisBunch->y[raystart+1] = *x*Rcav[1][0] + *px * Rcav[1][1] ;
-			ThisBunch->y[raystart+2] = *y*Rcav[0][0] + *py * Rcav[0][1] ;
-			ThisBunch->y[raystart+3] = *y*Rcav[1][0] + *py * Rcav[1][1] ;
-			ThisBunch->y[raystart+4] = *z ;
+      ThisBunch->y[raystart]   = *x*Rcav[0][0] + *px * Rcav[0][1] ;
+      ThisBunch->y[raystart+1] = *x*Rcav[1][0] + *px * Rcav[1][1] ;
+      ThisBunch->y[raystart+2] = *y*Rcav[0][0] + *py * Rcav[0][1] ;
+      ThisBunch->y[raystart+3] = *y*Rcav[1][0] + *py * Rcav[1][1] ;
+      ThisBunch->y[raystart+4] = *z ;
       
       /* add the deflections and delay for the transverse cavity */
       
-			if ( Mode == 1)
-			{
-				double dPx = dPKick * CosTilt ;
-				double dPy = dPKick * SinTilt ;
-				double dLov2 = dL / 2 ;
-				ThisBunch->y[raystart]   += dPx * dLov2 ;
-				ThisBunch->y[raystart+1] += dPx ;
-				ThisBunch->y[raystart+2] += dPy * dLov2 ;
-				ThisBunch->y[raystart+3] += dPy ;
+      if ( Mode == 1)
+      {
+        double dPx = dPKick * CosTilt ;
+        double dPy = dPKick * SinTilt ;
+        double dLov2 = dL / 2 ;
+        ThisBunch->y[raystart]   += dPx * dLov2 ;
+        ThisBunch->y[raystart+1] += dPx ;
+        ThisBunch->y[raystart+2] += dPy * dLov2 ;
+        ThisBunch->y[raystart+3] += dPy ;
         if (TrackFlag[ZMotion] == 1)
-          ThisBunch->y[raystart+4] += 
-					0.5*L*( *px * *px + *py * *py 
-                 + *px * dPx + *py * dPy
-                 + 0.5*dPx*dPx + 0.5*dPy*dPy ) ;
-			}
+          ThisBunch->y[raystart+4] +=
+                  0.5*L*( *px * *px + *py * *py
+                  + *px * dPx + *py * dPy
+                  + 0.5*dPx*dPx + 0.5*dPy*dPy ) ;
+      }
       
-			xout = &(ThisBunch->y[raystart]) ;
-			yout = &(ThisBunch->y[raystart+2]) ;
+      xout = &(ThisBunch->y[raystart]) ;
+      yout = &(ThisBunch->y[raystart+2]) ;
       
-      /* if the NEXT slice is the TWF slice, then we need to accumulate the mean 
-       position of each bin on THIS slice */
+      /* if the NEXT slice is the TWF slice, then we need to accumulate the mean
+       * position of each bin on THIS slice */
       
-			if (TWFSliceno == slicecount+1)
-			{
-				if (ThisTSR != NULL)
-					AccumulateWFBinPositions( ThisTSR->binx, 
-                                   ThisTSR->biny,
-                                   ThisTSR->binno[ray],
-                                   *xout, *yout, *Q ) ;
-				if (ThisTLRFreq != NULL)
-					AccumulateWFBinPositions( ThisTLRFreq->binx,
-                                   ThisTLRFreq->biny,
-                                   ThisTLRFreq->binno[ray],
-                                   *xout, *yout, *Q ) ;
-			}
+      if (TWFSliceno == slicecount+1)
+      {
+        if (ThisTSR != NULL)
+          AccumulateWFBinPositions( ThisTSR->binx,
+                  ThisTSR->biny,
+                  ThisTSR->binno[ray],
+                  *xout, *yout, *Q ) ;
+        if (ThisTLRFreq != NULL)
+          AccumulateWFBinPositions( ThisTLRFreq->binx,
+                  ThisTLRFreq->biny,
+                  ThisTLRFreq->binno[ray],
+                  *xout, *yout, *Q ) ;
+      }
       
       /* Last-slice activities: */
       
-			if (slicecount == nslice-1)
-			{
+      if (slicecount == nslice-1)
+      {
         
         /* if the last slice ends with an SBPM, fill it with data now */
         
-				if (doSBPM[nslice] > 0)
-				{
-					ArgStruc->sbpmdata[SBPMCounter]->Q[NSBPM-1] += (*Q) ;
-					ArgStruc->sbpmdata[SBPMCounter]->x[NSBPM-1] += (*xout)*(*Q) ;
-					ArgStruc->sbpmdata[SBPMCounter]->y[NSBPM-1] += (*yout)*(*Q);
-				}
+        if (doSBPM[nslice] > 0)
+        {
+          ArgStruc->sbpmdata[SBPMCounter]->Q[NSBPM-1] += (*Q) ;
+          ArgStruc->sbpmdata[SBPMCounter]->x[NSBPM-1] += (*xout)*(*Q) ;
+          ArgStruc->sbpmdata[SBPMCounter]->y[NSBPM-1] += (*yout)*(*Q);
+        }
         
         /* exit-face aperture test, if requested */
         
-				if (TrackFlag[Aper] == 1)
-				{
-					Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray,elemno,&aper2,ray,DOWNSTREAM,
-                                   NULL, 0 ) ;
-					if (Stop == 1)
-						continue ;
-				}
+        if (TrackFlag[Aper] == 1)
+        {
+          Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray,elemno,&aper2,ray,DOWNSTREAM,
+                  NULL, 0, StoppedParticles ) ;
+          if (Stop == 1)
+            continue ;
+        }
         
         /* undo the coordinate transformations */
         
-				GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
+        GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
         
-				ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
+        ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
         
         /* check amplitude of outgoing angular momentum */
         
-				Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray, elemno, ray, 
-                                  px, py ) ;
-			}
-			
-		} /* end of coord loop */
+        Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray, elemno, ray,
+                px, py, StoppedParticles ) ;
+      }
+      
+    } /* end of coord loop */
     
     /* now if this is not the last slice, exchange the x and y coordinates so
-     that the next slice starts tracking the output coords of this slice */
+     * that the next slice starts tracking the output coords of this slice */
     
-		if (slicecount < nslice-1)
-		{      
-			XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
-		}
+    if (slicecount < nslice-1)
+    {
+      XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
+    }
     
     /* if this slice was an SBPM slice, update the inner SBPM counter */
     
-		if (doSBPM[slicecount] > 0)
-			SBPMcount2++ ;
+    if (doSBPM[slicecount] > 0)
+      SBPMcount2++ ;
     
-	} /* end of slice loop */
+  } /* end of slice loop */
   
-  /* if this is the last bunch to be tracked, and there are SBPMs, 
-   compute the SBPM readings now */
+  /* if this is the last bunch to be tracked, and there are SBPMs,
+   * compute the SBPM readings now */
   
   if ( (bunchno+1 == ArgStruc->LastBunch) && (NSBPM > 0) )
   {
@@ -3760,77 +3872,77 @@ int TrackBunchThruRF( int elemno, int bunchno,
     {
       BadElementMessage( elemno+1 ) ;
     }
-		else
-			stat = abs(stat) ;
+    else
+      stat = abs(stat) ;
   }
   
-egress:
-  
-	if (ThisStrucTLRFreqKick != NULL)
-		PutThisElemTLRFreqKick( &(ThisStrucTLRFreqKick), elemno, bunchno,
-                           ArgStruc->LastBunch, 
-                           ArgStruc->BunchwiseTracking,
-                           0 ) ;
-	if (ThisStrucTLRErrFreqKick != NULL)
-		PutThisElemTLRFreqKick( &(ThisStrucTLRErrFreqKick), elemno, bunchno,
-                           ArgStruc->LastBunch, 
-                           ArgStruc->BunchwiseTracking,
-                           1 ) ;
-  
-  /* if this is the last bunch, and we are tracking element-wise, forget
+  egress:
+    
+    if (ThisStrucTLRFreqKick != NULL)
+      PutThisElemTLRFreqKick( &(ThisStrucTLRFreqKick), elemno, bunchno,
+              ArgStruc->LastBunch,
+              ArgStruc->BunchwiseTracking,
+              0 ) ;
+    if (ThisStrucTLRErrFreqKick != NULL)
+      PutThisElemTLRFreqKick( &(ThisStrucTLRErrFreqKick), elemno, bunchno,
+              ArgStruc->LastBunch,
+              ArgStruc->BunchwiseTracking,
+              1 ) ;
+    
+    /* if this is the last bunch, and we are tracking element-wise, forget
    about which bunch was first/last in this structure */
-  
-	if ( (bunchno+1 == ArgStruc->LastBunch) && 
-      (ArgStruc->BunchwiseTracking == 0)    )
-	{
-		FirstBunchAtRF[elemno] = -1 ;
-		LastBunchAtRF[elemno]  = -1 ;
-	}
-  
-	return stat ;
-  
+    
+    if ( (bunchno+1 == ArgStruc->LastBunch) &&
+            (ArgStruc->BunchwiseTracking == 0)    )
+    {
+      FirstBunchAtRF[elemno] = -1 ;
+      LastBunchAtRF[elemno]  = -1 ;
+    }
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
 
-/* Perform tracking of one bunch through one beam position monitor, 
- including transformations related to the element/girder offset.  
- While doing the tracking, the data structures for the BPM 
- readings etc are accumulated if required.
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno */
+/* Perform tracking of one bunch through one beam position monitor,
+ * including transformations related to the element/girder offset.
+ * While doing the tracking, the data structures for the BPM
+ * readings etc are accumulated if required.
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno */
 
-int TrackBunchThruBPM( int elemno, int bunchno, 
-                      struct TrackArgsStruc* ArgStruc,
-                      int* TrackFlags, double splitL )
+int TrackBunchThruBPM( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlags, double splitL )
 {
   
-	static int BPMCounter ;           /* Which BPM is it? */
-	int nBunchNeeded ;                /* how many bunches' dataspace? */
-	double* retcatch ;
-	int BunchSlot ;
-	int i,j,k, raystart ;
-	double Xfrms[6][2] ;  
-	double sintilt,costilt ;
-	struct Bunch* ThisBunch ;
-	double dx,dpx,dy,dpy,dz,P,Q ;
-	double dxvec[6] ;
-	double* gaussran ;
-	double QBS ;
-	int stat=1 ;
+  static int BPMCounter ;           /* Which BPM is it? */
+  int nBunchNeeded ;                /* how many bunches' dataspace? */
+  double* retcatch ;
+  int BunchSlot ;
+  int i,j,k, raystart ;
+  double Xfrms[6][2] ;
+  double sintilt,costilt ;
+  struct Bunch* ThisBunch ;
+  double dx,dpx,dy,dpy,dz,P,Q ;
+  double dxvec[6] ;
+  double* gaussran ;
+  double QBS ;
+  int stat=1 ;
   
   /* Get the BPM parameters */
   
-	stat = GetDatabaseParameters( elemno, nBPMPar, BPMPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nBPMPar, BPMPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* start by doing the tracking */
   if ( splitL >= 0 )
@@ -3838,348 +3950,348 @@ int TrackBunchThruBPM( int elemno, int bunchno,
   
   /* if we do not need to save BPM information here, we can return */
   
-	if ( ( (ArgStruc->GetInstData == 0) ||
-        ( (TrackFlags[GetBPMData] == 0)&&(TrackFlags[GetBPMBeamPars]==0) ) ) ||
-      ( splitL > 0 )  )
-		goto egress ;
+  if ( ( (ArgStruc->GetInstData == 0) ||
+          ( (TrackFlags[GetBPMData] == 0)&&(TrackFlags[GetBPMBeamPars]==0) ) ) ||
+          ( splitL > 0 )  )
+    goto egress ;
   
   /* if we're still here, we must want to accumulate some information, so
-   start that process */
+   * start that process */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* do initialization */
   
   BPMInstIndexingSetup( elemno, &FirstBPMElemno,
-                       &BPMElemnoLastCall, &BPMCounter ) ;
+          &BPMElemnoLastCall, &BPMCounter ) ;
   
   /* figure out how many bunch-data slots we need for this BPM, based on
-   the number of bunches to be tracked and the multi/single switch.  
-   While we're at it, figure out which data slot this bunch's data goes
-   into */
+   * the number of bunches to be tracked and the multi/single switch.
+   * While we're at it, figure out which data slot this bunch's data goes
+   * into */
   
-	BunchSlotSetup( TrackFlags, ArgStruc, bunchno, 
-                 &nBunchNeeded, &BunchSlot     ) ;
+  BunchSlotSetup( TrackFlags, ArgStruc, bunchno,
+          &nBunchNeeded, &BunchSlot     ) ;
   
   /* If this is the first bunch, then we've never tracked in this BPM
-   before and we should check the allocation of its data in the data
-   backbone */
+   * before and we should check the allocation of its data in the data
+   * backbone */
   
-	if (bunchno+1 == ArgStruc->FirstBunch)
-	{
-		if (bpmdata[BPMCounter] == NULL)
-		{
-			bpmdata[BPMCounter] = calloc(1,sizeof(struct BPMdat)) ;
-			if (bpmdata[BPMCounter] == NULL)
-			{
-				BadBPMAllocMsg( elemno+1 ) ;
-				stat = 0 ;
-				goto egress ;
-			}
-			bpmdata[BPMCounter]->nbunchalloc = 0 ;
-		} /* end allocation block */
+  if (bunchno+1 == ArgStruc->FirstBunch)
+  {
+    if (bpmdata[BPMCounter] == NULL)
+    {
+      bpmdata[BPMCounter] = (struct BPMdat*) calloc(1,sizeof(struct BPMdat)) ;
+      if (bpmdata[BPMCounter] == NULL)
+      {
+        BadBPMAllocMsg( elemno+1 ) ;
+        stat = 0 ;
+        goto egress ;
+      }
+      bpmdata[BPMCounter]->nbunchalloc = 0 ;
+    } /* end allocation block */
     
     /* initialize stuff which has to be initialized on bunch 1 */
     
-		bpmdata[BPMCounter]->nBunch      = 0 ;
-		bpmdata[BPMCounter]->indx = elemno + 1 ;
-		bpmdata[BPMCounter]->GetBeamPars = TrackFlags[GetBPMBeamPars] ;
-		bpmdata[BPMCounter]->S = GetDBValue( BPMPar+BPMS ) ;
-		bpmdata[BPMCounter]->Pmod = GetDBValue( BPMPar+BPMP )  ;
+    bpmdata[BPMCounter]->nBunch      = 0 ;
+    bpmdata[BPMCounter]->indx = elemno + 1 ;
+    bpmdata[BPMCounter]->GetBeamPars = TrackFlags[GetBPMBeamPars] ;
+    bpmdata[BPMCounter]->S = GetDBValue( BPMPar+BPMS ) ;
+    bpmdata[BPMCounter]->Pmod = GetDBValue( BPMPar+BPMP )  ;
     
     /* allocate enough space for the BPM data on all bunches required */
     
-		if (bpmdata[BPMCounter]->nbunchalloc < nBunchNeeded)
-		{
-			FreeAndNull( &(bpmdata[BPMCounter]->xread) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->yread) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->sigma) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->P) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->z) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->Q) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->sumpxq) ) ;
-			FreeAndNull( &(bpmdata[BPMCounter]->sumpyq) ) ;
+    if (bpmdata[BPMCounter]->nbunchalloc < nBunchNeeded)
+    {
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->xread) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->yread) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->sigma) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->P) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->z) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->Q) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->sumpxq) ) ;
+      FreeAndNull( (void **)&(bpmdata[BPMCounter]->sumpyq) ) ;
       
-			bpmdata[BPMCounter]->xread  = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			bpmdata[BPMCounter]->yread  = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			bpmdata[BPMCounter]->Q      = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			bpmdata[BPMCounter]->sigma  = 
-      calloc(36*nBunchNeeded,sizeof(double)) ;
-			bpmdata[BPMCounter]->P      = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			bpmdata[BPMCounter]->z      = 
-      calloc(nBunchNeeded,sizeof(double)) ;			
-			bpmdata[BPMCounter]->sumpxq = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			bpmdata[BPMCounter]->sumpyq = 
-      calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->xread  =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->yread  =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->Q      =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->sigma  =
+              (double*)calloc(36*nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->P      =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->z      =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->sumpxq =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      bpmdata[BPMCounter]->sumpyq =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
       
       
-			if ( (bpmdata[BPMCounter]->xread  == NULL) ||
-          (bpmdata[BPMCounter]->yread  == NULL) ||
-          (bpmdata[BPMCounter]->Q      == NULL) ||
-          (bpmdata[BPMCounter]->sigma  == NULL) ||
-          (bpmdata[BPMCounter]->P      == NULL) ||
-          (bpmdata[BPMCounter]->z      == NULL) ||
-          (bpmdata[BPMCounter]->sumpxq == NULL) ||
-          (bpmdata[BPMCounter]->sumpyq == NULL)    )
-			{
-				BadBPMAllocMsg( elemno+1 ) ;
-				stat = 0 ;
-				goto egress ;
-			}
+      if ( (bpmdata[BPMCounter]->xread  == NULL) ||
+              (bpmdata[BPMCounter]->yread  == NULL) ||
+              (bpmdata[BPMCounter]->Q      == NULL) ||
+              (bpmdata[BPMCounter]->sigma  == NULL) ||
+              (bpmdata[BPMCounter]->P      == NULL) ||
+              (bpmdata[BPMCounter]->z      == NULL) ||
+              (bpmdata[BPMCounter]->sumpxq == NULL) ||
+              (bpmdata[BPMCounter]->sumpyq == NULL)    )
+      {
+        BadBPMAllocMsg( elemno+1 ) ;
+        stat = 0 ;
+        goto egress ;
+      }
       
-			bpmdata[BPMCounter]->nbunchalloc = nBunchNeeded ;
-		} /* end allocation of data vectors block */
+      bpmdata[BPMCounter]->nbunchalloc = nBunchNeeded ;
+    } /* end allocation of data vectors block */
     
     /* increment the counter which tells how many structures are filled on
-     exit */
+     * exit */
     
-		ArgStruc->nBPM++ ;
+    ArgStruc->nBPM++ ;
     
-	} /* end first-bunch check/initialization/allocation block */
+  } /* end first-bunch check/initialization/allocation block */
   
   /* we need to clear out the present data slot if we are on the first
-   bunch, or if we are doing multibunch tracking */
+   * bunch, or if we are doing multibunch tracking */
   
-	if ( (TrackFlags[MultiBunch] == 1) ||
-      (bunchno+1 == ArgStruc->FirstBunch) )
-	{
-		bpmdata[BPMCounter]->xread[BunchSlot]  = 0. ;
-		bpmdata[BPMCounter]->yread[BunchSlot]  = 0. ;
-		bpmdata[BPMCounter]->P[BunchSlot]      = 0. ;
-		bpmdata[BPMCounter]->z[BunchSlot]      = 0. ;
-		bpmdata[BPMCounter]->Q[BunchSlot]      = 0. ;
-		bpmdata[BPMCounter]->sumpxq[BunchSlot] = 0. ;
-		bpmdata[BPMCounter]->sumpyq[BunchSlot] = 0. ;
-		for (i=0 ; i<36 ; i++)
-			bpmdata[BPMCounter]->sigma[36*BunchSlot+i] = 0. ;
-	}
+  if ( (TrackFlags[MultiBunch] == 1) ||
+          (bunchno+1 == ArgStruc->FirstBunch) )
+  {
+    bpmdata[BPMCounter]->xread[BunchSlot]  = 0. ;
+    bpmdata[BPMCounter]->yread[BunchSlot]  = 0. ;
+    bpmdata[BPMCounter]->P[BunchSlot]      = 0. ;
+    bpmdata[BPMCounter]->z[BunchSlot]      = 0. ;
+    bpmdata[BPMCounter]->Q[BunchSlot]      = 0. ;
+    bpmdata[BPMCounter]->sumpxq[BunchSlot] = 0. ;
+    bpmdata[BPMCounter]->sumpyq[BunchSlot] = 0. ;
+    for (i=0 ; i<36 ; i++)
+      bpmdata[BPMCounter]->sigma[36*BunchSlot+i] = 0. ;
+  }
   
   /* get the transformations needed based on BPM mechanical offsets */
   
-	stat = GetTotalOffsetXfrms( BPMPar[BPMGirder].ValuePtr,
-                             BPMPar[BPML].ValuePtr,
-                             BPMPar[BPMS].ValuePtr,
-                             BPMPar[BPMOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms( BPMPar[BPMGirder].ValuePtr,
+          BPMPar[BPML].ValuePtr,
+          BPMPar[BPMS].ValuePtr,
+          BPMPar[BPMOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* pre-compute sine and cosine components of the tilt */
   
-	sintilt = sin(Xfrms[5][0]) ;
-	costilt = cos(Xfrms[5][0]) ;
+  sintilt = sin(Xfrms[5][0]) ;
+  costilt = cos(Xfrms[5][0]) ;
   
   /* Accumulate the appropriate summation of particle positions in the
-   data structure.  Bear in mind that the present data vector is the
-   positions after tracking thru the BPM but in the survey coordinate
-   system, so we have to make appropriate transformations to the BPM
-   coordinate system */
+   * data structure.  Bear in mind that the present data vector is the
+   * positions after tracking thru the BPM but in the survey coordinate
+   * system, so we have to make appropriate transformations to the BPM
+   * coordinate system */
   
-	for (i=0 ; i<ThisBunch->nray ; i++)
-	{
-		raystart = 6*i ;
-		if (ThisBunch->stop[i] !=0.)
-			continue ;
+  for (i=0 ; i<ThisBunch->nray ; i++)
+  {
+    raystart = 6*i ;
+    if (ThisBunch->stop[i] !=0.)
+      continue ;
     
     /* get the contribution from this ray, including its weight and the
-     transformation from the element offset. */
+     * transformation from the element offset. */
     
-		dx  = ThisBunch->y[raystart] - Xfrms[0][1] 		 
-    + Xfrms[4][1] * ThisBunch->y[raystart+1] ;
-		dpx = ThisBunch->y[raystart+1] - Xfrms[1][1] ;
-		dy  = ThisBunch->y[raystart+2] - Xfrms[2][1] 		 
-    + Xfrms[4][1] * ThisBunch->y[raystart+3] ;
-		dpy = ThisBunch->y[raystart+3] - Xfrms[3][1] ;
-		dz  = ThisBunch->y[raystart+4] -	Xfrms[4][1] 
-    + 0.5 * Xfrms[4][1] *
-		(  ThisBunch->y[raystart+1] * ThisBunch->y[raystart+1] + 
-     ThisBunch->y[raystart+3] * ThisBunch->y[raystart+3]   ) ;
-		P   = ThisBunch->y[raystart+5] ;
-		Q   = ThisBunch->Q[i] ;
+    dx  = ThisBunch->y[raystart] - Xfrms[0][1]
+            + Xfrms[4][1] * ThisBunch->y[raystart+1] ;
+    dpx = ThisBunch->y[raystart+1] - Xfrms[1][1] ;
+    dy  = ThisBunch->y[raystart+2] - Xfrms[2][1]
+            + Xfrms[4][1] * ThisBunch->y[raystart+3] ;
+    dpy = ThisBunch->y[raystart+3] - Xfrms[3][1] ;
+    dz  = ThisBunch->y[raystart+4] -	Xfrms[4][1]
+            + 0.5 * Xfrms[4][1] *
+            (  ThisBunch->y[raystart+1] * ThisBunch->y[raystart+1] +
+            ThisBunch->y[raystart+3] * ThisBunch->y[raystart+3]   ) ;
+    P   = ThisBunch->y[raystart+5] ;
+    Q   = ThisBunch->Q[i] ;
     
     /* put into a vector, including rotations (if the BPM is rotated,
-     by convention clockwise, then a +x offset -> -y contribution and a
-     +y offset -> +x contribution) */
+     * by convention clockwise, then a +x offset -> -y contribution and a
+     * +y offset -> +x contribution) */
     
-		dxvec[0] = dx * costilt + dy * sintilt ;
-		dxvec[1] = dpx * costilt + dpy * sintilt ;
-		dxvec[2] = -dx * sintilt + dy * costilt ;
-		dxvec[3] = -dpx * sintilt + dpy * costilt ;
-		dxvec[4] = dz ;
-		dxvec[5] = P ;
+    dxvec[0] = dx * costilt + dy * sintilt ;
+    dxvec[1] = dpx * costilt + dpy * sintilt ;
+    dxvec[2] = -dx * sintilt + dy * costilt ;
+    dxvec[3] = -dpx * sintilt + dpy * costilt ;
+    dxvec[4] = dz ;
+    dxvec[5] = P ;
     
     /* accumulate this ray, weighted by charge, into the necessary slots
-     in the data structure */
+     * in the data structure */
     
-		bpmdata[BPMCounter]->xread[BunchSlot] += dxvec[0] * Q ;
-		bpmdata[BPMCounter]->yread[BunchSlot] += dxvec[2] * Q ;
-		bpmdata[BPMCounter]->Q[BunchSlot] += Q ;
+    bpmdata[BPMCounter]->xread[BunchSlot] += dxvec[0] * Q ;
+    bpmdata[BPMCounter]->yread[BunchSlot] += dxvec[2] * Q ;
+    bpmdata[BPMCounter]->Q[BunchSlot] += Q ;
     
-		if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
-		{
-			bpmdata[BPMCounter]->P[BunchSlot]      += dxvec[5] * Q ;
-			bpmdata[BPMCounter]->sumpxq[BunchSlot] += dxvec[1] * Q ;
-			bpmdata[BPMCounter]->sumpyq[BunchSlot] += dxvec[3] * Q ;
-			bpmdata[BPMCounter]->z[BunchSlot]      += dxvec[4] * Q ;
+    if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
+    {
+      bpmdata[BPMCounter]->P[BunchSlot]      += dxvec[5] * Q ;
+      bpmdata[BPMCounter]->sumpxq[BunchSlot] += dxvec[1] * Q ;
+      bpmdata[BPMCounter]->sumpyq[BunchSlot] += dxvec[3] * Q ;
+      bpmdata[BPMCounter]->z[BunchSlot]      += dxvec[4] * Q ;
       
-			for (j=0; j<6; j++)
-			{
-				for (k=j ; k<6 ; k++)
-				{
-					bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] +=
-          Q * dxvec[k]*dxvec[j] ;
-				}
-			}
+      for (j=0; j<6; j++)
+      {
+        for (k=j ; k<6 ; k++)
+        {
+          bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] +=
+                  Q * dxvec[k]*dxvec[j] ;
+        }
+      }
       
-		}
+    }
     
     /* that's all the accumulation we need to do, so end the loop over rays */
     
-	}
+  }
   
   /* Do we need to complete the calculation of first and second moments?
-   If we are doing multibunch tracking, the answer is yes; if we are not
-   but we are on the last bunch, the answer is also yes */
+   * If we are doing multibunch tracking, the answer is yes; if we are not
+   * but we are on the last bunch, the answer is also yes */
   
-	if ( (TrackFlags[MultiBunch] == 1)    ||
-      (bunchno+1 == ArgStruc->LastBunch)    )
-	{
+  if ( (TrackFlags[MultiBunch] == 1)    ||
+          (bunchno+1 == ArgStruc->LastBunch)    )
+  {
     
     /* increment the counter which tells TrackThruSetReturn how many bunch
-     data slots are filled */
+     * data slots are filled */
     
-		bpmdata[BPMCounter]->nBunch++ ;
+    bpmdata[BPMCounter]->nBunch++ ;
     
     /* normalize the charge out of the first-moment information */
     
-		QBS = bpmdata[BPMCounter]->Q[BunchSlot] ;
-		if (QBS == 0.) 
-			QBS = 1 ;
+    QBS = bpmdata[BPMCounter]->Q[BunchSlot] ;
+    if (QBS == 0.)
+      QBS = 1 ;
     
-		bpmdata[BPMCounter]->xread[BunchSlot] /= QBS ;
-		bpmdata[BPMCounter]->yread[BunchSlot] /= QBS ;
+    bpmdata[BPMCounter]->xread[BunchSlot] /= QBS ;
+    bpmdata[BPMCounter]->yread[BunchSlot] /= QBS ;
     
-		if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
-		{
-			bpmdata[BPMCounter]->P[BunchSlot]      /= QBS ;
-			bpmdata[BPMCounter]->sumpxq[BunchSlot] /= QBS ;
-			bpmdata[BPMCounter]->sumpyq[BunchSlot] /= QBS ;
-			bpmdata[BPMCounter]->z[BunchSlot]      /= QBS ;
+    if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
+    {
+      bpmdata[BPMCounter]->P[BunchSlot]      /= QBS ;
+      bpmdata[BPMCounter]->sumpxq[BunchSlot] /= QBS ;
+      bpmdata[BPMCounter]->sumpyq[BunchSlot] /= QBS ;
+      bpmdata[BPMCounter]->z[BunchSlot]      /= QBS ;
       
-			dxvec[0] = bpmdata[BPMCounter]->xread[BunchSlot] ;
-			dxvec[1] = bpmdata[BPMCounter]->sumpxq[BunchSlot] ;
-			dxvec[2] = bpmdata[BPMCounter]->yread[BunchSlot] ;
-			dxvec[3] = bpmdata[BPMCounter]->sumpyq[BunchSlot] ;
-			dxvec[4] = bpmdata[BPMCounter]->z[BunchSlot] ;
-			dxvec[5] = bpmdata[BPMCounter]->P[BunchSlot] ;
+      dxvec[0] = bpmdata[BPMCounter]->xread[BunchSlot] ;
+      dxvec[1] = bpmdata[BPMCounter]->sumpxq[BunchSlot] ;
+      dxvec[2] = bpmdata[BPMCounter]->yread[BunchSlot] ;
+      dxvec[3] = bpmdata[BPMCounter]->sumpyq[BunchSlot] ;
+      dxvec[4] = bpmdata[BPMCounter]->z[BunchSlot] ;
+      dxvec[5] = bpmdata[BPMCounter]->P[BunchSlot] ;
       
       /* normalize the charge out of the 2nd moment information and subtract
-       the appropriate first moment components */
+       * the appropriate first moment components */
       
-			for (j=0; j<6; j++)
-			{
-				for (k=j ; k<6 ; k++)
-				{
-					bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] /= QBS ;
-					bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] -=
-          dxvec[j] * dxvec[k] ;
-					bpmdata[BPMCounter]->sigma[36*BunchSlot+6*k+j] =
-          bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] ;
+      for (j=0; j<6; j++)
+      {
+        for (k=j ; k<6 ; k++)
+        {
+          bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] /= QBS ;
+          bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] -=
+                  dxvec[j] * dxvec[k] ;
+          bpmdata[BPMCounter]->sigma[36*BunchSlot+6*k+j] =
+                  bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] ;
           
-				}
-			}
+        }
+      }
       
-		}
+    }
     
     /* Apply the BPM scale factor */
     
-		retcatch = BPMPar[BPMdScale].ValuePtr ;
-		if ( retcatch != NULL )
-		{
-			double scale = 1. + *retcatch ;
-			bpmdata[BPMCounter]->xread[BunchSlot] *= scale ;
-			bpmdata[BPMCounter]->yread[BunchSlot] *= scale ;
-		}
+    retcatch = BPMPar[BPMdScale].ValuePtr ;
+    if ( retcatch != NULL )
+    {
+      double scale = 1. + *retcatch ;
+      bpmdata[BPMCounter]->xread[BunchSlot] *= scale ;
+      bpmdata[BPMCounter]->yread[BunchSlot] *= scale ;
+    }
     
     /* as a final step, apply the BPM electrical offset and resolution to
-     the BPM reading */
+     * the BPM reading */
     
-		retcatch = BPMPar[BPMElecOffset].ValuePtr ;
-		if ( (retcatch != NULL) && (BPMPar[BPMElecOffset].Length > 1) )
-		{
-			bpmdata[BPMCounter]->xread[BunchSlot] += retcatch[0] ;
-			bpmdata[BPMCounter]->yread[BunchSlot] += retcatch[1] ;
-		}
+    retcatch = BPMPar[BPMElecOffset].ValuePtr ;
+    if ( (retcatch != NULL) && (BPMPar[BPMElecOffset].Length > 1) )
+    {
+      bpmdata[BPMCounter]->xread[BunchSlot] += retcatch[0] ;
+      bpmdata[BPMCounter]->yread[BunchSlot] += retcatch[1] ;
+    }
     
-		retcatch = BPMPar[BPMResolution].ValuePtr ;
-		if ( (retcatch != NULL) && (BPMPar[BPMResolution].Length > 0) )
-		{
-			gaussran = RanGaussVecPtr( 2 ) ;
-			bpmdata[BPMCounter]->xread[BunchSlot] +=
-      retcatch[0]*gaussran[0] ;
-			bpmdata[BPMCounter]->yread[BunchSlot] +=
-      retcatch[0]*gaussran[1] ;
-		}
+    retcatch = BPMPar[BPMResolution].ValuePtr ;
+    if ( (retcatch != NULL) && (BPMPar[BPMResolution].Length > 0) )
+    {
+      gaussran = RanGaussVecPtr( 2 ) ;
+      bpmdata[BPMCounter]->xread[BunchSlot] +=
+              retcatch[0]*gaussran[0] ;
+      bpmdata[BPMCounter]->yread[BunchSlot] +=
+              retcatch[0]*gaussran[1] ;
+    }
     
-	}
+  }
   
   /* now return */
   
-egress:
-  
-	return stat ;
-  
+  egress:
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
 
 /* Perform tracking of one bunch through one instrument of some sort.
- Tracking includes transformations related to the element/girder
- offset.  While doing the tracking, the data structures for beam
- positions, sigmas, whatever are accumulated if required. */
+ * Tracking includes transformations related to the element/girder
+ * offset.  While doing the tracking, the data structures for beam
+ * positions, sigmas, whatever are accumulated if required. */
 
 /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno */
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno */
 
-int TrackBunchThruInst( int elemno, int bunchno, 
-                       struct TrackArgsStruc* ArgStruc,
-                       int* TrackFlags, double splitL )
+int TrackBunchThruInst( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlags, double splitL )
 {
   
-	static int instCounter ;           /* Which inst is it? */
-	int nBunchNeeded ;                /* how many bunches' dataspace? */
-	int BunchSlot ;
-	int i, raystart ;
-	double Xfrms[6][2] ;  
-	double sintilt,costilt ;
-	struct Bunch* ThisBunch ;
-	double dx,dx1,dy,dy1,dz,Q ;
-	double QBS ;
-	int stat=1 ;
+  static int instCounter ;           /* Which inst is it? */
+  int nBunchNeeded ;                /* how many bunches' dataspace? */
+  int BunchSlot ;
+  int i, raystart ;
+  double Xfrms[6][2] ;
+  double sintilt,costilt ;
+  struct Bunch* ThisBunch ;
+  double dx,dx1,dy,dy1,dz,Q ;
+  double QBS ;
+  int stat=1 ;
   
   /* Get the element data, exit with bad status if problems */
   
-	stat = GetDatabaseParameters( elemno, nInstPar, InstPar, 
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nInstPar, InstPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* start by doing the tracking */
   if ( splitL >= 0 )
@@ -4187,305 +4299,304 @@ int TrackBunchThruInst( int elemno, int bunchno,
   
   /* if we do not need to save inst information here, we can return */
   
-	if ( (ArgStruc->GetInstData == 0)    ||
-      (TrackFlags[GetInstData] == 0 ) || (splitL > 0)   )
-		goto egress ;
+  if ( (ArgStruc->GetInstData == 0)    ||
+          (TrackFlags[GetInstData] == 0 ) || (splitL > 0)   )
+    goto egress ;
   
   /* if we're still here, we must want to accumulate some information, so
-   start that process */
+   * start that process */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* setup the indexing */
   
   BPMInstIndexingSetup( elemno, &FirstInstElemno,
-                       &InstElemnoLastCall, &instCounter ) ;
+          &InstElemnoLastCall, &instCounter ) ;
   
   /* figure out how many bunch-data slots we need for this inst, based on
-   the number of bunches to be tracked and the multi/single switch.  
-   While we're at it, figure out which data slot this bunch's data goes
-   into */
+   * the number of bunches to be tracked and the multi/single switch.
+   * While we're at it, figure out which data slot this bunch's data goes
+   * into */
   
-	BunchSlotSetup( TrackFlags, ArgStruc, bunchno, 
-                 &nBunchNeeded, &BunchSlot     ) ;
+  BunchSlotSetup( TrackFlags, ArgStruc, bunchno,
+          &nBunchNeeded, &BunchSlot     ) ;
   
   /* If this is the first bunch, then we've never tracked in this inst
-   before and we should check the allocation of its data in the data
-   backbone */
+   * before and we should check the allocation of its data in the data
+   * backbone */
   
-	if (bunchno+1 == ArgStruc->FirstBunch)
-	{
-		if (instdata[instCounter] == NULL)
-		{
-			instdata[instCounter] = calloc(1,sizeof(struct INSTdat)) ;
-			if (instdata[instCounter] == NULL)
-			{
-				BadBPMAllocMsg( elemno+1 ) ;
-				stat = 0 ;
-				goto egress ;
-			}
-			instdata[instCounter]->nbunchalloc = 0 ;
-		} /* end allocation block */
+  if (bunchno+1 == ArgStruc->FirstBunch)
+  {
+    if (instdata[instCounter] == NULL)
+    {
+      instdata[instCounter] = (struct INSTdat*)calloc(1,sizeof(struct INSTdat)) ;
+      if (instdata[instCounter] == NULL)
+      {
+        BadBPMAllocMsg( elemno+1 ) ;
+        stat = 0 ;
+        goto egress ;
+      }
+      instdata[instCounter]->nbunchalloc = 0 ;
+    } /* end allocation block */
     
     /* initialize stuff which has to be initialized on bunch 1 */
     
-		instdata[instCounter]->nBunch      = 0 ;
-		instdata[instCounter]->indx = elemno + 1 ;
-		instdata[instCounter]->S = GetDBValue( InstPar+InstS ) ;
+    instdata[instCounter]->nBunch      = 0 ;
+    instdata[instCounter]->indx = elemno + 1 ;
+    instdata[instCounter]->S = GetDBValue( InstPar+InstS ) ;
     
     /* allocate enough space for the instrument data on all bunches needed */
     
-		if (instdata[instCounter]->nbunchalloc < nBunchNeeded )
-		{
-			FreeAndNull( &(instdata[instCounter]->x) ) ;
-			FreeAndNull( &(instdata[instCounter]->y) ) ;
-			FreeAndNull( &(instdata[instCounter]->z) ) ;
-			FreeAndNull( &(instdata[instCounter]->sig11) ) ;
-			FreeAndNull( &(instdata[instCounter]->sig13) ) ;
-			FreeAndNull( &(instdata[instCounter]->sig33) ) ;
-			FreeAndNull( &(instdata[instCounter]->sig55) ) ;
-			FreeAndNull( &(instdata[instCounter]->Q) ) ;
+    if (instdata[instCounter]->nbunchalloc < nBunchNeeded )
+    {
+      FreeAndNull( (void**)&(instdata[instCounter]->x) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->y) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->z) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->sig11) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->sig13) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->sig33) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->sig55) ) ;
+      FreeAndNull( (void**)&(instdata[instCounter]->Q) ) ;
       
-			instdata[instCounter]->x = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->y = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->z = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->sig11 = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->sig33 = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->sig55 = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->sig13 = 
-      calloc(nBunchNeeded,sizeof(double)) ;
-			instdata[instCounter]->Q = 
-      calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->x =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->y =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->z =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->sig11 =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->sig33 =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->sig55 =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->sig13 =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
+      instdata[instCounter]->Q =
+              (double*)calloc(nBunchNeeded,sizeof(double)) ;
       
-			if ( (instdata[instCounter]->x     == NULL) ||
-          (instdata[instCounter]->y     == NULL) ||
-          (instdata[instCounter]->z     == NULL) ||
-          (instdata[instCounter]->sig11 == NULL) ||
-          (instdata[instCounter]->sig33  == NULL) ||
-          (instdata[instCounter]->sig55  == NULL) ||
-          (instdata[instCounter]->sig13 == NULL) ||
-          (instdata[instCounter]->Q     == NULL)    )
-			{
-				BadBPMAllocMsg( elemno+1 ) ;
-				stat = 0 ;
-				goto egress ;
-			}
-			instdata[instCounter]->nbunchalloc = nBunchNeeded ;
-		} /* end of allocation of data vectors block */
+      if ( (instdata[instCounter]->x     == NULL) ||
+              (instdata[instCounter]->y     == NULL) ||
+              (instdata[instCounter]->z     == NULL) ||
+              (instdata[instCounter]->sig11 == NULL) ||
+              (instdata[instCounter]->sig33  == NULL) ||
+              (instdata[instCounter]->sig55  == NULL) ||
+              (instdata[instCounter]->sig13 == NULL) ||
+              (instdata[instCounter]->Q     == NULL)    )
+      {
+        BadBPMAllocMsg( elemno+1 ) ;
+        stat = 0 ;
+        goto egress ;
+      }
+      instdata[instCounter]->nbunchalloc = nBunchNeeded ;
+    } /* end of allocation of data vectors block */
     
     /* increment the counter which tells how many structures are filled on
-     exit */
+     * exit */
     
-		ArgStruc->nINST++ ;
+    ArgStruc->nINST++ ;
     
-	} /* end first-bunch check/initialization/allocation block */
+  } /* end first-bunch check/initialization/allocation block */
   
   /* we need to clear out the present data slot if we are on the first
-   bunch, or if we are doing multibunch tracking */
+   * bunch, or if we are doing multibunch tracking */
   
-	if ( (TrackFlags[MultiBunch] == 1) ||
-      (bunchno+1 == ArgStruc->FirstBunch) )
-	{
-		instdata[instCounter]->x[BunchSlot] = 0 ;
-		instdata[instCounter]->y[BunchSlot] = 0 ;
-		instdata[instCounter]->z[BunchSlot] = 0 ;
-		instdata[instCounter]->sig11[BunchSlot] = 0 ;
-		instdata[instCounter]->sig33[BunchSlot] = 0 ;
-		instdata[instCounter]->sig55[BunchSlot] = 0 ;
-		instdata[instCounter]->sig13[BunchSlot] = 0 ;
-		instdata[instCounter]->Q[BunchSlot] = 0 ;
-	}
+  if ( (TrackFlags[MultiBunch] == 1) ||
+          (bunchno+1 == ArgStruc->FirstBunch) )
+  {
+    instdata[instCounter]->x[BunchSlot] = 0 ;
+    instdata[instCounter]->y[BunchSlot] = 0 ;
+    instdata[instCounter]->z[BunchSlot] = 0 ;
+    instdata[instCounter]->sig11[BunchSlot] = 0 ;
+    instdata[instCounter]->sig33[BunchSlot] = 0 ;
+    instdata[instCounter]->sig55[BunchSlot] = 0 ;
+    instdata[instCounter]->sig13[BunchSlot] = 0 ;
+    instdata[instCounter]->Q[BunchSlot] = 0 ;
+  }
   
   /* get the transformations needed based on mechanical offsets */
   
-	stat = GetTotalOffsetXfrms( InstPar[InstGirder].ValuePtr,
-                             InstPar[InstL].ValuePtr,
-                             InstPar[InstS].ValuePtr,
-                             InstPar[InstOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms( InstPar[InstGirder].ValuePtr,
+          InstPar[InstL].ValuePtr,
+          InstPar[InstS].ValuePtr,
+          InstPar[InstOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* pre-compute sine and cosine components of the tilt */
   
-	sintilt = sin(Xfrms[5][0]) ;
-	costilt = cos(Xfrms[5][0]) ;
+  sintilt = sin(Xfrms[5][0]) ;
+  costilt = cos(Xfrms[5][0]) ;
   
   /* Accumulate the appropriate summation of particle positions in the
-   data structure.  Bear in mind that the present data vector is the
-   positions after tracking thru the inst but in the survey coordinate
-   system, so we have to make appropriate transformations to the inst
-   coordinate system */
+   * data structure.  Bear in mind that the present data vector is the
+   * positions after tracking thru the inst but in the survey coordinate
+   * system, so we have to make appropriate transformations to the inst
+   * coordinate system */
   
-	for (i=0 ; i<ThisBunch->nray ; i++)
-	{
-		raystart = 6*i ;
-		if (ThisBunch->stop[i] !=0.)
-			continue ;
+  for (i=0 ; i<ThisBunch->nray ; i++)
+  {
+    raystart = 6*i ;
+    if (ThisBunch->stop[i] !=0.)
+      continue ;
     
     /* get the contribution from this ray, including its weight and the
-     transformation from the element offset. */
+     * transformation from the element offset. */
     
-		dx1 = ThisBunch->y[raystart] - Xfrms[0][1] 		 
-    + Xfrms[4][1] * ThisBunch->y[raystart+1] ;
-		dy1 = ThisBunch->y[raystart+2] - Xfrms[2][1] 		 
-    + Xfrms[4][1] * ThisBunch->y[raystart+3] ;
-		dz  = ThisBunch->y[raystart+4] -	Xfrms[4][1] 
-    + 0.5 * Xfrms[4][1] *
-		(  ThisBunch->y[raystart+1] * ThisBunch->y[raystart+1] + 
-     ThisBunch->y[raystart+3] * ThisBunch->y[raystart+3]   ) ;
-		Q   = ThisBunch->Q[i] ;
+    dx1 = ThisBunch->y[raystart] - Xfrms[0][1]
+            + Xfrms[4][1] * ThisBunch->y[raystart+1] ;
+    dy1 = ThisBunch->y[raystart+2] - Xfrms[2][1]
+            + Xfrms[4][1] * ThisBunch->y[raystart+3] ;
+    dz  = ThisBunch->y[raystart+4] -	Xfrms[4][1]
+            + 0.5 * Xfrms[4][1] *
+            (  ThisBunch->y[raystart+1] * ThisBunch->y[raystart+1] +
+            ThisBunch->y[raystart+3] * ThisBunch->y[raystart+3]   ) ;
+    Q   = ThisBunch->Q[i] ;
     
-		dx = dx1 * costilt + dy1 * sintilt ;
-		dy = -dx1 * sintilt + dy1 * costilt ;
+    dx = dx1 * costilt + dy1 * sintilt ;
+    dy = -dx1 * sintilt + dy1 * costilt ;
     
     /* accumulate this ray, weighted by charge, into the necessary slots
-     in the data structure */
+     * in the data structure */
     
-		instdata[instCounter]->x[BunchSlot] += dx * Q ;
-		instdata[instCounter]->y[BunchSlot] += dy * Q ;
-		instdata[instCounter]->z[BunchSlot] += dz * Q ;
-		instdata[instCounter]->Q[BunchSlot] +=  Q ;
-		instdata[instCounter]->sig11[BunchSlot] += dx * dx * Q ;
-		instdata[instCounter]->sig33[BunchSlot] += dy * dy * Q ;
-		instdata[instCounter]->sig55[BunchSlot] += dz * dz * Q ;
-		instdata[instCounter]->sig13[BunchSlot] += dx * dy * Q ;
+    instdata[instCounter]->x[BunchSlot] += dx * Q ;
+    instdata[instCounter]->y[BunchSlot] += dy * Q ;
+    instdata[instCounter]->z[BunchSlot] += dz * Q ;
+    instdata[instCounter]->Q[BunchSlot] +=  Q ;
+    instdata[instCounter]->sig11[BunchSlot] += dx * dx * Q ;
+    instdata[instCounter]->sig33[BunchSlot] += dy * dy * Q ;
+    instdata[instCounter]->sig55[BunchSlot] += dz * dz * Q ;
+    instdata[instCounter]->sig13[BunchSlot] += dx * dy * Q ;
     
-	} /* end loop over rays and accumulation */
+  } /* end loop over rays and accumulation */
   
   /* Do we need to complete the calculation of first and second moments?
-   If we are doing multibunch tracking, the answer is yes; if we are not
-   but we are on the last bunch, the answer is also yes */
+   * If we are doing multibunch tracking, the answer is yes; if we are not
+   * but we are on the last bunch, the answer is also yes */
   
-	if ( (TrackFlags[MultiBunch] == 1)    ||
-      (bunchno+1 == ArgStruc->LastBunch)    )
-	{
+  if ( (TrackFlags[MultiBunch] == 1)    ||
+          (bunchno+1 == ArgStruc->LastBunch)    )
+  {
     
     /* increment the counter which tells TrackThruSetReturn how many bunch
-     data slots are filled */
+     * data slots are filled */
     
-		instdata[instCounter]->nBunch++ ;
+    instdata[instCounter]->nBunch++ ;
     
     /* normalize the charge out of the various data slots */
     
-		QBS = instdata[instCounter]->Q[BunchSlot] ;
-		if (QBS == 0.)
-			QBS = 1. ;
+    QBS = instdata[instCounter]->Q[BunchSlot] ;
+    if (QBS == 0.)
+      QBS = 1. ;
     
-		instdata[instCounter]->x[BunchSlot]     /= QBS ;
-		instdata[instCounter]->y[BunchSlot]     /= QBS ;
-		instdata[instCounter]->z[BunchSlot]     /= QBS ;
-		instdata[instCounter]->sig11[BunchSlot] /= QBS ;
-		instdata[instCounter]->sig33[BunchSlot] /= QBS ;
-		instdata[instCounter]->sig55[BunchSlot] /= QBS ;
-		instdata[instCounter]->sig13[BunchSlot] /= QBS ;
+    instdata[instCounter]->x[BunchSlot]     /= QBS ;
+    instdata[instCounter]->y[BunchSlot]     /= QBS ;
+    instdata[instCounter]->z[BunchSlot]     /= QBS ;
+    instdata[instCounter]->sig11[BunchSlot] /= QBS ;
+    instdata[instCounter]->sig33[BunchSlot] /= QBS ;
+    instdata[instCounter]->sig55[BunchSlot] /= QBS ;
+    instdata[instCounter]->sig13[BunchSlot] /= QBS ;
     
     /* subtract the <x>*<x> component from the sigmas */
     
-		instdata[instCounter]->sig11[BunchSlot] -= 
-    (instdata[instCounter]->x[BunchSlot] *
-     instdata[instCounter]->x[BunchSlot]   ) ;
-		instdata[instCounter]->sig33[BunchSlot] -= 
-    (instdata[instCounter]->y[BunchSlot] *
-     instdata[instCounter]->y[BunchSlot]   ) ;
-		instdata[instCounter]->sig55[BunchSlot] -= 
-    (instdata[instCounter]->z[BunchSlot] *
-     instdata[instCounter]->z[BunchSlot]   ) ;
-		instdata[instCounter]->sig13[BunchSlot] -= 
-    (instdata[instCounter]->x[BunchSlot] *
-     instdata[instCounter]->y[BunchSlot]   ) ;
+    instdata[instCounter]->sig11[BunchSlot] -=
+            (instdata[instCounter]->x[BunchSlot] *
+            instdata[instCounter]->x[BunchSlot]   ) ;
+    instdata[instCounter]->sig33[BunchSlot] -=
+            (instdata[instCounter]->y[BunchSlot] *
+            instdata[instCounter]->y[BunchSlot]   ) ;
+    instdata[instCounter]->sig55[BunchSlot] -=
+            (instdata[instCounter]->z[BunchSlot] *
+            instdata[instCounter]->z[BunchSlot]   ) ;
+    instdata[instCounter]->sig13[BunchSlot] -=
+            (instdata[instCounter]->x[BunchSlot] *
+            instdata[instCounter]->y[BunchSlot]   ) ;
     
-	}
+  }
   
-egress:
-  
-	return stat;
-  
-}	
+  egress:
+    
+    return stat;
+    
+}
 
 /*=====================================================================*/
 
 /* Perform tracking of one bunch through one corrector magnet, including
- any transformations necessary to manage magnet, girder, or girder
- mover rotations.  All strength errors are also included.  Does 
- slightly different things depending on whether the calling routine
- indicates that the magnet is an XCOR or a YCOR. */
+ * any transformations necessary to manage magnet, girder, or girder
+ * mover rotations.  All strength errors are also included.  Does
+ * slightly different things depending on whether the calling routine
+ * indicates that the magnet is an XCOR or a YCOR. */
 
 /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno; if
- BEAMLINE{elemno} is not some sort of magnet;
- if a ray is encountered which has momentum <= 0 but which
- has not been STOPped. */
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno; if
+ * BEAMLINE{elemno} is not some sort of magnet;
+ * if a ray is encountered which has momentum <= 0 but which
+ * has not been STOPped. */
 
-int TrackBunchThruCorrector( int elemno, int bunchno, 
-                            struct TrackArgsStruc* ArgStruc,
-                            int* TrackFlag, int xycorflag, double splitL, double splitS )
+int TrackBunchThruCorrector( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, int xycorflag, double splitL, double splitS )
 {
-	double Lov2,B,B2,dB,Tilt,L ;     /* some basic parameters */
-	double Xfrms[6][2] ;           /* upstream and downstream coordinate
-                                  xfrms from magnet + girder + mover
-                                  offset values */
-	int PS ;
-	int ray ;
-	int raystart ;               /* shortcut for 6*ray */
-	int Stop ;                   /* did the ray stop? */
-	struct Bunch* ThisBunch ;    /* a shortcut */
-	double XField, YField ;      /* x and y deflecting fields */
-	double dx, dy ;              /* x and y deflection */
-	double dxp, dyp ;
-	int stat = 1 ;
-	double Lrad, fabsB ;
-	int i ;
-	double SR_dP = 0 ;
-	struct LucretiaParameter* CPar ;
+  double Lov2,B,B2,dB,Tilt,L ;     /* some basic parameters */
+  double Xfrms[6][2] ;           /* upstream and downstream coordinate
+   * xfrms from magnet + girder + mover
+   * offset values */
+  int PS ;
+  int ray ;
+  int raystart ;               /* shortcut for 6*ray */
+  int Stop ;                   /* did the ray stop? */
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  double XField, YField ;      /* x and y deflecting fields */
+  double dx, dy ;              /* x and y deflection */
+  double dxp, dyp ;
+  int stat = 1 ;
+  double Lrad, fabsB ;
+  double SR_dP = 0 ;
+  struct LucretiaParameter* CPar ;
   
   /* depending on whether this is an XCOR, a YCOR, or an XYCOR, we use
-   different dictionaries */
+   * different dictionaries */
   
   
-	if (xycorflag == XYCOR)
-		CPar = XYCorrectorPar ;
-	else
-		CPar = CorrectorPar ;
+  if (xycorflag == XYCOR)
+    CPar = XYCorrectorPar ;
+  else
+    CPar = CorrectorPar ;
   
   /* get the element parameters from BEAMLINE; exit with bad status if
-   any parameters are missing or corrupted. */
+   * any parameters are missing or corrupted. */
   
-	stat = GetDatabaseParameters( elemno, nCorrectorPar, CPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
-	Lov2 = GetDBValue( CPar+CorL ) / 2. ;
-	B = GetDBValue( CPar+CorB ) ;
-	Tilt = GetDBValue( CPar+CorTilt ) ;
-	Lrad = GetDBValue( CPar+CorLrad ) ;
-	if (Lrad <= 0.)
-		Lrad = 2*Lov2 ;
-	if ( (TrackFlag[SynRad] != SR_None) &&
-      (Lrad <= 0.)                       )
-	{
-		stat = 0 ; 
-		BadSROptionsMessage( elemno ) ;
-		goto egress ; 
-	}
+  stat = GetDatabaseParameters( elemno, nCorrectorPar, CPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
+  Lov2 = GetDBValue( CPar+CorL ) / 2. ;
+  B = GetDBValue( CPar+CorB ) ;
+  Tilt = GetDBValue( CPar+CorTilt ) ;
+  Lrad = GetDBValue( CPar+CorLrad ) ;
+  if (Lrad <= 0.)
+    Lrad = 2*Lov2 ;
+  if ( (TrackFlag[SynRad] != SR_None) &&
+          (Lrad <= 0.)                       )
+  {
+    stat = 0 ;
+    BadSROptionsMessage( elemno ) ;
+    goto egress ;
+  }
   
   /* Split element treatment */
   if ( splitL == 0 ) {
@@ -4501,35 +4612,35 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
   
   /* now the error parameters */
   
-	B *= (1. + GetDBValue( CPar+CordB ) ) ;
+  B *= (1. + GetDBValue( CPar+CordB ) ) ;
   
   /* now get the power supply parameters, if any */
   
-	PS = (int)(GetDBValue( CPar+CorPS ) )  ;
-	if (PS > 0)
-	{
+  PS = (int)(GetDBValue( CPar+CorPS ) )  ;
+  if (PS > 0)
+  {
     
     /* convert from Matlab to C indexing */
     
-		PS -= 1 ;
-		stat = GetDatabaseParameters( PS, nPSPar, PSPar, 
-                                 TrackPars, PSTable ) ;
-		if (stat == 0)
-		{
-			BadPSMessage( elemno+1, PS+1 ) ;
-			goto egress ;
-		}
-		B *= GetDBValue( PSPar+PSAmpl ) * (1.+GetDBValue( PSPar+PSdAmpl ) ) ;
-		
-	} /* end of PS interlude */
+    PS -= 1 ;
+    stat = GetDatabaseParameters( PS, nPSPar, PSPar,
+            TrackPars, PSTable ) ;
+    if (stat == 0)
+    {
+      BadPSMessage( elemno+1, PS+1 ) ;
+      goto egress ;
+    }
+    B *= GetDBValue( PSPar+PSAmpl ) * (1.+GetDBValue( PSPar+PSdAmpl ) ) ;
+    
+  } /* end of PS interlude */
   
   /* now we handle the case of an XYCOR, which has an additional B field,
-   /* an additional power supply, and an additional field error.  While we're
-   at it, arrange for B to always be associated with the horizontal kick, and
-   B2 always with the vertical kick.  */
+   * /* an additional power supply, and an additional field error.  While we're
+   * at it, arrange for B to always be associated with the horizontal kick, and
+   * B2 always with the vertical kick.  */
   
-	switch (xycorflag) {
-      
+  switch (xycorflag) {
+    
     case XYCOR :
       
       B2 = *(CPar[CorB].ValuePtr+1) ;
@@ -4542,8 +4653,8 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
         /* convert from Matlab to C indexing */
         
         PS -= 1 ;
-        stat = GetDatabaseParameters( PS, nPSPar, PSPar, 
-                                     TrackPars, PSTable ) ;
+        stat = GetDatabaseParameters( PS, nPSPar, PSPar,
+                TrackPars, PSTable ) ;
         if (stat == 0)
         {
           BadPSMessage( elemno+1, PS+1 ) ;
@@ -4572,156 +4683,156 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
   B2 *= splitL ;
   
   
-	fabsB = sqrt(B*B + B2*B2) ;
+  fabsB = sqrt(B*B + B2*B2) ;
   
   /* now we get the complete input- and output- transformations for the
-   element courtesy of the relevant function */
+   * element courtesy of the relevant function */
   if ( splitS == 0 ) {
     if ( CollPar[CollS].ValuePtr == NULL )
       splitS = 0 ;
     else
       splitS = *CollPar[CollS].ValuePtr ;
-  }  
+  }
   
-	stat = GetTotalOffsetXfrms( CPar[CorGirder].ValuePtr,
-                             &L,
-                             &splitS,
-                             CPar[CorOffset].ValuePtr,
-                             Xfrms ) ;
+  stat = GetTotalOffsetXfrms( CPar[CorGirder].ValuePtr,
+          &L,
+          &splitS,
+          CPar[CorOffset].ValuePtr,
+          Xfrms ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-  /* since the rotation transformation can be applied to the magnet 
-   rather than the beam, do that now */
+  /* since the rotation transformation can be applied to the magnet
+   * rather than the beam, do that now */
   
-	Tilt += Xfrms[5][0] ;
+  Tilt += Xfrms[5][0] ;
   
-	XField = (B * cos(Tilt) - B2*sin(Tilt)) / GEV2TM ;
-	YField = (B * sin(Tilt) + B2*cos(Tilt)) / GEV2TM ;
-	dx = XField * Lov2 ;
-	dy = YField * Lov2 ;
+  XField = (B * cos(Tilt) - B2*sin(Tilt)) / GEV2TM ;
+  YField = (B * sin(Tilt) + B2*cos(Tilt)) / GEV2TM ;
+  dx = XField * Lov2 ;
+  dy = YField * Lov2 ;
   
   /* make a shortcut to get to the bunch of interest */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* use the drift-tracker first */
-	
-	stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlag, L ) ;
+  
+  stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlag, L ) ;
   
   /* loop over rays in the bunch */
   
-	for (ray=0 ;ray<ThisBunch->nray ; ray++)
-	{
+  for (ray=0 ;ray<ThisBunch->nray ; ray++)
+  {
     
-		raystart = 6*ray ;
+    raystart = 6*ray ;
     
     /* if previously stopped, skip this particle;
-     we don't need to copy its coordinates, since TrackBunchThruDrift
-     has already moved the x values to y. */
+     * we don't need to copy its coordinates, since TrackBunchThruDrift
+     * has already moved the x values to y. */
     
-		if ( ThisBunch->stop[ray] > 0. )
-		{
-			continue ;
-		}
+    if ( ThisBunch->stop[ray] > 0. )
+    {
+      continue ;
+    }
     
     /* apply synchrotron radiation */
     
-		if (TrackFlag[SynRad] != SR_None)
-		{
-			SR_dP = ComputeSRMomentumLoss( ThisBunch->y[raystart+5], 
-                                    fabsB, Lrad, 
-                                    TrackFlag[SynRad]   ) ;
-			SR_dP /= 2 ;
-			ThisBunch->y[raystart+5]  -= SR_dP ;
-			Stop = CheckP0StopPart(ThisBunch->stop,&ThisBunch->ngoodray,ThisBunch->x,ThisBunch->y,elemno,ray,
-                             ThisBunch->y[raystart+5]-SR_dP, UPSTREAM) ;
-			if (Stop != 0)
-				continue ;
-		}
+    if (TrackFlag[SynRad] != SR_None)
+    {
+      SR_dP = ComputeSRMomentumLoss( ThisBunch->y[raystart+5],
+              fabsB, Lrad,
+              TrackFlag[SynRad]   ) ;
+      SR_dP /= 2 ;
+      ThisBunch->y[raystart+5]  -= SR_dP ;
+      Stop = CheckP0StopPart(ThisBunch->stop,&ThisBunch->ngoodray,ThisBunch->x,ThisBunch->y,elemno,ray,
+              ThisBunch->y[raystart+5]-SR_dP, UPSTREAM, StoppedParticles) ;
+      if (Stop != 0)
+        continue ;
+    }
     
     /* add the kick.  Note that rays with zero energy
-     are detected and stopped by TrackThruMain, and do not
-     need to be trapped here. */
+     * are detected and stopped by TrackThruMain, and do not
+     * need to be trapped here. */
     
-		dxp = XField / ThisBunch->y[raystart+5] ;
-		dyp = YField / ThisBunch->y[raystart+5] ;
+    dxp = XField / ThisBunch->y[raystart+5] ;
+    dyp = YField / ThisBunch->y[raystart+5] ;
     
-		if (TrackFlag[ZMotion] == 1)
-      ThisBunch->y[raystart+4] += Lov2 * 
-			( ThisBunch->y[raystart+1]*dxp + ThisBunch->y[raystart+3]*dyp 
-       + 0.5 * (dxp*dxp + dyp*dyp)             ) ;
-		
-		ThisBunch->y[raystart+1] += dxp ;
-		ThisBunch->y[raystart]   += dx  / ThisBunch->y[raystart+5] ;
-		ThisBunch->y[raystart+3] += dyp ;
-		ThisBunch->y[raystart+2] += dy  / ThisBunch->y[raystart+5] ;
-		ThisBunch->y[raystart+5] -= SR_dP ;
+    if (TrackFlag[ZMotion] == 1)
+      ThisBunch->y[raystart+4] += Lov2 *
+              ( ThisBunch->y[raystart+1]*dxp + ThisBunch->y[raystart+3]*dyp
+              + 0.5 * (dxp*dxp + dyp*dyp)             ) ;
+    
+    ThisBunch->y[raystart+1] += dxp ;
+    ThisBunch->y[raystart]   += dx  / ThisBunch->y[raystart+5] ;
+    ThisBunch->y[raystart+3] += dyp ;
+    ThisBunch->y[raystart+2] += dy  / ThisBunch->y[raystart+5] ;
+    ThisBunch->y[raystart+5] -= SR_dP ;
     
     /* check amplitude of outgoing angular momentum */
     
-		Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray , elemno, ray, 
-                              ThisBunch->y+raystart+1, 
-                              ThisBunch->y+raystart+3 ) ;
-	}
+    Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray , elemno, ray,
+            ThisBunch->y+raystart+1,
+            ThisBunch->y+raystart+3, StoppedParticles ) ;
+  }
   
-egress:
-  
-	return stat;
-  
-}	
+  egress:
+    
+    return stat;
+    
+}
 
 /*=====================================================================*/
 
 /* Track one bunch thru one collimator
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
- and self-consistent structure for bunch # bunchno; if
- BEAMLINE{elemno} is not some sort of collimator. */
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if: ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno; if
+ * BEAMLINE{elemno} is not some sort of collimator. */
 
-int TrackBunchThruCollimator( int elemno, int bunchno, 
-                             struct TrackArgsStruc* ArgStruc,
-                             int* TrackFlag, double splitL, double splitS )
+int TrackBunchThruCollimator( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag, double splitL, double splitS )
 {
-	int stat = 1 ; 
-	double Xfrms[6][2] ;           /* upstream and downstream coordinate
-                                  xfrms from magnet + girder + mover
-                                  offset values */
-	double aper2[2] ;              /* square of apertures */
-	int shape ;                    /* collimator shape */
-	struct Bunch* ThisBunch ;      /* shortcut */
-	int Stop ;
-	double Tilt, *L, *S ;  
-	int ray, raystart ;
+  int stat = 1 ;
+  double Xfrms[6][2] ;           /* upstream and downstream coordinate
+   * xfrms from magnet + girder + mover
+   * offset values */
+  double aper2[2] ;              /* square of apertures */
+  int shape ;                    /* collimator shape */
+  struct Bunch* ThisBunch ;      /* shortcut */
+  int Stop ;
+  double Tilt, *L, *S ;
+  int ray, raystart ;
   
   double *x, *px, *y, *py, *z, *p0 ;
   
   /* get the element parameters from BEAMLINE; exit with bad status if
-   any parameters are missing or corrupted. */
+   * any parameters are missing or corrupted. */
   
-	stat = GetDatabaseParameters( elemno, nCollPar, CollPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nCollPar, CollPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* compute the square of the half-gap in x and y degrees of freedom */
   
-	aper2[0] = CollPar[Collaper].ValuePtr[0] * 
-  CollPar[Collaper].ValuePtr[0]    ;
-	aper2[1] = CollPar[Collaper].ValuePtr[1] * 
-  CollPar[Collaper].ValuePtr[1]    ;
+  aper2[0] = CollPar[Collaper].ValuePtr[0] *
+          CollPar[Collaper].ValuePtr[0]    ;
+  aper2[1] = CollPar[Collaper].ValuePtr[1] *
+          CollPar[Collaper].ValuePtr[1]    ;
   
   /* get the complete coordinate transforms including any from the girder */
   if (splitL == 0) {
@@ -4734,41 +4845,41 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
   }
   
   
-	stat = GetTotalOffsetXfrms( CollPar[CollGirder].ValuePtr,
-                             L,
-                             S,
-                             CollPar[CollOffset].ValuePtr,
-                             Xfrms                         ) ;
+  stat = GetTotalOffsetXfrms( CollPar[CollGirder].ValuePtr,
+          L,
+          S,
+          CollPar[CollOffset].ValuePtr,
+          Xfrms                         ) ;
   
-  /* if the status is 1, then everything was found and unpacked OK.  
-   If it's zero, then something was seriously wrong so abort. */
+  /* if the status is 1, then everything was found and unpacked OK.
+   * If it's zero, then something was seriously wrong so abort. */
   
-	if (stat == 0)
-	{
-		BadOffsetMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat == 0)
+  {
+    BadOffsetMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
-	Tilt = GetDBValue( CollPar + CollTilt ) + Xfrms[5][0] ;
+  Tilt = GetDBValue( CollPar + CollTilt ) + Xfrms[5][0] ;
   
   /* get the geometry of the collimator from the database */
   
-	shape = GetCollimatorGeometry( elemno ) ;
-	if (shape == COLL_UNKNOWN)
-	{
-		BadElementMessage( elemno+1 ) ;
-		stat = 0 ;
-		goto egress ;
-	}
+  shape = GetCollimatorGeometry( elemno ) ;
+  if (shape == COLL_UNKNOWN)
+  {
+    BadElementMessage( elemno+1 ) ;
+    stat = 0 ;
+    goto egress ;
+  }
   
   /* make a shortcut to get to the bunch of interest */
   
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* if apertures are turned on, do the upstream transformation and
-   aperture check */
+   * aperture check */
   
-	if (TrackFlag[Aper] > 0)
+  if (TrackFlag[Aper] > 0)
     for (ray=0 ;ray<ThisBunch->nray ; ray++)
     {
       
@@ -4776,33 +4887,33 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
       
       /* if the ray was previously stopped ignore it  */
       
-      if (ThisBunch->stop[ray] > 0.) 
+      if (ThisBunch->stop[ray] > 0.)
         continue ;
       
       /* make ray coordinates into local ones, including offsets etc which
-       are demanded by the transformation structure. */
+       * are demanded by the transformation structure. */
       
       GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
       
       ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
       
       Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray, elemno, aper2, ray,
-                               UPSTREAM, &shape, Tilt ) ;
+              UPSTREAM, &shape, Tilt, StoppedParticles ) ;
     }
   
   /* now track thru the intervening drift */
   
   stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlag, *L ) ;
-	if (stat==0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  if (stat==0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* if apertures are turned on, do the downstream aperture check and
-   transform */
+   * transform */
   
-	if (TrackFlag[Aper] > 0)
+  if (TrackFlag[Aper] > 0)
     for (ray=0 ;ray<ThisBunch->nray ; ray++)
     {
       
@@ -4810,16 +4921,16 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
       
       /* if the ray was previously stopped ignore it  */
       
-      if (ThisBunch->stop[ray] > 0.) 
+      if (ThisBunch->stop[ray] > 0.)
         continue ;
       
       /* make ray coordinates into local ones, including offsets etc which
-       are demanded by the transformation structure. */
+       * are demanded by the transformation structure. */
       
       GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
       
       Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray, elemno, aper2, ray,
-                               DOWNSTREAM, &shape, Tilt ) ;
+              DOWNSTREAM, &shape, Tilt, StoppedParticles ) ;
       if (Stop == 1)
         continue ;
       
@@ -4827,69 +4938,69 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
       
     }
   
-  egress : 
-  
-  return stat ;
-  
+  egress :
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
 
 /* Track one bunch thru one coordinate change element
- 
- /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:   never. */
+ *
+ * /* RET:    Status, 1 = success, 0 = failure.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-int TrackBunchThruCoord( int elemno, int bunchno, 
-                        struct TrackArgsStruc* ArgStruc,
-                        int* TrackFlag                   )
+int TrackBunchThruCoord( int elemno, int bunchno,
+        struct TrackArgsStruc* ArgStruc,
+        int* TrackFlag                   )
 {
-	int stat = 1 ; 
-	struct Bunch* ThisBunch ;      /* shortcut */
-	int ray, raystart ;
-	Rmat R ;
-	double dx[6] ;
-	double x1, y1 ;
-	int Stop ;
+  int stat = 1 ;
+  struct Bunch* ThisBunch ;      /* shortcut */
+  int ray, raystart ;
+  Rmat R ;
+  double dx[6] ;
+  double x1, y1 ;
+  int Stop ;
   
   double *x, *px, *y, *py, *z, *p0 ;
   
   /* get the element parameters from BEAMLINE; exit with bad status if
-   any parameters are missing or corrupted. */
+   * any parameters are missing or corrupted. */
   
-	stat = GetDatabaseParameters( elemno, nCoordPar, CoordPar,
-                               TrackPars, ElementTable ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetDatabaseParameters( elemno, nCoordPar, CoordPar,
+          TrackPars, ElementTable ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* compute the transfer map, exit with bad status if not successful */
   
-	stat = GetCoordMap( CoordPar[CoordChange].ValuePtr, dx, R ) ;
-	if (stat == 0)
-	{
-		BadElementMessage( elemno+1 ) ;
-		goto egress ;
-	}
+  stat = GetCoordMap( CoordPar[CoordChange].ValuePtr, dx, R ) ;
+  if (stat == 0)
+  {
+    BadElementMessage( elemno+1 ) ;
+    goto egress ;
+  }
   
   /* make a shortcut to the bunch of interest */
-	
-	ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* loop over rays */
   
-	for (ray=0 ;ray<ThisBunch->nray ; ray++)
-	{
+  for (ray=0 ;ray<ThisBunch->nray ; ray++)
+  {
     
-		raystart = 6*ray ;
+    raystart = 6*ray ;
     
     /* if the ray was previously stopped ignore it  */
     
-    if (ThisBunch->stop[ray] > 0.) 
-			continue ;
+    if (ThisBunch->stop[ray] > 0.)
+      continue ;
     
     /* make ray coordinates into local ones */
     
@@ -4897,40 +5008,40 @@ int TrackBunchThruCoord( int elemno, int bunchno,
     
     /* make transformed coordinates from original coordinates */
     
-		x1 = *x + dx[0] ;
-		y1 = *y + dx[2] ; 
-		ThisBunch->y[raystart  ] = R[0][0]*x1 + R[0][1]* *px + 
-    R[0][2]*y1 + R[0][3]* *py ;
-		ThisBunch->y[raystart+2] = R[2][0]*x1 + R[2][1]* *px + 
-    R[2][2]*y1 + R[2][3]* *py ;
-		ThisBunch->y[raystart+4] = *z + dx[4] ;
-		if (TrackFlag[ZMotion] == 1)
-      ThisBunch->y[raystart+4] += R[4][0]*x1 + R[4][1]* *px + 
-      R[4][2]*y1 + R[4][3]* *py ;
+    x1 = *x + dx[0] ;
+    y1 = *y + dx[2] ;
+    ThisBunch->y[raystart  ] = R[0][0]*x1 + R[0][1]* *px +
+            R[0][2]*y1 + R[0][3]* *py ;
+    ThisBunch->y[raystart+2] = R[2][0]*x1 + R[2][1]* *px +
+            R[2][2]*y1 + R[2][3]* *py ;
+    ThisBunch->y[raystart+4] = *z + dx[4] ;
+    if (TrackFlag[ZMotion] == 1)
+      ThisBunch->y[raystart+4] += R[4][0]*x1 + R[4][1]* *px +
+              R[4][2]*y1 + R[4][3]* *py ;
     
-		ThisBunch->y[raystart+1] = R[1][1] * *px + R[1][3]* *py + dx[1] ;
-		ThisBunch->y[raystart+3] = R[3][1] * *px + R[3][3]* *py + dx[3] ;
-		ThisBunch->y[raystart+5] = *p0 ;
+    ThisBunch->y[raystart+1] = R[1][1] * *px + R[1][3]* *py + dx[1] ;
+    ThisBunch->y[raystart+3] = R[3][1] * *px + R[3][3]* *py + dx[3] ;
+    ThisBunch->y[raystart+5] = *p0 ;
     
     /* check to see if, as a result of the coordinate transformation, any
-     of the particles are now going perpendicular to the new coordinate
-     axes, if so stop them now. */
+     * of the particles are now going perpendicular to the new coordinate
+     * axes, if so stop them now. */
     
     GetLocalCoordPtrs(ThisBunch->y, raystart,&x,&px,&y,&py,&z,&p0) ;
     
-		Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray, elemno, ray, 
-                              px, py ) ;
-		if (Stop != 0)
-			BadParticlePperpMessage( elemno+1, bunchno+1, ray+1 ) ;
+    Stop = CheckPperpStopPart( ThisBunch->stop, &ThisBunch->ngoodray, elemno, ray,
+            px, py, StoppedParticles ) ;
+    if (Stop != 0)
+      BadParticlePperpMessage( elemno+1, bunchno+1, ray+1 ) ;
     
-	}
+  }
   
   /* Now set status and exit */
   
-egress:
-  
-	return stat ;
-  
+  egress:
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
@@ -4941,62 +5052,62 @@ egress:
 
 /* Some utility procedures follow */
 
-/* Copy R matrix Rsource into R matrix Rtarget 
- 
- /* RET:   none
- /* ABORT: never.
- /* FAIL:  never.                                               */
+/* Copy R matrix Rsource into R matrix Rtarget
+ *
+ * /* RET:   none
+ * /* ABORT: never.
+ * /* FAIL:  never.                                               */
 
-void RmatCopy( Rmat Rsource, Rmat Rtarget ) 
+void RmatCopy( Rmat Rsource, Rmat Rtarget )
 {
-	int i,j ;
+  int i,j ;
   for (i=0 ; i<6 ; i++){
     for (j=0 ; j<6 ; j++){
       Rtarget[i][j] = Rsource[i][j] ;
-		}
-	}
+    }
+  }
   return ;
 }
 
 /*=====================================================================*/
 
 /* Multiply R matrix Rearly by R matrix Rlate, put results into Rprod;
- the contents of Rprod are (obviously) destroyed.  In matrix terms,
- 
- Rprod = Rlate * Rearly ;
- 
- /* RET:   none.
- /* ABORT: never.
- /* FAIL:  never.                                               */
+ * the contents of Rprod are (obviously) destroyed.  In matrix terms,
+ *
+ * Rprod = Rlate * Rearly ;
+ *
+ * /* RET:   none.
+ * /* ABORT: never.
+ * /* FAIL:  never.                                               */
 
 
 
-void RmatProduct( Rmat Rlate, Rmat Rearly, Rmat Rprod ) 
+void RmatProduct( Rmat Rlate, Rmat Rearly, Rmat Rprod )
 {
   Rmat Rtemp = {
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0}
+    {0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0}
   } ;
-	int i,j,k ;
+  int i,j,k ;
   
-  /* Since it is possible that Rprod and Rearly are the same (ie the calling 
-   routine would like to ultimately replace Rearly with Rprod), we must
-   carefully do the multiplication in a way that does not corrupt Rearly.
-   Specifically, perform the multiplication into Rtemp, then do an RmatCopy. */
+  /* Since it is possible that Rprod and Rearly are the same (ie the calling
+   * routine would like to ultimately replace Rearly with Rprod), we must
+   * carefully do the multiplication in a way that does not corrupt Rearly.
+   * Specifically, perform the multiplication into Rtemp, then do an RmatCopy. */
   
-	for (i = 0 ; i < 6 ; i++){
-		for (j = 0 ; j < 6 ; j++){
-			for (k = 0 ; k < 6 ; k++){
-				Rtemp[i][j] += Rlate[i][k]*Rearly[k][j] ;
-			}
-		}
-	}
-	RmatCopy(Rtemp,Rprod) ;
-	return ;
+  for (i = 0 ; i < 6 ; i++){
+    for (j = 0 ; j < 6 ; j++){
+      for (k = 0 ; k < 6 ; k++){
+        Rtemp[i][j] += Rlate[i][k]*Rearly[k][j] ;
+      }
+    }
+  }
+  RmatCopy(Rtemp,Rprod) ;
+  return ;
 }
 
 /*=====================================================================*/
@@ -5004,240 +5115,228 @@ void RmatProduct( Rmat Rlate, Rmat Rearly, Rmat Rprod )
 /* Return the values of the tracking flags to the calling procedure.*/
 
 /* RET:    a vector of ints with the values of the flags.  Note that
- the last of the flags returned is a status, which indicates
- whether subsidiary procedure GetTrackFlagGlobals executed
- successfully.  Alson indicates which flags are set, and how
- many times, via the global TrackFlagSet vector.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * the last of the flags returned is a status, which indicates
+ * whether subsidiary procedure GetTrackFlagGlobals executed
+ * successfully.  Alson indicates which flags are set, and how
+ * many times, via the global TrackFlagSet vector.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-int* GetTrackingFlags( int elemno ) 
+int* GetTrackingFlags( int elemno )
 {
   
-	const char* FlagName ; /* flag names from BEAMLINE cell array */
-	int  FlagValue ; /* values from BEAMLINE cell array */
-	int  nFlagNames   ; /* how many there were */
+  const char* FlagName ; /* flag names from BEAMLINE cell array */
+  int  FlagValue ; /* values from BEAMLINE cell array */
+  int  nFlagNames   ; /* how many there were */
   static int DecodedFlagValue[NUM_TRACK_FLAGS+1] ;
-	int i,j ;
-	int OutOfBounds=0 ;
+  int i,j ;
+  int OutOfBounds=0 ;
   
   /* initialize all tracking flags to zero (defaults) */
   
-	for (i=0 ; i<NUM_TRACK_FLAGS ; i++)
-	{
-		DecodedFlagValue[i] = 0 ;
-		TrackFlagSet[i] = 0 ;
-	}
-	DecodedFlagValue[NUM_TRACK_FLAGS] = 0 ;
+  for (i=0 ; i<NUM_TRACK_FLAGS ; i++)
+  {
+    DecodedFlagValue[i] = 0 ;
+    TrackFlagSet[i] = 0 ;
+  }
+  DecodedFlagValue[NUM_TRACK_FLAGS] = 0 ;
   
   /* use global access to get the names of the tracking flags and their
-   values.  If there is not a TrackFlag structure in the BEAMLINE elt
-   of interest, return with good status (no law says you must have a
-   tracking flags structure on an element).  If however there is such
-   a structure but it is corrupted, return with bad status. */
+   * values.  If there is not a TrackFlag structure in the BEAMLINE elt
+   * of interest, return with good status (no law says you must have a
+   * tracking flags structure on an element).  If however there is such
+   * a structure but it is corrupted, return with bad status. */
   
-	nFlagNames = GetNumTrackFlags( elemno )  ;
+  nFlagNames = GetNumTrackFlags( elemno )  ;
   
-	if (nFlagNames == 0)
-	{
-		DecodedFlagValue[NUM_TRACK_FLAGS] = 1 ;
-		goto egress ;
-	}
-	if (nFlagNames < 0)
-	{
-		DecodedFlagValue[NUM_TRACK_FLAGS] = 0 ;
-		goto egress ;
-	}
+  if (nFlagNames == 0)
+  {
+    DecodedFlagValue[NUM_TRACK_FLAGS] = 1 ;
+    goto egress ;
+  }
+  if (nFlagNames < 0)
+  {
+    DecodedFlagValue[NUM_TRACK_FLAGS] = 0 ;
+    goto egress ;
+  }
   
   
   /* otherwise loop over the flags and compare them to the prod names: */
   
-	for (i=0 ; i<nFlagNames ; i++)
-	{
-		FlagName = GetTrackFlagName( i ) ;
-		FlagValue = GetTrackFlagValue( i ) ;
-		for (j=0 ; j<NUM_TRACK_FLAGS ; j++)
-		{
-			if (strcmp(FlagName,TrackFlagNames[j]) == 0)
-			{
-				DecodedFlagValue[j] = FlagValue ;
-				if ( (FlagValue > TrackFlagMaxValue[j]) ||
-            (FlagValue < TrackFlagMinValue[j])    )
+  for (i=0 ; i<nFlagNames ; i++)
+  {
+    FlagName = GetTrackFlagName( i ) ;
+    FlagValue = GetTrackFlagValue( i ) ;
+    for (j=0 ; j<NUM_TRACK_FLAGS ; j++)
+    {
+      if (strcmp(FlagName,TrackFlagNames[j]) == 0)
+      {
+        DecodedFlagValue[j] = FlagValue ;
+        if ( (FlagValue > TrackFlagMaxValue[j]) ||
+                (FlagValue < TrackFlagMinValue[j])    )
           OutOfBounds++ ;
-				TrackFlagSet[j]++ ;
-				break ;
-			}
-		}
-	}
-	if (OutOfBounds==0)
-		DecodedFlagValue[NUM_TRACK_FLAGS] = 1 ;
+        TrackFlagSet[j]++ ;
+        break ;
+      }
+    }
+  }
+  if (OutOfBounds==0)
+    DecodedFlagValue[NUM_TRACK_FLAGS] = 1 ;
   
-egress:
-  
-	return DecodedFlagValue ;
-  
+  egress:
+    
+    return DecodedFlagValue ;
+    
 }
 
 /*=====================================================================*/
 
 /* Check to see whether a particle has gone outside of the aperture;
- if so, stop it from further tracking. */
+ * if so, stop it from further tracking. */
 
 /* RET:    status int, 0 == did not stop particle, 1 == particle was
- stopped.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * stopped.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
 int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray,
-                      int elemno, 
-                      double* aper2, 
-                      int ray, int UpstreamDownstream,
-                      int* shape, double tilt )
+        int elemno,
+        double* aper2,
+        int ray, int UpstreamDownstream,
+        int* shape, double tilt, int* stp )
 {
-	double* posvec ;
-	int retval = 0 ;
-	double x_rotated, y_rotated ;
-	int i ;
+  double* posvec ;
+  int retval = 0 ;
+  double x_rotated, y_rotated ;
+  int i ;
   
   /* if UpstreamDownstream is zero, point posvec at x (pre-tracking
-   particle positions), otherwise at y (post-tracking positions) */
+   * particle positions), otherwise at y (post-tracking positions) */
   
-	if (UpstreamDownstream == UPSTREAM)
-		posvec = x ;
-	else
-		posvec = y ;
+  if (UpstreamDownstream == UPSTREAM)
+    posvec = x ;
+  else
+    posvec = y ;
   
   /* check the position */
   
-	if (shape == NULL) /* indicates circular, element aperture */
-	{
-    if ( posvec[6*ray+0]*posvec[6*ray+0] + 
-        posvec[6*ray+2]*posvec[6*ray+2] >= aper2[0] )
+  if (shape == NULL) /* indicates circular, element aperture */
+  {
+    if ( posvec[6*ray+0]*posvec[6*ray+0] +
+            posvec[6*ray+2]*posvec[6*ray+2] >= aper2[0] )
       retval = 1 ;
-	}
-	else               /* rectangular or elliptical */
-	{
+  }
+  else               /* rectangular or elliptical */
+  {
     x_rotated = posvec[6*ray+0] * cos(tilt) - posvec[6*ray+2] * sin(tilt) ;
     y_rotated = posvec[6*ray+0] * sin(tilt) + posvec[6*ray+2] * cos(tilt) ;
     if (*shape == COLL_ELLIPSE)
       if ( x_rotated*x_rotated / aper2[0]  +
-          y_rotated*y_rotated / aper2[1]  >= 1 )
+            y_rotated*y_rotated / aper2[1]  >= 1 )
         retval = 1 ;
-      else if (*shape = COLL_RECTANGLE)
+      else if (*shape == COLL_RECTANGLE)
         if ( (x_rotated*x_rotated >= aper2[0]) ||
             (y_rotated*y_rotated >= aper2[1])    )
           retval = 1 ;
-	}
+  }
   
-	if (retval == 1)
-	{
+  if (retval == 1)
+  {
     
     /* set the stopping point in the ThisBunch->stop vector */
     
-		stop[ray] = (double)(elemno+1)  ; /* in Matlab indexing */
-		*ngoodray-- ;
+    stop[ray] = (double)(elemno+1)  ; /* in Matlab indexing */
+    *ngoodray-- ;
     
     /* set the global stopped-particle variable */
-#ifdef __CUDA_ARCH__
-    StoppedParticles_gpu = 1 ;
-#else
-		StoppedParticles = 1 ;
-#endif
+    *stp = 1 ;
     
     /* if we are doing the upstream face, copy the ray from input to output
-     vector */
+     * vector */
     
-		if (UpstreamDownstream == UPSTREAM)
-		{
-			for (i=6*ray ; i<6*ray+5 ; i++) 
-				y[i] = x[i] ;
-		}
-	}
+    if (UpstreamDownstream == UPSTREAM)
+    {
+      for (i=6*ray ; i<6*ray+5 ; i++)
+        y[i] = x[i] ;
+    }
+  }
   
-	return retval ;
+  return retval ;
   
 }
 
 /*==================================================================*/
 
 /* Check whether a particle needs to stop on total momentum <= 0.
- 
- /* RET:    status int, 0 == did not stop particle, 1 == particle was
- stopped.
- /* ABORT:  never.
- /* FAIL:   never. */
+ *
+ * /* RET:    status int, 0 == did not stop particle, 1 == particle was
+ * stopped.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int elemno, 
-                    int rayno, double P0, int upstreamdownstream )
+int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int elemno,
+        int rayno, double P0, int upstreamdownstream, int* stp )
 {
-	int stat = 0, i ;
-	if (P0 <= 0.)
-	{
-		stat = 1 ;
-		stop[rayno] = (double)(elemno+1) ;
-		ngoodray-- ;
-#ifdef __CUDA_ARCH__
-    StoppedParticles_gpu = 1 ;
-#else
-		StoppedParticles = 1 ;
-#endif
+  int stat = 0, i ;
+  if (P0 <= 0.)
+  {
+    stat = 1 ;
+    stop[rayno] = (double)(elemno+1) ;
+    ngoodray-- ;
+    *stp = 1 ;
     
     /* If the check is done on the upstream face, copy the
-     x, px, y, py, z coordinates from x to y (ie, we want to preserve
-     the incoming particle coordinates, and the negative momentum, in
-     the y so that they are handed to the user on exit); also copy the
-     bad momentum into the returned-data vector */
-		if (upstreamdownstream == UPSTREAM)
-		{
-      for (i=6*rayno ; i<6*rayno+4 ; i++) 
+     * x, px, y, py, z coordinates from x to y (ie, we want to preserve
+     * the incoming particle coordinates, and the negative momentum, in
+     * the y so that they are handed to the user on exit); also copy the
+     * bad momentum into the returned-data vector */
+    if (upstreamdownstream == UPSTREAM)
+    {
+      for (i=6*rayno ; i<6*rayno+4 ; i++)
         y[i] = x[i] ;
       y[6*rayno+5] = P0 ;
-		}
+    }
     
-	}
-	return stat ;
+  }
+  return stat ;
 }
 
 /*==================================================================*/
 
 /* Check whether a particle needs to stop on |Pperp| >= 1.
- 
- /* RET:    status int, 0 == did not stop particle, 1 == particle was
- stopped.
- /* ABORT:  never.
- /* FAIL:   never. */
+ *
+ * /* RET:    status int, 0 == did not stop particle, 1 == particle was
+ * stopped.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-int CheckPperpStopPart( double* stop, int* ngoodray, int elemno, 
-                       int rayno, double* Px, double* Py )
+int CheckPperpStopPart( double* stop, int* ngoodray, int elemno,
+        int rayno, double* Px, double* Py, int* stp )
 {
-	int stat = 0 ;
-	double Pperp ;
+  int stat = 0 ;
+  double Pperp ;
   
-	Pperp = (*Px) * (*Px) + (*Py) * (*Py) ;
-	if (Pperp >= 1.)
-	{
-		stat = 1 ;
-		stop[rayno] = (double)(elemno+1) ;
-		ngoodray-- ;
-#ifdef __CUDA_ARCH__    
-    StoppedParticles_gpu = 1 ;
-#else
-		StoppedParticles = 1 ;
-#endif
-	}
-	return stat ;
+  Pperp = (*Px) * (*Px) + (*Py) * (*Py) ;
+  if (Pperp >= 1.)
+  {
+    stat = 1 ;
+    stop[rayno] = (double)(elemno+1) ;
+    ngoodray-- ;
+    *stp = 1 ;
+  }
+  return stat ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about a bad element */
 
-void BadElementMessage( int elemno ) 
+void BadElementMessage( int elemno )
 {
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Error in element definition:  Element %d",elemno) ;
-	AddMessage( outmsg, 1 ) ;
+  
+  sprintf(outmsg,"Error in element definition:  Element %d",elemno) ;
+  AddMessage( outmsg, 1 ) ;
   
 }
 
@@ -5249,9 +5348,9 @@ void BadPSMessage( int elemno, int PSno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Error in definition of PS %d, Element %d",PSno,elemno) ;
-	AddMessage( outmsg, 1 ) ;
+  
+  sprintf(outmsg,"Error in definition of PS %d, Element %d",PSno,elemno) ;
+  AddMessage( outmsg, 1 ) ;
 }
 
 /*==================================================================*/
@@ -5262,22 +5361,22 @@ void BadKlystronMessage( int elemno, int Kno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Error in definition of Klystron %d, Element %d",Kno,elemno) ;
-	AddMessage( outmsg, 1 ) ;
+  
+  sprintf(outmsg,"Error in definition of Klystron %d, Element %d",Kno,elemno) ;
+  AddMessage( outmsg, 1 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about a bad Twiss propagation */
 
-void BadTwissMessage( int elemno ) 
+void BadTwissMessage( int elemno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Error in Twiss propagation, Element %d",elemno) ;
-	AddMessage( outmsg, 1 ) ;
+  
+  sprintf(outmsg,"Error in Twiss propagation, Element %d",elemno) ;
+  AddMessage( outmsg, 1 ) ;
 }
 
 /*==================================================================*/
@@ -5288,118 +5387,118 @@ void BadInverseTwissMessage( int e1, int e2 )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,
+  
+  sprintf(outmsg,
           "Error in back-propagating Twiss, elements %d to %d",
           e1, e2) ;
-	AddMessage( outmsg, 1 ) ;
+  AddMessage( outmsg, 1 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about bad tracking flags */
 
-void BadTrackFlagMessage( int elemno ) 
+void BadTrackFlagMessage( int elemno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Corrupted tracking flags, Element %d",elemno) ;
-	AddMessage( outmsg, 0 ) ;
+  
+  sprintf(outmsg,"Corrupted tracking flags, Element %d",elemno) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about aperture problems */
 
-void BadApertureMessage( int elemno ) 
+void BadApertureMessage( int elemno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Missing or zero aperture, Element %d",elemno) ;
-	AddMessage( outmsg, 0 ) ;
+  
+  sprintf(outmsg,"Missing or zero aperture, Element %d",elemno) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about SR options */
 
-void BadSROptionsMessage( int elemno ) 
+void BadSROptionsMessage( int elemno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"SR selected for element with zero L/Lrad, Element %d",elemno) ;
-	AddMessage( outmsg, 0 ) ;
+  
+  sprintf(outmsg,"SR selected for element with zero L/Lrad, Element %d",elemno) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about a bad momentum */
 
-void BadParticleMomentumMessage( int elemno, int bunchno, int rayloop ) 
+void BadParticleMomentumMessage( int elemno, int bunchno, int rayloop )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Negative or zero particle momentum: Element %d, Bunch %d, Particle %d",
+  
+  sprintf(outmsg,"Negative or zero particle momentum: Element %d, Bunch %d, Particle %d",
           elemno, bunchno, rayloop ) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about a bad transverse momentum */
 
-void BadParticlePperpMessage( int elemno, int bunchno, int rayloop ) 
+void BadParticlePperpMessage( int elemno, int bunchno, int rayloop )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Transverse momentum > Total momentum: Element %d, Bunch %d, Particle %d",
+  
+  sprintf(outmsg,"Transverse momentum > Total momentum: Element %d, Bunch %d, Particle %d",
           elemno, bunchno, rayloop ) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about bad initial momenta */
 
-void BadInitMomentumMessage( ) 
+void BadInitMomentumMessage( )
 {
   
-	char outmsg[90] ; 
-	sprintf(outmsg,"Invalid total or perpendicular momenta in initial rays") ;
-	AddMessage( outmsg, 1 ) ;
+  char outmsg[90] ;
+  sprintf(outmsg,"Invalid total or perpendicular momenta in initial rays") ;
+  AddMessage( outmsg, 1 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about a bad offset */
 
-void BadOffsetMessage( int elemno ) 
+void BadOffsetMessage( int elemno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Corrupted offset/girder/mover: Element %d",
+  
+  sprintf(outmsg,"Corrupted offset/girder/mover: Element %d",
           elemno ) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
 
 /* Add an error message about a bad allocation of BPM stuff */
 
-void BadBPMAllocMsg( int elemno ) 
+void BadBPMAllocMsg( int elemno )
 {
   
   char outmsg[90]; /* output message */
-	
-	sprintf(outmsg,"Unable to allocate BPM/INST dataspace: Element %d",
+  
+  sprintf(outmsg,"Unable to allocate BPM/INST dataspace: Element %d",
           elemno ) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
 }
 
 /*==================================================================*/
@@ -5409,31 +5508,31 @@ void BadBPMAllocMsg( int elemno )
 void BadSliceAllocMessage( int elemno )
 {
   
-	char outmsg[90] ;
+  char outmsg[90] ;
   
-	sprintf(outmsg,"Unable to allocate LCAV attribute dataspace: Element %d",
+  sprintf(outmsg,"Unable to allocate LCAV attribute dataspace: Element %d",
           elemno ) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
   
 }
 
 /*==================================================================*/
 
 /* Add a message about being unable to allocate space for the convolution
- of a SRWF */
+ * of a SRWF */
 
 void BadSRWFAllocMsg( int WF, int flag )
 {
   
-	char outmsg[90] ;
+  char outmsg[90] ;
   
-	if (flag==0)
-		sprintf(outmsg,
+  if (flag==0)
+    sprintf(outmsg,
             "Unable to allocate convolved-ZSR dataspace, ZSRno = %d",WF) ;
-	else
-		sprintf(outmsg,
+  else
+    sprintf(outmsg,
             "Unable to allocate convolved-TSR dataspace, TSRno = %d",WF) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
   
 }
 
@@ -5444,15 +5543,15 @@ void BadSRWFAllocMsg( int WF, int flag )
 void BadSRWFMessage( int WF, int flag )
 {
   
-	char outmsg[90] ;
+  char outmsg[90] ;
   
-	if (flag==0)
-		sprintf(outmsg,
+  if (flag==0)
+    sprintf(outmsg,
             "Corrupted ZSR data, ZSRno = %d",WF) ;
-	else
-		sprintf(outmsg,
+  else
+    sprintf(outmsg,
             "Corrupted TSR data, TSRno = %d",WF) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
   
 }
 
@@ -5463,38 +5562,38 @@ void BadSRWFMessage( int WF, int flag )
 void NonExistentLRWFmessage( int elemno, int wakeno, int tableno )
 {
   
-	char outmsg[90] ;
+  char outmsg[90] ;
   
-	if ( tableno == TLRTable )
-		sprintf(outmsg, 
+  if ( tableno == TLRTable )
+    sprintf(outmsg,
             "Element %d points to nonexistent LRWF %d",
             elemno, wakeno) ;
-	else
+  else
     if ( tableno == TLRTable )
-      sprintf(outmsg, 
+      sprintf(outmsg,
               "Element %d points to nonexistent error LRWF %d",
               elemno, wakeno) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
   
 }
 
 /*==================================================================*/
 
 /* Add a message about being unable to allocate space for the convolution
- of a LRWF */
+ * of a LRWF */
 
 void BadLRWFAllocMsg( int WF, int flag )
 {
   
-	char outmsg[90] ;
+  char outmsg[90] ;
   
-	if (flag==0)
-		sprintf(outmsg,
+  if (flag==0)
+    sprintf(outmsg,
             "Unable to allocate bins for bunch-TLR interaction, TLRno = %d",WF) ;
-	else
-		sprintf(outmsg,
+  else
+    sprintf(outmsg,
             "Unable to allocate bins for bunch-error TLR interaction, TLRno = %d",WF) ;
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
   
 }
 
@@ -5505,11 +5604,11 @@ void BadLRWFAllocMsg( int WF, int flag )
 void BadLRWFBunchOrder( int LastBunch, int ThisBunch )
 {
   
-	char outmsg[90] ;
-	sprintf(outmsg,
+  char outmsg[90] ;
+  sprintf(outmsg,
           "Bad bunch order for LRWF:  last bunch = %d, this bunch = %d",
           LastBunch, ThisBunch ) ;
-	AddMessage(outmsg,0) ;
+  AddMessage(outmsg,0) ;
 }
 
 
@@ -5520,14 +5619,14 @@ void BadLRWFBunchOrder( int LastBunch, int ThisBunch )
 void BunchStopMessage( int bunch, int elem )
 {
   
-	char outmsg[90] ;
+  char outmsg[90] ;
   
-	sprintf( outmsg, 
+  sprintf( outmsg,
           "BUNCHSTOP:  All rays stopped, bunch %d, element %d",
           bunch, elem ) ;
   
   
-	AddMessage( outmsg, 0 ) ;
+  AddMessage( outmsg, 0 ) ;
   
 }
 
@@ -5535,312 +5634,312 @@ void BunchStopMessage( int bunch, int elem )
 /*==================================================================*/
 
 /* Compute the coordinate transformation required for an element based
- on its offset, the offset of its girder, and the offset of its
- mover.  The upstream and downstream transforms are returned in
- Xfrms.  The returned integer is a status value. */
+ * on its offset, the offset of its girder, and the offset of its
+ * mover.  The upstream and downstream transforms are returned in
+ * Xfrms.  The returned integer is a status value. */
 
 /* RET:    1 if all required fields are present, and all required and
- optional fields are well-formed.
- 0 if required fields are missing or any fields are 
- incorrectly formed.
- /* ABORT:  never.
- /* FAIL:   never.                           */
+ * optional fields are well-formed.
+ * 0 if required fields are missing or any fields are
+ * incorrectly formed.
+ * /* ABORT:  never.
+ * /* FAIL:   never.                           */
 
 int GetTotalOffsetXfrms( double* ElemGirdNo, double* ElemLen,
-                        double* ElemS, double* ElemOffset,
-                        double Xfrms[6][2] ) 
+        double* ElemS, double* ElemOffset,
+        double Xfrms[6][2] )
 {
   
-	double s0, s ;                   /* S positions */
-	double d1, d2 ;                  /* face distances from girder center */
-	double L ;                       /* element length */
-	double Lov2 ;                    /* element half-length */
-	double GO2[6] =
+  double s0, s ;                   /* S positions */
+  double d1, d2 ;                  /* face distances from girder center */
+  double L ;                       /* element length */
+  double Lov2 ;                    /* element half-length */
+  double GO2[6] =
   {0,0,0,0,0,0}
-	;
-	double* utility ;
-	int stat = 1 ;
-	int i,j ;
-	int girdno ;
-	int MovrAxes[6] ;
-	int NumAxes ;
+  ;
+  double* utility ;
+  int stat = 1 ;
+  int i,j ;
+  int girdno ;
+  int MovrAxes[6] ;
+  int NumAxes ;
   
   /* start with the element parameters themselves; they are guaranteed
-   not to be NULL by the dictionary lookup process */
+   * not to be NULL by the dictionary lookup process */
   
-	L = *ElemLen ;
-	Lov2 = 0.5 * L ;
-	s = *ElemS ;
+  L = *ElemLen ;
+  Lov2 = 0.5 * L ;
+  s = *ElemS ;
   
   /* no offset field is legal */
   
-	if (ElemOffset == NULL)
-	{
-		for (i=0 ; i<6 ; i++)
-		{
-			for (j=0 ; j<2 ; j++)
-			{
-				Xfrms[i][j] = 0. ;
-			}
-		}
-	}
-	else
-	{
+  if (ElemOffset == NULL)
+  {
+    for (i=0 ; i<6 ; i++)
+    {
+      for (j=0 ; j<2 ; j++)
+      {
+        Xfrms[i][j] = 0. ;
+      }
+    }
+  }
+  else
+  {
     
     /* put in the front-face transformation */
     
-		Xfrms[0][0] = ElemOffset[0] - Lov2 * ElemOffset[1] ;
-		Xfrms[0][1] = ElemOffset[0] + Lov2 * ElemOffset[1] ;
+    Xfrms[0][0] = ElemOffset[0] - Lov2 * ElemOffset[1] ;
+    Xfrms[0][1] = ElemOffset[0] + Lov2 * ElemOffset[1] ;
     
-		Xfrms[1][0] = ElemOffset[1] ;
-		Xfrms[1][1] = ElemOffset[1] ;
+    Xfrms[1][0] = ElemOffset[1] ;
+    Xfrms[1][1] = ElemOffset[1] ;
     
-		Xfrms[2][0] = ElemOffset[2] - Lov2 * ElemOffset[3] ;
-		Xfrms[2][1] = ElemOffset[2] + Lov2 * ElemOffset[3] ;
+    Xfrms[2][0] = ElemOffset[2] - Lov2 * ElemOffset[3] ;
+    Xfrms[2][1] = ElemOffset[2] + Lov2 * ElemOffset[3] ;
     
-		Xfrms[3][0] = ElemOffset[3] ;
-		Xfrms[3][1] = ElemOffset[3] ;
+    Xfrms[3][0] = ElemOffset[3] ;
+    Xfrms[3][1] = ElemOffset[3] ;
     
-		Xfrms[4][0] = ElemOffset[4] ;
-		Xfrms[4][1] = ElemOffset[4] ;
+    Xfrms[4][0] = ElemOffset[4] ;
+    Xfrms[4][1] = ElemOffset[4] ;
     
-		Xfrms[5][0] = ElemOffset[5] ;
-		Xfrms[5][1] = ElemOffset[5] ;
+    Xfrms[5][0] = ElemOffset[5] ;
+    Xfrms[5][1] = ElemOffset[5] ;
     
-	}
+  }
   
   /* Exit if the element has no girder */
   
-	if (ElemGirdNo == NULL)
-		goto egress ;
-	else
-	{
-		girdno = (int)(*ElemGirdNo) ;
-		if (girdno == 0)
-			goto egress ;
-	}
-	
+  if (ElemGirdNo == NULL)
+    goto egress ;
+  else
+  {
+    girdno = (int)(*ElemGirdNo) ;
+    if (girdno == 0)
+      goto egress ;
+  }
+  
   
   /* if we're still here, get girder parameters */
   
-	stat = GetDatabaseParameters( girdno-1, nGirderPar, 
-                               GirderPar, TrackPars, GirderTable ) ;
-	if (stat==0)
-		goto egress ;
-	if (stat=-1) 
-		stat = 1 ;
+  stat = GetDatabaseParameters( girdno-1, nGirderPar,
+          GirderPar, TrackPars, GirderTable ) ;
+  if (stat==0)
+    goto egress ;
+  if (stat==-1)
+    stat = 1 ;
   
   /* make sure that the NDOF of the mover, if any, and the position of the
-   mover have the same length */
+   * mover have the same length */
   
-	stat = CheckGirderMoverPars( GirderPar, TrackPars ) ;
-	if (stat!=1)
+  stat = CheckGirderMoverPars( GirderPar, TrackPars ) ;
+  if (stat!=1)
   {
     stat = 0 ;
-		goto egress ;
+    goto egress ;
   }
   
-	s0 = *(GirderPar[GirderS].ValuePtr) ;
-	if (GirderPar[GirderS].Length > 1)
-  /*		s0 = 0.5 * (*(GirderPar[GirderS].ValuePtr+1)-s0) ; */
-		s0 = 0.5 * (*(GirderPar[GirderS].ValuePtr+1)+s0) ; 
+  s0 = *(GirderPar[GirderS].ValuePtr) ;
+  if (GirderPar[GirderS].Length > 1)
+    /*		s0 = 0.5 * (*(GirderPar[GirderS].ValuePtr+1)-s0) ; */
+    s0 = 0.5 * (*(GirderPar[GirderS].ValuePtr+1)+s0) ;
   
   /* compute the distance from the girder center to the faces of the
-   element, with the convention that if the face is upstream of the
-   girder center then the offset is negative */
+   * element, with the convention that if the face is upstream of the
+   * girder center then the offset is negative */
   
-	d1 = s-Lov2 - s0 ; /* dist gird center to upstream face */
-	d2 = d1 + L ;      /* dist gird center to downstream face */
+  d1 = s-Lov2 - s0 ; /* dist gird center to upstream face */
+  d2 = d1 + L ;      /* dist gird center to downstream face */
   
   /* Now:  if d1>0 and the girder angle > 0, then the element has a
-   positive offset and angle from the survey line.  This is emulated
-   by moving the beam negative in position and angle.  However, since
-   the Xfrm values on the upstream face are **SUBTRACTED**, we find
-   that the change in Xfrm has to be positive if d1 and the angle are
-   positive, or if the offset is positive: */
+   * positive offset and angle from the survey line.  This is emulated
+   * by moving the beam negative in position and angle.  However, since
+   * the Xfrm values on the upstream face are **SUBTRACTED**, we find
+   * that the change in Xfrm has to be positive if d1 and the angle are
+   * positive, or if the offset is positive: */
   
-	utility = GirderPar[GirderOffset].ValuePtr ;
+  utility = GirderPar[GirderOffset].ValuePtr ;
   
-	Xfrms[0][0] += utility[0] + d1 * utility[1] ;
-	Xfrms[0][1] += utility[0] + d2 * utility[1] ;
+  Xfrms[0][0] += utility[0] + d1 * utility[1] ;
+  Xfrms[0][1] += utility[0] + d2 * utility[1] ;
   
-	Xfrms[1][0] += utility[1] ;
-	Xfrms[1][1] += utility[1] ;
+  Xfrms[1][0] += utility[1] ;
+  Xfrms[1][1] += utility[1] ;
   
-	Xfrms[2][0] += utility[2] + d1 * utility[3] ;
-	Xfrms[2][1] += utility[2] + d2 * utility[3] ;
+  Xfrms[2][0] += utility[2] + d1 * utility[3] ;
+  Xfrms[2][1] += utility[2] + d2 * utility[3] ;
   
-	Xfrms[3][0] += utility[3] ;
-	Xfrms[3][1] += utility[3] ;
+  Xfrms[3][0] += utility[3] ;
+  Xfrms[3][1] += utility[3] ;
   
-	Xfrms[4][0] += utility[4] ;
-	Xfrms[4][1] += utility[4] ;
+  Xfrms[4][0] += utility[4] ;
+  Xfrms[4][1] += utility[4] ;
   
-	Xfrms[5][0] += utility[5] ;
-	Xfrms[5][1] += utility[5] ;
+  Xfrms[5][0] += utility[5] ;
+  Xfrms[5][1] += utility[5] ;
   
   /* Get the girder mover parameters.  There are 2 vectors here, the
-   first is a vector of coordinate indices (ie, a 3 DOF mover with 
-   x,y, xyrotate would have [1 2 6] for this vector */
+   * first is a vector of coordinate indices (ie, a 3 DOF mover with
+   * x,y, xyrotate would have [1 2 6] for this vector */
   
   /* If there is no mover, go to the exit */
   
-	if (GirderPar[GirderMover].ValuePtr == NULL)
-		goto egress ;
+  if (GirderPar[GirderMover].ValuePtr == NULL)
+    goto egress ;
   
   /* otherwise combine values in Xfrms with the mover values */
   
-	NumAxes = GirderPar[GirderMover].Length ;
-	utility = GirderPar[GirderMover].ValuePtr ;
-	for (i=0 ; i<NumAxes ;i++)
-		MovrAxes[i] = (int)utility[i]-1 ;
+  NumAxes = GirderPar[GirderMover].Length ;
+  utility = GirderPar[GirderMover].ValuePtr ;
+  for (i=0 ; i<NumAxes ;i++)
+    MovrAxes[i] = (int)utility[i]-1 ;
   
   /* if there's a mover but no MoverPos, or MoverPos has the wrong length,
-   it's an error */
+   * it's an error */
   
-	utility = GirderPar[GirderMoverPos].ValuePtr ;
+  utility = GirderPar[GirderMoverPos].ValuePtr ;
   
   /* extract mover position values */
   
-	for (i=0 ; i<NumAxes ; i++)
-		GO2[MovrAxes[i]] = utility[i] ;
+  for (i=0 ; i<NumAxes ; i++)
+    GO2[MovrAxes[i]] = utility[i] ;
   
   /* set them into the transform databank just the way that the girder
-   offsets were set in */
+   * offsets were set in */
   
-	Xfrms[0][0] += GO2[0] + d1 * GO2[1] ;
-	Xfrms[0][1] += GO2[0] + d2 * GO2[1] ;
+  Xfrms[0][0] += GO2[0] + d1 * GO2[1] ;
+  Xfrms[0][1] += GO2[0] + d2 * GO2[1] ;
   
-	Xfrms[1][0] += GO2[1] ;
-	Xfrms[1][1] += GO2[1] ;
+  Xfrms[1][0] += GO2[1] ;
+  Xfrms[1][1] += GO2[1] ;
   
-	Xfrms[2][0] += GO2[2] + d1 * GO2[3] ;
-	Xfrms[2][1] += GO2[2] + d2 * GO2[3] ;
+  Xfrms[2][0] += GO2[2] + d1 * GO2[3] ;
+  Xfrms[2][1] += GO2[2] + d2 * GO2[3] ;
   
-	Xfrms[3][0] += GO2[3] ;
-	Xfrms[3][1] += GO2[3] ;
+  Xfrms[3][0] += GO2[3] ;
+  Xfrms[3][1] += GO2[3] ;
   
-	Xfrms[4][0] += GO2[4] ;
-	Xfrms[4][1] += GO2[4] ;
+  Xfrms[4][0] += GO2[4] ;
+  Xfrms[4][1] += GO2[4] ;
   
-	Xfrms[5][0] += GO2[5] ;
-	Xfrms[5][1] += GO2[5] ;
+  Xfrms[5][0] += GO2[5] ;
+  Xfrms[5][1] += GO2[5] ;
   
   /* that's it, set return and exit */
   
   egress :
-  
-	return stat ;
-  
+    
+    return stat ;
+    
 }
 
 /*==================================================================*/
 
 /* Apply an element's xyz translations and xz/yz rotations to the
- coordinates of a particle (at the upstream face), or undo the
- transformations (at the downstream face). */
+ * coordinates of a particle (at the upstream face), or undo the
+ * transformations (at the downstream face). */
 
 /* RET:    none.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-void ApplyTotalXfrm( double Xfrms[6][2], int face, int* TrackFlag, 
-                    double dzmod, double *x, double *px, double *y, double *py, double *z, double *p0 )
+void ApplyTotalXfrm( double Xfrms[6][2], int face, int* TrackFlag,
+        double dzmod, double *x, double *px, double *y, double *py, double *z, double *p0 )
 {
   
   /* The pointers to the particle coordinates have global scope, thus
-   are not passed as arguments.  Are we on the upstream or downstream
-   face? */
-	if (face == UPSTREAM)
-	{
-		(*x)  += Xfrms[4][0] * (*px) - Xfrms[0][0] ;
-		(*px) -= Xfrms[1][0] ;
-		(*y)  += Xfrms[4][0] * (*py) - Xfrms[2][0] ;
-		(*py) -= Xfrms[3][0] ;
+   * are not passed as arguments.  Are we on the upstream or downstream
+   * face? */
+  if (face == UPSTREAM)
+  {
+    (*x)  += Xfrms[4][0] * (*px) - Xfrms[0][0] ;
+    (*px) -= Xfrms[1][0] ;
+    (*y)  += Xfrms[4][0] * (*py) - Xfrms[2][0] ;
+    (*py) -= Xfrms[3][0] ;
     
-		if (TrackFlag[ZMotion] == 1)
-			(*z) += 0.5 * Xfrms[4][0] *
-      ( (*px) * (*px) + (*py) * (*py) )
-      - Xfrms[4][0] ;
-	}
-	else if (face == DOWNSTREAM)
-	{
-		(*x)  += Xfrms[0][1] - Xfrms[4][1] * (*px) ;
-		(*px) += Xfrms[1][1] ;
-		(*y)  += Xfrms[2][1] - Xfrms[4][1] * (*py) ;
-		(*py) += Xfrms[3][1] ;
-		if (TrackFlag[ZMotion] == 1)
-			(*z) += Xfrms[4][1] - 
-      0.5 * Xfrms[4][0] *
-      ( (*px) * (*px) + (*py) * (*py) ) ;
-		if (TrackFlag[LorentzDelay] == 1)
-			(*z) += LORENTZ_DELAY( (*p0) ) - dzmod ;
-	}
+    if (TrackFlag[ZMotion] == 1)
+      (*z) += 0.5 * Xfrms[4][0] *
+              ( (*px) * (*px) + (*py) * (*py) )
+              - Xfrms[4][0] ;
+  }
+  else if (face == DOWNSTREAM)
+  {
+    (*x)  += Xfrms[0][1] - Xfrms[4][1] * (*px) ;
+    (*px) += Xfrms[1][1] ;
+    (*y)  += Xfrms[2][1] - Xfrms[4][1] * (*py) ;
+    (*py) += Xfrms[3][1] ;
+    if (TrackFlag[ZMotion] == 1)
+      (*z) += Xfrms[4][1] -
+              0.5 * Xfrms[4][0] *
+              ( (*px) * (*px) + (*py) * (*py) ) ;
+    if (TrackFlag[LorentzDelay] == 1)
+      (*z) += LORENTZ_DELAY( (*p0) ) - dzmod ;
+  }
   
-	return ;
+  return ;
   
 }
 
 /*==================================================================*/
 
 /* Perform some common logic for BPMs and INSTs related to setting
- the indexing between the BEAMLINE list (element order) and the
- BPM or INST list (only BPMs or INSTs that return data are indexed). */
+ * the indexing between the BEAMLINE list (element order) and the
+ * BPM or INST list (only BPMs or INSTs that return data are indexed). */
 
 /* RET:    none.
- /* Abort:  never.
- /* FAIL:   never. */
+ * /* Abort:  never.
+ * /* FAIL:   never. */
 
 void BPMInstIndexingSetup( int elemno, int* FirstElemno,
-                          int *ElemnoLastCall, int* Counter )
+        int *ElemnoLastCall, int* Counter )
 {
   
   /* if FirstElemno is -1, means it ain't been set yet.  Set it now. */
   
-	if ( *FirstElemno == -1 )
-		*FirstElemno = elemno ;
+  if ( *FirstElemno == -1 )
+    *FirstElemno = elemno ;
   
   /* if we're on the first inst/bpm element, zero the counter of such
-   devices; if we are not on the first element, AND we are not on the
-   same element as last time, increment the counter */
+   * devices; if we are not on the first element, AND we are not on the
+   * same element as last time, increment the counter */
   
-	if ( *FirstElemno == elemno )
-		*Counter = 0 ;
-	else if (elemno != *ElemnoLastCall)
-	{
-		(*Counter)++ ;
-		*ElemnoLastCall = elemno ;
-	}
+  if ( *FirstElemno == elemno )
+    *Counter = 0 ;
+  else if (elemno != *ElemnoLastCall)
+  {
+    (*Counter)++ ;
+    *ElemnoLastCall = elemno ;
+  }
   
-	return ;
+  return ;
   
 }
 
 /*==================================================================*/
 
 /* figure out how many bunch slots are needed, and which one we are
- on now */
+ * on now */
 
 /* RET:    none.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-void BunchSlotSetup( int *TrackFlags, 
-                    struct TrackArgsStruc *ArgStruc, int bunchno, 
-                    int* nBunchNeeded, int* BunchSlot) 
+void BunchSlotSetup( int *TrackFlags,
+        struct TrackArgsStruc *ArgStruc, int bunchno,
+        int* nBunchNeeded, int* BunchSlot)
 {
-	if (TrackFlags[MultiBunch] == 1)
-	{
-		*nBunchNeeded = ArgStruc->LastBunch - ArgStruc->FirstBunch + 1 ;
-		*BunchSlot    = bunchno - (ArgStruc->FirstBunch-1) ;
-	}
-	else
-	{
-		*nBunchNeeded = 1 ;
-		*BunchSlot = 0 ;
-	}
+  if (TrackFlags[MultiBunch] == 1)
+  {
+    *nBunchNeeded = ArgStruc->LastBunch - ArgStruc->FirstBunch + 1 ;
+    *BunchSlot    = bunchno - (ArgStruc->FirstBunch-1) ;
+  }
+  else
+  {
+    *nBunchNeeded = 1 ;
+    *BunchSlot = 0 ;
+  }
   
-	return ;
+  return ;
   
 }
 
@@ -5848,219 +5947,219 @@ void BunchSlotSetup( int *TrackFlags,
 
 /* free dynamic memory and null the pointer to it */
 
-/* RET:   none. 
- /* ABORT: never.
- /* FAIL:  will fail if told to free memory that was not dynamically
- allocated in the first place */
+/* RET:   none.
+ * /* ABORT: never.
+ * /* FAIL:  will fail if told to free memory that was not dynamically
+ * allocated in the first place */
 
 void FreeAndNull( void** GeneralPointer )
 {
-	if (*GeneralPointer != NULL)
-	{
-		free(*GeneralPointer) ;
-		*GeneralPointer = NULL ;
-	}
+  if (*GeneralPointer != NULL)
+  {
+    free(*GeneralPointer) ;
+    *GeneralPointer = NULL ;
+  }
   
-	return ;
+  return ;
   
 }
 
 /*==================================================================*/
 
 /* clear tracking variables which otherwise stick around from one call
- to TrackThru to another */
+ * to TrackThru to another */
 
-/* RET:    none. 
- /* ABORT:  never.
- /* FAIL:   */
+/* RET:    none.
+ * /* ABORT:  never.
+ * /* FAIL:   */
 
-void ClearTrackingVars( ) 
+void ClearTrackingVars( )
 {
   
-	int i ;
+  int i ;
   
   /* start with the bpmdata global:  is it allocated? */
   
-	if (bpmdata != NULL)
-	{
+  if (bpmdata != NULL)
+  {
     
     /* loop over entries in bpmdata until we find one that is not assigned */
     
-		i=0 ;
-		while (bpmdata[i] != NULL)
-		{
+    i=0 ;
+    while (bpmdata[i] != NULL)
+    {
       
       /* free the dynamically-allocated data vectors */
       
-			FreeAndNull( &(bpmdata[i]->xread) ) ;
-			FreeAndNull( &(bpmdata[i]->yread) ) ;
-			FreeAndNull( &(bpmdata[i]->sigma) ) ;
-			FreeAndNull( &(bpmdata[i]->P) ) ;
-			FreeAndNull( &(bpmdata[i]->z) ) ;
-			FreeAndNull( &(bpmdata[i]->Q) ) ;
-			FreeAndNull( &(bpmdata[i]->sumpxq) ) ;
-			FreeAndNull( &(bpmdata[i]->sumpyq) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->xread) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->yread) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->sigma) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->P) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->z) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->Q) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->sumpxq) ) ;
+      FreeAndNull( (void**)&(bpmdata[i]->sumpyq) ) ;
       
       /* free the bpmdata entry */
       
-			FreeAndNull( &(bpmdata[i]) ) ;
-			i++ ;
+      FreeAndNull( (void**)&(bpmdata[i]) ) ;
+      i++ ;
       
-		}
+    }
     
     /* free the backbone itself */
     
-		free( bpmdata ) ;
-		bpmdata = NULL ;
+    free( bpmdata ) ;
+    bpmdata = NULL ;
     
-	}
+  }
   
   /* now apply the same logic to insts */
   
-	if ( instdata != NULL )
-	{
-		i=0 ;
-		while (instdata[i] != NULL)
-		{
-			FreeAndNull( &(instdata[i]->x) ) ;
-			FreeAndNull( &(instdata[i]->y) ) ;
-			FreeAndNull( &(instdata[i]->z) ) ;
-			FreeAndNull( &(instdata[i]->Q) ) ;
-			FreeAndNull( &(instdata[i]->sig11) ) ;
-			FreeAndNull( &(instdata[i]->sig33) ) ;
-			FreeAndNull( &(instdata[i]->sig55) ) ;
-			FreeAndNull( &(instdata[i]->sig13) ) ;
+  if ( instdata != NULL )
+  {
+    i=0 ;
+    while (instdata[i] != NULL)
+    {
+      FreeAndNull( (void**)&(instdata[i]->x) ) ;
+      FreeAndNull( (void**)&(instdata[i]->y) ) ;
+      FreeAndNull( (void**)&(instdata[i]->z) ) ;
+      FreeAndNull( (void**)&(instdata[i]->Q) ) ;
+      FreeAndNull( (void**)&(instdata[i]->sig11) ) ;
+      FreeAndNull( (void**)&(instdata[i]->sig33) ) ;
+      FreeAndNull( (void**)&(instdata[i]->sig55) ) ;
+      FreeAndNull( (void**)&(instdata[i]->sig13) ) ;
       
-			FreeAndNull( &(instdata[i]) ) ;
-			i++ ;
-		}
-		free( instdata ) ;
-		instdata = NULL ;
-	}
+      FreeAndNull( (void**)&(instdata[i]) ) ;
+      i++ ;
+    }
+    free( instdata ) ;
+    instdata = NULL ;
+  }
   
   /*  SBPMs */
   
-	if (sbpmdata != NULL)
-	{
-		i=0 ;
-		while (sbpmdata[i] != NULL)
-		{
-			FreeAndNull( &(sbpmdata[i]->x) ) ;
-			FreeAndNull( &(sbpmdata[i]->y) ) ;
-			FreeAndNull( &(sbpmdata[i]->Q) ) ;
-			FreeAndNull( &(sbpmdata[i]->S) ) ;
+  if (sbpmdata != NULL)
+  {
+    i=0 ;
+    while (sbpmdata[i] != NULL)
+    {
+      FreeAndNull( (void**)&(sbpmdata[i]->x) ) ;
+      FreeAndNull( (void**)&(sbpmdata[i]->y) ) ;
+      FreeAndNull( (void**)&(sbpmdata[i]->Q) ) ;
+      FreeAndNull( (void**)&(sbpmdata[i]->S) ) ;
       
-			FreeAndNull( &(sbpmdata[i]) ) ;
-			i++ ;
-		}
-		free( sbpmdata ) ;
-		sbpmdata = NULL ;
-	}
+      FreeAndNull( (void**)&(sbpmdata[i]) ) ;
+      i++ ;
+    }
+    free( sbpmdata ) ;
+    sbpmdata = NULL ;
+  }
   
   /* frequency-mode LRWF_T's  */
   
-	if (TLRFreqKickDat != NULL)
-	{
-		for (i=0 ; i<nElemOld ; i++)
-		{
+  if (TLRFreqKickDat != NULL)
+  {
+    for (i=0 ; i<nElemOld ; i++)
+    {
       if (TLRFreqKickDat[i] != NULL)
       {
-        FreeAndNull( &(TLRFreqKickDat[i]->xKick) ) ;
-        FreeAndNull( &(TLRFreqKickDat[i]->yKick) ) ;
-        FreeAndNull( &(TLRFreqKickDat[i]) ) ;
+        FreeAndNull( (void**)&(TLRFreqKickDat[i]->xKick) ) ;
+        FreeAndNull( (void**)&(TLRFreqKickDat[i]->yKick) ) ;
+        FreeAndNull( (void**)&(TLRFreqKickDat[i]) ) ;
       }
-		}
-		free( TLRFreqKickDat ) ;
-		TLRFreqKickDat = NULL ;
-	}
+    }
+    free( TLRFreqKickDat ) ;
+    TLRFreqKickDat = NULL ;
+  }
   
   /* frequency-mode LRWF_error's  */
   
-	if (TLRErrFreqKickDat != NULL)
-	{
-		for (i=0 ; i<nElemOld ; i++)
-		{
+  if (TLRErrFreqKickDat != NULL)
+  {
+    for (i=0 ; i<nElemOld ; i++)
+    {
       if (TLRErrFreqKickDat[i] != NULL)
       {
-        FreeAndNull( &(TLRErrFreqKickDat[i]->xKick) ) ;
-        FreeAndNull( &(TLRErrFreqKickDat[i]->yKick) ) ;
-        FreeAndNull( &(TLRErrFreqKickDat[i]) ) ;
+        FreeAndNull( (void**)&(TLRErrFreqKickDat[i]->xKick) ) ;
+        FreeAndNull( (void**)&(TLRErrFreqKickDat[i]->yKick) ) ;
+        FreeAndNull( (void**)&(TLRErrFreqKickDat[i]) ) ;
       }
-		}
-		free( TLRErrFreqKickDat ) ;
-		TLRErrFreqKickDat = NULL ;
-	}
+    }
+    free( TLRErrFreqKickDat ) ;
+    TLRErrFreqKickDat = NULL ;
+  }
   
   /* first/last-bunch-at-RF backbone */
   
-	if (FirstBunchAtRF != NULL)
-		FreeAndNull( &FirstBunchAtRF ) ;
-	if (LastBunchAtRF != NULL)
-		FreeAndNull( &LastBunchAtRF ) ;
+  if (FirstBunchAtRF != NULL)
+    FreeAndNull( (void**)&FirstBunchAtRF ) ;
+  if (LastBunchAtRF != NULL)
+    FreeAndNull( (void**)&LastBunchAtRF ) ;
   
   
-	return ;
+  return ;
   
 }
 
 /*=====================================================================*/
 
 /* Perform slice setup -- figure out how many slices to use when tracking
- the LCAV (for TSRs and SBPMs), make sure that there's a valid SBPM data
- structure ready for the data, make sure that the correct BPM number is
- being pointed to.
- 
- /* RET:    Status, +1 for success, 0 for failure.
- /* ABORT:  never.
- /* FAIL:   never.    */
+ * the LCAV (for TSRs and SBPMs), make sure that there's a valid SBPM data
+ * structure ready for the data, make sure that the correct BPM number is
+ * being pointed to.
+ *
+ * /* RET:    Status, +1 for success, 0 for failure.
+ * /* ABORT:  never.
+ * /* FAIL:   never.    */
 
 int LcavSliceSetup( struct TrackArgsStruc *ArgStruc, int elemno, int* TrackFlag,
-                   int* nslice, int* nslicealloc, int* NSBPM, int** doSBPM, 
-                   double** Lfrac, int* TWFSliceno )
+        int* nslice, int* nslicealloc, int* NSBPM, int** doSBPM,
+        double** Lfrac, int* TWFSliceno )
 {
   
-	double* dmy ;
-	double dL ;
-	div_t nslov2 ;
-	int count ;
-	int stat = 1 ;
+  double* dmy ;
+  double dL ;
+  div_t nslov2 ;
+  int count ;
+  int stat = 1 ;
   
   /* Are we doing SBPMs, and does this particular structure have SBPMs?  If
-   so, we need to figure out how many SBPMs are in this structure */
+   * so, we need to figure out how many SBPMs are in this structure */
   
   *NSBPM = 0 ;
   if ( (ArgStruc->GetInstData==1) && (TrackFlag[GetSBPMData] == 1))
   {
-		dmy = GetElemNumericPar( elemno, "NBPM", NULL ) ;
-		if (dmy==NULL)
-			*NSBPM = 0 ;
-		else
-			*NSBPM = (int)(*dmy) ;
-	}
+    dmy = GetElemNumericPar( elemno, "NBPM", NULL ) ;
+    if (dmy==NULL)
+      *NSBPM = 0 ;
+    else
+      *NSBPM = (int)(*dmy) ;
+  }
   
   /* figure out the number of slices needed based on the number of SBPMs on
-   this structure */
+   * this structure */
   
   switch (*NSBPM)
   {
     case 0  : *nslice = 1 ;
-      break ;
+    break ;
     case 1  : *nslice = 2 ;
-      break ;
+    break ;
     default : *nslice = (*NSBPM) - 1 ;
-      break ;
+    break ;
   }
   
   /* if we have enough slices allocated, great.  Otherwise, allocate now.
-   Remember to allocate at least 2 extra slices over the total needed from
-   the calculation above */
+   * Remember to allocate at least 2 extra slices over the total needed from
+   * the calculation above */
   
   if (*nslicealloc < (*nslice)+2)
   {
-    FreeAndNull( doSBPM ) ;
-    FreeAndNull( Lfrac ) ;
-    *doSBPM = calloc( (*nslice)+2,sizeof(int) ) ;
-    *Lfrac  = calloc( (*nslice)+2,sizeof(double) ) ;
+    FreeAndNull( (void**)doSBPM ) ;
+    FreeAndNull( (void**)Lfrac ) ;
+    *doSBPM = (int*)calloc( (*nslice)+2,sizeof(int) ) ;
+    *Lfrac  = (double*)calloc( (*nslice)+2,sizeof(double) ) ;
     if ( (*doSBPM == NULL) || (*Lfrac == NULL) )
     {
       BadSliceAllocMessage( elemno+1 ) ;
@@ -6087,8 +6186,8 @@ int LcavSliceSetup( struct TrackArgsStruc *ArgStruc, int elemno, int* TrackFlag,
   }
   
   /* now:  if transverse wakefieldss are requested, and the number of
-   slices is odd, that means that we need to "split" a slice to
-   ensure that we track to exactly the 50% point in the structure.
+   * slices is odd, that means that we need to "split" a slice to
+   * ensure that we track to exactly the 50% point in the structure.
    */
   
   if ( (TrackFlag[SRWF_T]) || (TrackFlag[LRWF_T]) || (TrackFlag[LRWF_ERR]) )
@@ -6112,508 +6211,508 @@ int LcavSliceSetup( struct TrackArgsStruc *ArgStruc, int elemno, int* TrackFlag,
   else
     *TWFSliceno = -1 ;
   
-egress:
-  
-  return stat;
-  
+  egress:
+    
+    return stat;
+    
 }
 
 /*=====================================================================*/
 
 /* Perform setup and initialization of the SBPM data structures during
- LCAV tracking */
+ * LCAV tracking */
 
 /* RET:    Status, 1 = success, 0 = failure.
- /* ABORT:  never.
- /* FAIL:    */
+ * /* ABORT:  never.
+ * /* FAIL:    */
 
 int SBPMSetup( struct TrackArgsStruc* ArgStruc, int elemno,
-              int bunchno, int NSBPM, int* SBPMCounter     )
+        int bunchno, int NSBPM, int* SBPMCounter     )
 {
-	int count ;
-	int stat = 1 ;
+  int count ;
+  int stat = 1 ;
   
   /* if NSBPM is less than one, do nothing and return */
   
-	if (NSBPM < 1)
-		goto egress ;
+  if (NSBPM < 1)
+    goto egress ;
   
   /* find the correct index into the SBPM backbone */
   
-	BPMInstIndexingSetup( elemno, &FirstSBPMElemno, 
-                       &SBPMElemnoLastCall, SBPMCounter ) ;
+  BPMInstIndexingSetup( elemno, &FirstSBPMElemno,
+          &SBPMElemnoLastCall, SBPMCounter ) ;
   
   /* if this is not the first bunch to be tracked, we can exit */
   
-	if (bunchno+1 != ArgStruc->FirstBunch)
-		goto egress ;
+  if (bunchno+1 != ArgStruc->FirstBunch)
+    goto egress ;
   
   /* if on the other hand this is the first bunch, then we need to: */
   
   /* Check to make sure that the correct backbone is allocated: */
   
-	if (sbpmdata[*SBPMCounter] == NULL)
-	{
-		sbpmdata[*SBPMCounter] = calloc(1,sizeof(struct SBPMdat)) ;
-		if (sbpmdata[*SBPMCounter] == NULL)
-		{
-			BadBPMAllocMsg( elemno+1) ;
-			stat = 0 ;
-			goto egress ;
-		}
-		sbpmdata[*SBPMCounter]->nbpmalloc = 0 ;
-	}
+  if (sbpmdata[*SBPMCounter] == NULL)
+  {
+    sbpmdata[*SBPMCounter] = (struct SBPMdat*)calloc(1,sizeof(struct SBPMdat)) ;
+    if (sbpmdata[*SBPMCounter] == NULL)
+    {
+      BadBPMAllocMsg( elemno+1) ;
+      stat = 0 ;
+      goto egress ;
+    }
+    sbpmdata[*SBPMCounter]->nbpmalloc = 0 ;
+  }
   
   /* set the SBPM index value */
   
-	sbpmdata[*SBPMCounter]->indx = elemno+1 ;
+  sbpmdata[*SBPMCounter]->indx = elemno+1 ;
   
   /* check to make sure enough BPMs are allocated */
   
-	if (sbpmdata[*SBPMCounter]->nbpmalloc < NSBPM)
-	{
-		FreeAndNull( &(sbpmdata[*SBPMCounter]->x) ) ;
-		FreeAndNull( &(sbpmdata[*SBPMCounter]->y) ) ;
-		FreeAndNull( &(sbpmdata[*SBPMCounter]->S) ) ;
-		FreeAndNull( &(sbpmdata[*SBPMCounter]->Q) ) ;
+  if (sbpmdata[*SBPMCounter]->nbpmalloc < NSBPM)
+  {
+    FreeAndNull( (void**)&(sbpmdata[*SBPMCounter]->x) ) ;
+    FreeAndNull( (void**)&(sbpmdata[*SBPMCounter]->y) ) ;
+    FreeAndNull( (void**)&(sbpmdata[*SBPMCounter]->S) ) ;
+    FreeAndNull( (void**)&(sbpmdata[*SBPMCounter]->Q) ) ;
     
-		sbpmdata[*SBPMCounter]->x = 
-    calloc(NSBPM,sizeof(double)) ;
-		sbpmdata[*SBPMCounter]->y = 
-    calloc(NSBPM,sizeof(double)) ;
-		sbpmdata[*SBPMCounter]->S = 
-    calloc(NSBPM,sizeof(double)) ;
-		sbpmdata[*SBPMCounter]->Q = 
-    calloc(NSBPM,sizeof(double)) ;
-		if ( (sbpmdata[*SBPMCounter]->x == NULL) ||
-        (sbpmdata[*SBPMCounter]->y == NULL) ||
-        (sbpmdata[*SBPMCounter]->S == NULL) ||
-        (sbpmdata[*SBPMCounter]->Q == NULL)    )
-		{
-			BadBPMAllocMsg( elemno+1 ) ;
-			stat = 0 ;
-			goto egress ;
-		}
-		sbpmdata[*SBPMCounter]->nbpmalloc = NSBPM ;
-	}
+    sbpmdata[*SBPMCounter]->x =
+            (double*)calloc(NSBPM,sizeof(double)) ;
+    sbpmdata[*SBPMCounter]->y =
+            (double*)calloc(NSBPM,sizeof(double)) ;
+    sbpmdata[*SBPMCounter]->S =
+            (double*)calloc(NSBPM,sizeof(double)) ;
+    sbpmdata[*SBPMCounter]->Q =
+            (double*)calloc(NSBPM,sizeof(double)) ;
+    if ( (sbpmdata[*SBPMCounter]->x == NULL) ||
+            (sbpmdata[*SBPMCounter]->y == NULL) ||
+            (sbpmdata[*SBPMCounter]->S == NULL) ||
+            (sbpmdata[*SBPMCounter]->Q == NULL)    )
+    {
+      BadBPMAllocMsg( elemno+1 ) ;
+      stat = 0 ;
+      goto egress ;
+    }
+    sbpmdata[*SBPMCounter]->nbpmalloc = NSBPM ;
+  }
   
   /* increment ArgStruc's SBPM counter */
   
-	ArgStruc->nSBPM++ ;
+  ArgStruc->nSBPM++ ;
   
   /* set the nbpm value in the SBPM structure */
   
-	sbpmdata[*SBPMCounter]->nbpm = NSBPM ;
+  sbpmdata[*SBPMCounter]->nbpm = NSBPM ;
   
   /* initialize all data accumulators on all BPMs to zero */
   
-	for (count=0 ; count < NSBPM ; count++)
-	{
-		sbpmdata[*SBPMCounter]->x[count] = 0. ;
-		sbpmdata[*SBPMCounter]->y[count] = 0. ;
-		sbpmdata[*SBPMCounter]->S[count] = 0. ;
-		sbpmdata[*SBPMCounter]->Q[count] = 0. ;
-	}
+  for (count=0 ; count < NSBPM ; count++)
+  {
+    sbpmdata[*SBPMCounter]->x[count] = 0. ;
+    sbpmdata[*SBPMCounter]->y[count] = 0. ;
+    sbpmdata[*SBPMCounter]->S[count] = 0. ;
+    sbpmdata[*SBPMCounter]->Q[count] = 0. ;
+  }
   
   
-egress:
-  
-	return stat;
-  
+  egress:
+    
+    return stat;
+    
 }
 
 /*=====================================================================*/
 
 /* Set S positions of SBPMs within a given RF structure. */
 
-/* RET:    none. 
- /* ABORT:  never.
- /* FAIL:   never. */
+/* RET:    none.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-void SBPMSetS( int SBPMCounter, 
-              double S0, double L, 
-              int nslice, int* doSBPM, 
-              double* Lfrac )
+void SBPMSetS( int SBPMCounter,
+        double S0, double L,
+        int nslice, int* doSBPM,
+        double* Lfrac )
 {
-	int count ;
-	int sbpmno=-1 ; 
-	double Lcum = 0. ;
+  int count ;
+  int sbpmno=-1 ;
+  double Lcum = 0. ;
   
-	for (count=0 ; count<=nslice ; count++)
-	{
-		if (doSBPM[count] > 0)
-		{
-			sbpmno++ ;
-			sbpmdata[SBPMCounter]->S[sbpmno] = S0 + dS * Lcum ;
-		}
-		Lcum = Lcum + Lfrac[count] * L ;
-	}
+  for (count=0 ; count<=nslice ; count++)
+  {
+    if (doSBPM[count] > 0)
+    {
+      sbpmno++ ;
+      sbpmdata[SBPMCounter]->S[sbpmno] = S0 + dS * Lcum ;
+    }
+    Lcum = Lcum + Lfrac[count] * L ;
+  }
   
-	return ;
+  return ;
 }
 
 /*=====================================================================*/
 
-/* charge-normalize the data in the SBPMs, add offsets and electrical 
- noise */
+/* charge-normalize the data in the SBPMs, add offsets and electrical
+ * noise */
 
 /* RET:    status int == 1 for all okay, == -1 if no offset or resolution
- info, == 0 if offsets corrupted. */
+ * info, == 0 if offsets corrupted. */
 /* ABORT:  never.
- /* FAIL:   */
+ * /* FAIL:   */
 
 
-int ComputeSBPMReadings( int SBPMCounter, int elemno, double dTilt ) 
+int ComputeSBPMReadings( int SBPMCounter, int elemno, double dTilt )
 {
-	int count ;
-	double* offset;
-	int noffset ;
-	double* resol ;
-	double* noise=NULL ;
-	int stat = 1 ;
-	double QC ;
-	double x,y ;
-	double costilt, sintilt ;
+  int count ;
+  double* offset;
+  int noffset ;
+  double* resol ;
+  double* noise=NULL ;
+  int stat = 1 ;
+  double QC ;
+  double x,y ;
+  double costilt, sintilt ;
   
   /* get the BPM offsets from the BEAMLINE data structure */
   
-	offset = GetElemNumericPar( elemno, "BPMOffset", &noffset ) ;
-	if (offset == NULL) 
-		stat = -1 ;
-	else if (noffset != 2*sbpmdata[SBPMCounter]->nbpm)
-	{
-		stat = 0 ;
-		goto egress ;
-	}
-	costilt = cos(dTilt) ;
-	sintilt = sin(dTilt) ;
+  offset = GetElemNumericPar( elemno, "BPMOffset", &noffset ) ;
+  if (offset == NULL)
+    stat = -1 ;
+  else if (noffset != 2*sbpmdata[SBPMCounter]->nbpm)
+  {
+    stat = 0 ;
+    goto egress ;
+  }
+  costilt = cos(dTilt) ;
+  sintilt = sin(dTilt) ;
   
-	resol = GetElemNumericPar( elemno, "BPMResolution", NULL ) ;
-	if (resol == NULL)
-		stat = -1 ;
-	else if (*resol != 0.)
-		noise = RanGaussVecPtr(2*sbpmdata[SBPMCounter]->nbpm) ;
+  resol = GetElemNumericPar( elemno, "BPMResolution", NULL ) ;
+  if (resol == NULL)
+    stat = -1 ;
+  else if (*resol != 0.)
+    noise = RanGaussVecPtr(2*sbpmdata[SBPMCounter]->nbpm) ;
   
   /* loop over SBPM slots */
   
-	for (count=0 ; count<sbpmdata[SBPMCounter]->nbpm ; count++)
-	{
-		QC = sbpmdata[SBPMCounter]->Q[count] ;
-		if (QC==0.)
-			QC = 1. ;
+  for (count=0 ; count<sbpmdata[SBPMCounter]->nbpm ; count++)
+  {
+    QC = sbpmdata[SBPMCounter]->Q[count] ;
+    if (QC==0.)
+      QC = 1. ;
     
-		x = sbpmdata[SBPMCounter]->x[count] / QC ;
-		y = sbpmdata[SBPMCounter]->x[count] / QC ;
+    x = sbpmdata[SBPMCounter]->x[count] / QC ;
+    y = sbpmdata[SBPMCounter]->x[count] / QC ;
     
-		sbpmdata[SBPMCounter]->x[count] =  x*costilt + y*sintilt ;
-		sbpmdata[SBPMCounter]->y[count] = -x*sintilt + y*costilt ;
-		if (offset != NULL)
-		{
-			sbpmdata[SBPMCounter]->x[count] += offset[2*count]  ;
-			sbpmdata[SBPMCounter]->y[count] += offset[2*count+1]  ;
-		}
-		if (noise != NULL)
-		{
-			sbpmdata[SBPMCounter]->x[count] += noise[2*count]   * (*resol) ;
-			sbpmdata[SBPMCounter]->y[count] += noise[2*count+1] * (*resol) ;
-		}
-	}
+    sbpmdata[SBPMCounter]->x[count] =  x*costilt + y*sintilt ;
+    sbpmdata[SBPMCounter]->y[count] = -x*sintilt + y*costilt ;
+    if (offset != NULL)
+    {
+      sbpmdata[SBPMCounter]->x[count] += offset[2*count]  ;
+      sbpmdata[SBPMCounter]->y[count] += offset[2*count+1]  ;
+    }
+    if (noise != NULL)
+    {
+      sbpmdata[SBPMCounter]->x[count] += noise[2*count]   * (*resol) ;
+      sbpmdata[SBPMCounter]->y[count] += noise[2*count+1] * (*resol) ;
+    }
+  }
   
-egress:
-  
-	return stat ;
-  
+  egress:
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
 
-/* Clear out one or more convolved wakefields from a bunch. 
- 
- /* RET:    none.
- /* ABORT:  none.
- /* FAIL:   none. */
+/* Clear out one or more convolved wakefields from a bunch.
+ *
+ * /* RET:    none.
+ * /* ABORT:  none.
+ * /* FAIL:   none. */
 
 void ClearConvolvedSRWF( struct Bunch* ThisBunch, int wake, int flag )
 {
-	int first, last, count ;
-	struct SRWF* TheWF ;
-	struct SRWF** backbone ;
-	int* numwake ;
+  int first, last, count ;
+  struct SRWF* TheWF ;
+  struct SRWF** backbone ;
+  int* numwake ;
   
   /* are we interested in ZSRs or TSRs? */
   
-	if (flag==0)
-		backbone = ThisBunch->ZSR ;
-	else
-		backbone = ThisBunch->TSR ;
+  if (flag==0)
+    backbone = ThisBunch->ZSR ;
+  else
+    backbone = ThisBunch->TSR ;
   
   /* how many? */
   
-	numwake = GetNumWakes( ) ;
+  numwake = GetNumWakes( ) ;
   
-	if (wake==-1)
-	{
-		first = 0 ;
-		last = numwake[flag] ;
-	}
-	else
-	{
-		first = wake ;
-		last = wake+1 ;
-	}
+  if (wake==-1)
+  {
+    first = 0 ;
+    last = numwake[flag] ;
+  }
+  else
+  {
+    first = wake ;
+    last = wake+1 ;
+  }
   
   /* loop over wakes and begin clearing */
   
-	for (count=first ; count<last ; count++)
-	{
-		TheWF = backbone[count] ;
-		if (TheWF==NULL)
-			continue ;
-		FreeAndNull( &(TheWF->binno) ) ;
-		FreeAndNull( &(TheWF->binQ) ) ;
-		FreeAndNull( &(TheWF->binx) ) ;
-		FreeAndNull( &(TheWF->biny) ) ;
-		FreeAndNull( &(TheWF->binVx) ) ;
-		FreeAndNull( &(TheWF->binVy) ) ;
-		FreeAndNull( &(TheWF->K) ) ;
-		FreeAndNull( &(TheWF) ) ;
-		backbone[count] = TheWF ;
-	}
+  for (count=first ; count<last ; count++)
+  {
+    TheWF = backbone[count] ;
+    if (TheWF==NULL)
+      continue ;
+    FreeAndNull( (void**)&(TheWF->binno) ) ;
+    FreeAndNull( (void**)&(TheWF->binQ) ) ;
+    FreeAndNull( (void**)&(TheWF->binx) ) ;
+    FreeAndNull( (void**)&(TheWF->biny) ) ;
+    FreeAndNull( (void**)&(TheWF->binVx) ) ;
+    FreeAndNull( (void**)&(TheWF->binVy) ) ;
+    FreeAndNull( (void**)&(TheWF->K) ) ;
+    FreeAndNull( (void**)&(TheWF) ) ;
+    backbone[count] = TheWF ;
+  }
   
-	return ;
+  return ;
   
 }
 
 /*=====================================================================*/
 
-/* Clear out one or more binning-vectors related to a LRWF in Freq domain */ 
+/* Clear out one or more binning-vectors related to a LRWF in Freq domain */
 
 /* RET:    none.
- /* ABORT:  none.
- /* FAIL:   none. */
+ * /* ABORT:  none.
+ * /* FAIL:   none. */
 
 void ClearBinnedLRWFFreq( struct Bunch* ThisBunch, int wake, int flag )
 {
-	int first, last, count ;
-	struct LRWFFreq* TheWF ;
-	struct LRWFFreq** backbone ;
-	int* numwake ;
+  int first, last, count ;
+  struct LRWFFreq* TheWF ;
+  struct LRWFFreq** backbone ;
+  int* numwake ;
   
   /* are we interested in ZSRs or TSRs? */
   
-	if (flag==0)
-		backbone = ThisBunch->TLRFreq ;
-	else
-		backbone = ThisBunch->TLRErrFreq ;
+  if (flag==0)
+    backbone = ThisBunch->TLRFreq ;
+  else
+    backbone = ThisBunch->TLRErrFreq ;
   
   /* how many? */
   
-	numwake = GetNumWakes( ) ;
+  numwake = GetNumWakes( ) ;
   
-	if (wake==-1)
-	{
-		first = 0 ;
-		last = numwake[flag+2] ;
-	}
-	else
-	{
-		first = wake ;
-		last = wake+1 ;
-	}
+  if (wake==-1)
+  {
+    first = 0 ;
+    last = numwake[flag+2] ;
+  }
+  else
+  {
+    first = wake ;
+    last = wake+1 ;
+  }
   
   /* loop over wakes and begin clearing */
   
-	for (count=first ; count<last ; count++)
-	{
-		TheWF = backbone[count] ;
-		if (TheWF==NULL)
-			continue ;
-		FreeAndNull( &(TheWF->binno) ) ;
-		FreeAndNull( &(TheWF->binQ) ) ;
-		FreeAndNull( &(TheWF->binVx) ) ;
-		FreeAndNull( &(TheWF->binVy) ) ;
-		FreeAndNull( &(TheWF->binx) )  ;
-		FreeAndNull( &(TheWF->biny) ) ;
-		FreeAndNull( &(TheWF->Wx) ) ;
-		FreeAndNull( &(TheWF->Wy) ) ;
-		FreeAndNull( &(TheWF->xphase) ) ;
-		FreeAndNull( &(TheWF->yphase) ) ;
-		FreeAndNull( &(TheWF) ) ;
-		backbone[count] = TheWF ;
-	}
+  for (count=first ; count<last ; count++)
+  {
+    TheWF = backbone[count] ;
+    if (TheWF==NULL)
+      continue ;
+    FreeAndNull( (void**)&(TheWF->binno) ) ;
+    FreeAndNull( (void**)&(TheWF->binQ) ) ;
+    FreeAndNull( (void**)&(TheWF->binVx) ) ;
+    FreeAndNull( (void**)&(TheWF->binVy) ) ;
+    FreeAndNull( (void**)&(TheWF->binx) )  ;
+    FreeAndNull( (void**)&(TheWF->biny) ) ;
+    FreeAndNull( (void**)&(TheWF->Wx) ) ;
+    FreeAndNull( (void**)&(TheWF->Wy) ) ;
+    FreeAndNull( (void**)&(TheWF->xphase) ) ;
+    FreeAndNull( (void**)&(TheWF->yphase) ) ;
+    FreeAndNull( (void**)&(TheWF) ) ;
+    backbone[count] = TheWF ;
+  }
   
-	return ;
+  return ;
   
 }
 
 /*=====================================================================*/
 
 /* Get the required parameters for an operation out of the database.
- If requested, check the length of the returned scalar/vector of
- parameters.  Make sure that all parameters needed for the operation
- are present, and that all parameters for which the parameter length
- is crucial meet that tolerance.  Signal failure, success, or warn
- that optional parameters are missing or have the wrong length. */
+ * If requested, check the length of the returned scalar/vector of
+ * parameters.  Make sure that all parameters needed for the operation
+ * are present, and that all parameters for which the parameter length
+ * is crucial meet that tolerance.  Signal failure, success, or warn
+ * that optional parameters are missing or have the wrong length. */
 
 /* RET:    +1 if all required and optional parameters are present, and
- all parameters with a required or optional length tolerance
- are within that tolerance
- -1 if optional parameters are missing, or parameters for which
- the length tolerance is optional are not within tolerance
- 0 if required parameters are missing, or parameters with a
- required length tolerance are not within tolerance.
- /* ABORT:  Never.
- /* FAIL:   Never. */
+ * all parameters with a required or optional length tolerance
+ * are within that tolerance
+ * -1 if optional parameters are missing, or parameters for which
+ * the length tolerance is optional are not within tolerance
+ * 0 if required parameters are missing, or parameters with a
+ * required length tolerance are not within tolerance.
+ * /* ABORT:  Never.
+ * /* FAIL:   Never. */
 
-int GetDatabaseParameters( int elemno, int nParam, 
-                          struct LucretiaParameter Dictionary[],
-                          int WhichPars, int WhichTable )
+int GetDatabaseParameters( int elemno, int nParam,
+        struct LucretiaParameter Dictionary[],
+        int WhichPars, int WhichTable )
 {
   
   int count ;
-	int stat = 1 ;
-	int LengthOK ;
+  int stat = 1 ;
+  int LengthOK ;
   
   /* loop over parameters */
   
-	for (count=0 ; count < nParam ; count++)
-	{
+  for (count=0 ; count < nParam ; count++)
+  {
     
     /* is the parameter needed, based on the calling operation? */
     
-		if (Dictionary[count].Requirement[WhichPars] != Ignored)
-		{
+    if (Dictionary[count].Requirement[WhichPars] != Ignored)
+    {
       
       /* figure out which table to interrogate, and go to it! */
       
-			switch( WhichTable )
-			{
+      switch( WhichTable )
+      {
         case ElementTable:
-					Dictionary[count].ValuePtr = 
-          GetElemNumericPar( elemno, 
-                            Dictionary[count].name,
-                            &(Dictionary[count].Length) ) ;
+          Dictionary[count].ValuePtr =
+                  GetElemNumericPar( elemno,
+                  Dictionary[count].name,
+                  &(Dictionary[count].Length) ) ;
           break ;
         case PSTable:
-					Dictionary[count].ValuePtr = 
-          GetPSNumericPar( elemno, 
-                          Dictionary[count].name,
-                          &(Dictionary[count].Length) ) ;
+          Dictionary[count].ValuePtr =
+                  GetPSNumericPar( elemno,
+                  Dictionary[count].name,
+                  &(Dictionary[count].Length) ) ;
           break ;
         case GirderTable:
-					Dictionary[count].ValuePtr = 
-          GetGirderNumericPar( elemno, 
-                              Dictionary[count].name,
-                              &(Dictionary[count].Length) ) ;
+          Dictionary[count].ValuePtr =
+                  GetGirderNumericPar( elemno,
+                  Dictionary[count].name,
+                  &(Dictionary[count].Length) ) ;
           break ;
         case KlystronTable:
-					Dictionary[count].ValuePtr = 
-          GetKlystronNumericPar( elemno, 
-                                Dictionary[count].name,
-                                &(Dictionary[count].Length) ) ;
+          Dictionary[count].ValuePtr =
+                  GetKlystronNumericPar( elemno,
+                  Dictionary[count].name,
+                  &(Dictionary[count].Length) ) ;
           break ;
         case TLRTable:
-					Dictionary[count].ValuePtr = 
-          GetTLRNumericPar( elemno, 
-                           Dictionary[count].name,
-                           &(Dictionary[count].Length) ) ;
+          Dictionary[count].ValuePtr =
+                  GetTLRNumericPar( elemno,
+                  Dictionary[count].name,
+                  &(Dictionary[count].Length) ) ;
           break ;
         case TLRErrTable:
-					Dictionary[count].ValuePtr = 
-          GetTLRErrNumericPar( elemno, 
-                              Dictionary[count].name,
-                              &(Dictionary[count].Length) ) ;
+          Dictionary[count].ValuePtr =
+                  GetTLRErrNumericPar( elemno,
+                  Dictionary[count].name,
+                  &(Dictionary[count].Length) ) ;
           break ;
         default:
           stat = 0 ;
           goto egress ;
-			}
+      }
       
       /* handle a missing parameter */
       
-			if (Dictionary[count].ValuePtr == NULL)
-			{
-				if (Dictionary[count].Requirement[WhichPars] == Required)
-				{
-					stat = 0 ;       /* missing required par => return bad status */
-					goto egress ;
-				}
-				stat = -1 ;         /* missing optional par => return warning */
+      if (Dictionary[count].ValuePtr == NULL)
+      {
+        if (Dictionary[count].Requirement[WhichPars] == Required)
+        {
+          stat = 0 ;       /* missing required par => return bad status */
+          goto egress ;
+        }
+        stat = -1 ;         /* missing optional par => return warning */
         
-			}
+      }
       
       /* if the parameter is not missing, handle any requirements on its length */
       
-			else if (Dictionary[count].LengthRequirement[WhichPars] != Ignored)
-			{
-				LengthOK = ( (Dictionary[count].Length >= Dictionary[count].MinLength) &&
-                    (Dictionary[count].Length <= Dictionary[count].MaxLength)    ) ;
-				if ( !LengthOK )
-				{
-					if (Dictionary[count].LengthRequirement[WhichPars] == Required)
-					{
-						stat = 0 ;
-						goto egress ;
-					}
-					stat = -1 ;
-				}
-			}
+      else if (Dictionary[count].LengthRequirement[WhichPars] != Ignored)
+      {
+        LengthOK = ( (Dictionary[count].Length >= Dictionary[count].MinLength) &&
+                (Dictionary[count].Length <= Dictionary[count].MaxLength)    ) ;
+        if ( !LengthOK )
+        {
+          if (Dictionary[count].LengthRequirement[WhichPars] == Required)
+          {
+            stat = 0 ;
+            goto egress ;
+          }
+          stat = -1 ;
+        }
+      }
       
-		}
+    }
     
-	}
+  }
   
-egress:
-  
-	return stat ;
-  
+  egress:
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
 
 /* Return the value of a bend magnet parameter for which the user can
- specify either 1 value or 2, and for which the calling routine wants
- either the first, or the second (which is equal to the first if no
- second is specified). */
+ * specify either 1 value or 2, and for which the calling routine wants
+ * either the first, or the second (which is equal to the first if no
+ * second is specified). */
 
 /* RET:    double precision value of desired parameter.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
 double GetSpecialSBendPar(struct LucretiaParameter* ThePar, int index)
 {
-	double* dptr ;
+  double* dptr ;
   
-	dptr = ThePar->ValuePtr ;
+  dptr = ThePar->ValuePtr ;
   
-	if ( (index == 1) && (ThePar->Length == 2) )
-		dptr++ ;
+  if ( (index == 1) && (ThePar->Length == 2) )
+    dptr++ ;
   
-	return *dptr ;
+  return *dptr ;
   
 }
 
 /*=====================================================================*/
 
 /* Get the design Lorentz delay of an element based on its design
- momentum.  Return zero if the design momentum is zero.
- 
- /* RET:    double precision value of Lorentz delay.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * momentum.  Return zero if the design momentum is zero.
+ *
+ * /* RET:    double precision value of Lorentz delay.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
 double GetDesignLorentzDelay( double* pmod )
 {
-	double dzmod ;
+  double dzmod ;
   
-	if (pmod == NULL)
-		dzmod = 0. ;
-	else if (*pmod == 0.)
-		dzmod = 0. ;
-	else
-		dzmod = LORENTZ_DELAY(*pmod) ;
+  if (pmod == NULL)
+    dzmod = 0. ;
+  else if (*pmod == 0.)
+    dzmod = 0. ;
+  else
+    dzmod = LORENTZ_DELAY(*pmod) ;
   
-	return dzmod ;
+  return dzmod ;
   
 }
 
@@ -6622,26 +6721,26 @@ double GetDesignLorentzDelay( double* pmod )
 /* Exchange the x and y coordinate vectors of a bunch */
 
 /* RET:    None.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 void XYExchange( double** xb, double** yb, int nray )
 {
-	double* temp ;
+  double* temp ;
   
-  /* If using GPU, swap x_gpu and y */  
-#ifdef __CUDA_ARCH__
-  cudaMalloc(&temp, 6*nray*sizeof(double)) ;
+  /* If using GPU, swap x_gpu and y */
+#ifdef __CUDACC__
+  cudaMalloc((void**)&temp, 6*nray*sizeof(double)) ;
   cudaMemcpy(temp, *xb, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
   cudaMemcpy(*xb, *yb, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
   cudaMemcpy(*yb, temp, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
   cudaFree(temp) ;
-#else  
-	temp = *xb ;
-	*xb = *yb ;
-	*yb = temp ;
-#endif  
+#else
+  temp = *xb ;
+  *xb = *yb ;
+  *yb = temp ;
+#endif
   
-	return ;
+  return ;
   
 }
 
@@ -6651,22 +6750,35 @@ void XYExchange( double** xb, double** yb, int nray )
 /* Copy required data from CPU memory to GPU memory*/
 
 /* RET:    None.
- /* ABORT:  never.
- /* FAIL:   never. */
-#ifdef __CUDA_ARCH__
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
+#ifdef __CUDACC__
 void XCPU2GPU( struct TrackArgsStruc* ArgStruc )
 {
   int i ;
+  cudaError_t cerr;
   for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
   {
-    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x_gpu, ArgStruc->TheBeam->bunches[i]->x,
-               6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
-    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q_gpu, ArgStruc->TheBeam->bunches[i]->Q,
-               6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
-    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop_gpu, ArgStruc->TheBeam->bunches[i]->stop,
-               6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x_gpu, ArgStruc->TheBeam->bunches[i]->x,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+    if (cerr != cudaSuccess)
+    {
+      printf("CUDA Falied to copy bunch info to device!\n");
+    }
+    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q_gpu, ArgStruc->TheBeam->bunches[i]->Q,
+            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+    if (cerr != cudaSuccess)
+    {
+      printf("CUDA Falied to copy bunch info to device!\n");
+    }
+    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop_gpu, ArgStruc->TheBeam->bunches[i]->stop,
+            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
+    if (cerr != cudaSuccess)
+    {
+      printf("CUDA Falied to copy bunch info to device!\n");
+    }
   }
-	return ;
+  return ;
   
 }
 #endif
@@ -6676,23 +6788,39 @@ void XCPU2GPU( struct TrackArgsStruc* ArgStruc )
 /* Copy required data from GPU memory to CPU memory*/
 
 /* RET:    None.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-#ifdef __CUDA_ARCH__
+#ifdef __CUDACC__
 void XGPU2CPU( struct TrackArgsStruc* ArgStruc )
 {
-  int i ;
-	for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
+  int i;
+  cudaError_t cerr;
+  for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
   {
-    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x, ArgStruc->TheBeam->bunches[i]->x_gpu,
-               6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
-    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q, ArgStruc->TheBeam->bunches[i]->Q_gpu,
-               6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
-    cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop, ArgStruc->TheBeam->bunches[i]->stop_gpu,
-               6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;   
+    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x, ArgStruc->TheBeam->bunches[i]->x_gpu,
+            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
+    if (cerr == cudaSuccess)
+    {
+      printf("CUDA OK!\n");
+    }
+    else printf("CUDA FAIL! (%d)\n",cerr);
+    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q, ArgStruc->TheBeam->bunches[i]->Q_gpu,
+            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
+    if (cerr == cudaSuccess)
+    {
+      printf("CUDA OK!\n");
+    }
+    else printf("CUDA FAIL!\n");
+    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop, ArgStruc->TheBeam->bunches[i]->stop_gpu,
+            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
+    if (cerr == cudaSuccess)
+    {
+      printf("CUDA OK!\n");
+    }
+    else printf("CUDA FAIL!\n");
   }
-	return ;
+  return ;
   
 }
 #endif
@@ -6700,58 +6828,58 @@ void XGPU2CPU( struct TrackArgsStruc* ArgStruc )
 /*=====================================================================*/
 
 /* Perform initial check of all momenta in a tracked bunch.  If some are
- bad (P0 <= 0 or Pperp >= 1) raise a warning and issue a message. */
+ * bad (P0 <= 0 or Pperp >= 1) raise a warning and issue a message. */
 
 /* RET:    Status, 1 = all incoming particles OK (good p0 and Pperp, or
- bad p0 and/or Pperp but stopped), 0 = some particles which
- came in bad but not stopped.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * bad p0 and/or Pperp but stopped), 0 = some particles which
+ * came in bad but not stopped.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
 int InitialMomentumCheck( struct TrackArgsStruc *TrackArgs )
 {
-	int BunchLoop, RayLoop, stop ;
-	struct Bunch* TheBunch ;
-	double *px, *py ;
-	int stat = 1 ;
-	int dmy = 0 ;
+  int BunchLoop, RayLoop, stop ;
+  struct Bunch* TheBunch ;
+  double *px, *py ;
+  int stat = 1 ;
+  int dmy = 0 ;
   
   /* loop over bunches */
   
-	for (BunchLoop = TrackArgs->FirstBunch-1 ;
-	     BunchLoop < TrackArgs->LastBunch ;
-       BunchLoop++)
-	{
-		TheBunch = TrackArgs->TheBeam->bunches[BunchLoop] ;
-		
+  for (BunchLoop = TrackArgs->FirstBunch-1 ;
+  BunchLoop < TrackArgs->LastBunch ;
+  BunchLoop++)
+  {
+    TheBunch = TrackArgs->TheBeam->bunches[BunchLoop] ;
+    
     /* loop over rays */
     
-		for (RayLoop = 0 ;
-         RayLoop < TheBunch->nray ;
-         RayLoop++)
-		{
-			if (RayLoop > 395)
-				dmy++ ;
-			if (TheBunch->stop[RayLoop] == 0)
-			{
-				stop = 0 ;
-				stop = CheckP0StopPart( TheBunch->stop,&TheBunch->ngoodray,TheBunch->x,TheBunch->y, 0, RayLoop, 
-                               TheBunch->x[6*RayLoop+5], UPSTREAM ) ;
-				if (stop != 0)
-					BadParticleMomentumMessage( 0, BunchLoop+1, RayLoop+1 ) ;
-				else
-				{	
-					px = &(TheBunch->x[6*RayLoop+1]) ;
-					py = &(TheBunch->x[6*RayLoop+3]) ;
-					stop = CheckPperpStopPart( TheBunch->stop, &TheBunch->ngoodray, 0, RayLoop, px, py ) ;
-					if (stop != 0)
-						BadParticlePperpMessage( 0, BunchLoop+1, RayLoop+1 ) ;
-				}
-				if (stop !=0)
-					stat = 0 ;
-			}
-		}
-	}
+    for (RayLoop = 0 ;
+    RayLoop < TheBunch->nray ;
+    RayLoop++)
+    {
+      if (RayLoop > 395)
+        dmy++ ;
+      if (TheBunch->stop[RayLoop] == 0)
+      {
+        stop = 0 ;
+        stop = CheckP0StopPart( TheBunch->stop,&TheBunch->ngoodray,TheBunch->x,TheBunch->y, 0, RayLoop,
+                TheBunch->x[6*RayLoop+5], UPSTREAM, StoppedParticles ) ;
+        if (stop != 0)
+          BadParticleMomentumMessage( 0, BunchLoop+1, RayLoop+1 ) ;
+        else
+        {
+          px = &(TheBunch->x[6*RayLoop+1]) ;
+          py = &(TheBunch->x[6*RayLoop+3]) ;
+          stop = CheckPperpStopPart( TheBunch->stop, &TheBunch->ngoodray, 0, RayLoop, px, py, StoppedParticles ) ;
+          if (stop != 0)
+            BadParticlePperpMessage( 0, BunchLoop+1, RayLoop+1 ) ;
+        }
+        if (stop !=0)
+          stat = 0 ;
+      }
+    }
+  }
   
   return stat ;
   
@@ -6763,17 +6891,17 @@ int InitialMomentumCheck( struct TrackArgsStruc *TrackArgs )
 
 
 /* RET:    None.
- /* ABORT:  never.
- /* FAIL:   If selected rayno > # of rays in the data vector */
+ * /* ABORT:  never.
+ * /* FAIL:   If selected rayno > # of rays in the data vector */
 
 void GetLocalCoordPtrs( double coordvec[], int raystart, double** x, double** px,double** y,double** py,double** z,double** p0 )
 {
-	*x  = &(coordvec[raystart]  ) ;
-	*px = &(coordvec[raystart+1]) ;
-	*y  = &(coordvec[raystart+2]) ;
-	*py = &(coordvec[raystart+3]) ;
-	*z  = &(coordvec[raystart+4]) ;
-	*p0 = &(coordvec[raystart+5]) ;
+  *x  = &(coordvec[raystart]  ) ;
+  *px = &(coordvec[raystart+1]) ;
+  *y  = &(coordvec[raystart+2]) ;
+  *py = &(coordvec[raystart+3]) ;
+  *z  = &(coordvec[raystart+4]) ;
+  *p0 = &(coordvec[raystart+5]) ;
   
 }
 
@@ -6782,69 +6910,69 @@ void GetLocalCoordPtrs( double coordvec[], int raystart, double** x, double** px
 /* consistency check for girder mover parameter lengths */
 
 /* RET:    +1 if mover parameters are consistent (ie either all
- present or all absent, and all the same length)
- +2 if Mover(...) has invalid DOFs (ie values which 
- are not between 1 and 6 inclusive, or duplicates)
- 0 otherwise.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * present or all absent, and all the same length)
+ * +2 if Mover(...) has invalid DOFs (ie values which
+ * are not between 1 and 6 inclusive, or duplicates)
+ * 0 otherwise.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-int CheckGirderMoverPars( struct LucretiaParameter GirderPar[], 
-                         int WhichPars ) 
+int CheckGirderMoverPars( struct LucretiaParameter GirderPar[],
+        int WhichPars )
 {
-	int FirstMovrPar = GirderMover;
-	int LastMovrPar ;
-	int MovrPar ;
-	int stat ;
-	int i ;
-	int dof;
-	int nTimesFound[6] = {0,0,0,0,0,0} ;
+  int FirstMovrPar = GirderMover;
+  int LastMovrPar ;
+  int MovrPar ;
+  int stat ;
+  int i ;
+  int dof;
+  int nTimesFound[6] = {0,0,0,0,0,0} ;
   
-	stat = 1 ;
-	if (WhichPars == TrackPars)
-		LastMovrPar = GirderMoverPos ;
-	else
-		LastMovrPar = GirderMoverStep ;
+  stat = 1 ;
+  if (WhichPars == TrackPars)
+    LastMovrPar = GirderMoverPos ;
+  else
+    LastMovrPar = GirderMoverStep ;
   
-	if (GirderPar[FirstMovrPar].ValuePtr == NULL)
-	{
-		for (MovrPar = FirstMovrPar+1 ; MovrPar <= LastMovrPar ; MovrPar++)
-		{
-			if (GirderPar[MovrPar].ValuePtr != NULL)
-				stat = 0 ;
-		}
-	}
-	else
-	{
-		for (MovrPar = FirstMovrPar+1 ; MovrPar <= LastMovrPar ; MovrPar++)
-		{
-			if (GirderPar[MovrPar].ValuePtr == NULL)
-				stat = 0 ;
-			if (GirderPar[MovrPar].Length != GirderPar[FirstMovrPar].Length)
-				stat = 0 ;
-		}
-		for (i = 0 ; i < GirderPar[FirstMovrPar].Length ; i++)
-		{
-			dof = (int)(*(GirderPar[FirstMovrPar].ValuePtr+i)) ;
-			if ( (dof<1) || (dof>6) ) 
-			{
-				stat = 2 ;
-				goto egress ;
-			}
-			nTimesFound[dof-1]++ ;
-			if (nTimesFound[dof-1]>1)
-			{
-				stat = 2 ;
-				goto egress ;
-			}
-		}
+  if (GirderPar[FirstMovrPar].ValuePtr == NULL)
+  {
+    for (MovrPar = FirstMovrPar+1 ; MovrPar <= LastMovrPar ; MovrPar++)
+    {
+      if (GirderPar[MovrPar].ValuePtr != NULL)
+        stat = 0 ;
+    }
+  }
+  else
+  {
+    for (MovrPar = FirstMovrPar+1 ; MovrPar <= LastMovrPar ; MovrPar++)
+    {
+      if (GirderPar[MovrPar].ValuePtr == NULL)
+        stat = 0 ;
+      if (GirderPar[MovrPar].Length != GirderPar[FirstMovrPar].Length)
+        stat = 0 ;
+    }
+    for (i = 0 ; i < GirderPar[FirstMovrPar].Length ; i++)
+    {
+      dof = (int)(*(GirderPar[FirstMovrPar].ValuePtr+i)) ;
+      if ( (dof<1) || (dof>6) )
+      {
+        stat = 2 ;
+        goto egress ;
+      }
+      nTimesFound[dof-1]++ ;
+      if (nTimesFound[dof-1]>1)
+      {
+        stat = 2 ;
+        goto egress ;
+      }
+    }
     
-	}
+  }
   
-egress:
-  
-	return stat ;
-  
+  egress:
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
@@ -6852,118 +6980,117 @@ egress:
 /* Derefernce a double pointer; if pointer is null, return default value. */
 
 /* RET:   The value of the double which is pointed to by the argument,
- or a default value if null pointer.
- /* ABORT: never.
- /* FAIL:  never. */
+ * or a default value if null pointer.
+ * /* ABORT: never.
+ * /* FAIL:  never. */
 
 double GetDBValue( struct LucretiaParameter* Pardat )
 {
-	double* valptr ;
+  double* valptr ;
   
-	valptr = (*Pardat).ValuePtr ;
-	if (valptr != NULL)
-		return *valptr ;
-	else
-		return (*Pardat).DefaultValue ;
+  valptr = (*Pardat).ValuePtr ;
+  if (valptr != NULL)
+    return *valptr ;
+  else
+    return (*Pardat).DefaultValue ;
 }
 
 /*=====================================================================*/
 
 /* Perform lattice verification, putting messages related to errors
- and warnings into Lucretia's text message queue.
- 
- /* RET:    none.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * and warnings into Lucretia's text message queue.
+ *
+ * /* RET:    none.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
 void VerifyLattice( )
 {
   
 #include "LucretiaVerifyMsg.h"
   
-	int nElem, nPS, nGirder, nKlys ;
-	int* nWakes ;
-	int nDat, ElemP ;
-	int count1, count2, count0, count3 ;
-	int tlrtypecount, tlrKcountFact ; 
-	int wakecondition ;
-	char* wf ;
-	char message[100] ;
-	int paramstat[15], paramlenstat[15] ;
-	int stat ;
-	double* retval ;
-	double retvalderef ;
-	int retlen ;
-	int elemno ;
-	char* ElemClass ;
-	int GirderIndex, KlysIndex, PSIndex ;
-	int PSVec[MaxPSPerDevice], 
-  KlysVec[MaxKlysPerDevice], 
-  GirderVec[MaxGirderPerDevice] ;
-	int LenPSVec, LenKlysVec, LenGirderVec ;
-	int* HardwareVec ;
-	int LenHardwareVec ;
-	int PIndex, LIndex, aperindex ;
-	int WFIndex, WFlen ;
-	double* WFPtr ;
-	struct LucretiaParameter* Dictionary ;
-	int nPar ;
-	enum KlystronStatus* kstat ;
-	int* AllowedTrackFlag ;
-	int* ActualTrackFlag ;
-	int pole ;
-	double dmy ;
-	int LradIndex ;
-	int ZeroLenOK ;
+  int nElem, nPS, nGirder, nKlys ;
+  int* nWakes ;
+  int nDat, ElemP ;
+  int count1, count2, count0, count3 ;
+  int tlrtypecount, tlrKcountFact ;
+  int wakecondition ;
+  char* wf ;
+  char message[100] ;
+  int paramstat[15], paramlenstat[15] ;
+  int stat ;
+  double* retval ;
+  int retlen ;
+  int elemno ;
+  char* ElemClass ;
+  int GirderIndex, KlysIndex, PSIndex ;
+  int PSVec[MaxPSPerDevice],
+          KlysVec[MaxKlysPerDevice],
+          GirderVec[MaxGirderPerDevice] ;
+  int LenPSVec, LenKlysVec, LenGirderVec ;
+  int* HardwareVec ;
+  int LenHardwareVec ;
+  int PIndex, LIndex, aperindex ;
+  int WFIndex, WFlen ;
+  double* WFPtr ;
+  struct LucretiaParameter* Dictionary ;
+  int nPar ;
+  enum KlystronStatus* kstat ;
+  int* AllowedTrackFlag ;
+  int* ActualTrackFlag ;
+  int pole ;
+  double dmy ;
+  int LradIndex ;
+  int ZeroLenOK ;
   
   
   /* get sizes of globals */
   
-	nElem = nElemInBeamline( )  ;
-	nPS = GetnPS( ) ;
-	nKlys = GetnKlystron( ) ;
-	nGirder = GetnGirder( ) ;
-	nWakes = GetNumWakes( ) ;
+  nElem = nElemInBeamline( )  ;
+  nPS = GetnPS( ) ;
+  nKlys = GetnKlystron( ) ;
+  nGirder = GetnGirder( ) ;
+  nWakes = GetNumWakes( ) ;
   
   /* if no elements, it's an error */
   
-	if (nElem==0)
-		AddMessage("Error: no BEAMLINE or zero elements in BEAMLINE",0) ;
+  if (nElem==0)
+    AddMessage("Error: no BEAMLINE or zero elements in BEAMLINE",0) ;
   
   /* if the others are missing, it's just warnings */
   
-	if (nPS==0)
-		AddMessage("Warning: no PS or zero power supplies in PS",0) ;
-	if (nKlys==0)
-		AddMessage("Warning: no KLYSTRON or zero klystrons in KLYSTRON",0) ;
-	if (nGirder==0)
-		AddMessage("Warning: no GIRDER or zero girders in GIRDER",0) ;
-	if (nWakes[0]==0)
-		AddMessage("Warning: no short-range longitudinal wakefields",0) ;
-	if (nWakes[1]==0)
-		AddMessage("Warning: no short-range transverse wakefields",0) ;
-	if (nWakes[2]==0)
-		AddMessage("Warning: no long-range transverse wakefields",0) ;
+  if (nPS==0)
+    AddMessage("Warning: no PS or zero power supplies in PS",0) ;
+  if (nKlys==0)
+    AddMessage("Warning: no KLYSTRON or zero klystrons in KLYSTRON",0) ;
+  if (nGirder==0)
+    AddMessage("Warning: no GIRDER or zero girders in GIRDER",0) ;
+  if (nWakes[0]==0)
+    AddMessage("Warning: no short-range longitudinal wakefields",0) ;
+  if (nWakes[1]==0)
+    AddMessage("Warning: no short-range transverse wakefields",0) ;
+  if (nWakes[2]==0)
+    AddMessage("Warning: no long-range transverse wakefields",0) ;
   
   /* Wakefield verification:  each SRWF must have a vector of z values
-   and a vector of K values which are equal in length, and must have
-   a bin width / spline accuracy factor: */
+   * and a vector of K values which are equal in length, and must have
+   * a bin width / spline accuracy factor: */
   
-	for (count1 = 0 ; count1 < 2 ; count1++ )
-	{
-		if (count1==0)
-			wf = zwf ;
-		else
-			wf = twf ;
-		for (count2 = 0 ; count2 < nWakes[count1] ; count2++)
-		{
-			double *z, *k, bw ;
-			wakecondition = GetSRWFParameters( count2, count1, &z, &k, &bw) ;
+  for (count1 = 0 ; count1 < 2 ; count1++ )
+  {
+    if (count1==0)
+      wf = zwf ;
+    else
+      wf = twf ;
+    for (count2 = 0 ; count2 < nWakes[count1] ; count2++)
+    {
+      double *z, *k, bw ;
+      wakecondition = GetSRWFParameters( count2, count1, &z, &k, &bw) ;
       
       /* if wakecondition is zero or less it signifies an error condition */
       
-			switch ( wakecondition )
-			{
+      switch ( wakecondition )
+      {
         case  0 : /* no such WF */
           sprintf( message, "Error: %s wake %d missing",wf,count2+1) ;
           AddMessage( message, 0 ) ;
@@ -7003,16 +7130,16 @@ void VerifyLattice( )
                   wf,count2+1) ;
           AddMessage( message, 0 ) ;
           break ;
-			}
-		}
-	} /* end of srwf verification */
+      }
+    }
+  } /* end of srwf verification */
   
   /* lrwf verification:  each transverse long-range wakefield must be (for now)
-   recognizably in the frequency domain, and each must have a full set of
-   equal-length vectors for Freq, dFreq, K, Q, Tilt, and a scalar BinWidth */
+   * recognizably in the frequency domain, and each must have a full set of
+   * equal-length vectors for Freq, dFreq, K, Q, Tilt, and a scalar BinWidth */
   
-	for (tlrtypecount = 2 ; tlrtypecount<4 ; tlrtypecount++)
-	{
+  for (tlrtypecount = 2 ; tlrtypecount<4 ; tlrtypecount++)
+  {
     if (tlrtypecount==2) /* regular LRWF */
     {
       tlrKcountFact = 2 ;
@@ -7037,42 +7164,40 @@ void VerifyLattice( )
                   wf, count2+1) ;
           AddMessage(message,0) ;
           continue ;
-          break ;
         case TIMEDOMAIN :
           sprintf(message, "Error: %s # %d in Time domain -- not yet supported",
                   wf, count2+1) ;
           continue ;
-          break ;
-        case FREQDOMAIN : 
+        case FREQDOMAIN :
           
           /* get the parameters using the dictionary and the VerifyParameters function */
           
-          stat = VerifyParameters( count2, nLRWFFreqPar, LRWFFreqPar, 
-                                  TLRTable, paramstat, paramlenstat ) ;
+          stat = VerifyParameters( count2, nLRWFFreqPar, LRWFFreqPar,
+                  TLRTable, paramstat, paramlenstat ) ;
           
           /* since there are no optional parameters, and there are no dictionary constraints
-           on parameters lengths, the only thing that can be reported by the verifier is
-           missing, corrupted, or non-numeric fields where well-formed numeric fields are
-           expected */
+           * on parameters lengths, the only thing that can be reported by the verifier is
+           * missing, corrupted, or non-numeric fields where well-formed numeric fields are
+           * expected */
           
           if (stat != 1)
             for (count1=0 ; count1 < nLRWFFreqPar ; count1++)
               if (paramstat[count1] == 0)
               {
-                sprintf(message, MissPar, ErrStr, wf, count1+1, reqdStr, 
+                sprintf(message, MissPar, ErrStr, wf, count1+1, reqdStr,
                         LRWFFreqPar[count1].name);
                 AddMessage(message,0) ;
               }
           
           /* the other thing that can be wrong with a frequency-domain wakefield is that
-           the vector fields lengths can fail to match */
+           * the vector fields lengths can fail to match */
           
-          if ( 
-              (LRWFFreqPar[LRWFFreqQ].Length     != LRWFFreqPar[LRWFFreqFreq].Length)
-              ||
-              (tlrKcountFact*LRWFFreqPar[LRWFFreqK].Length != LRWFFreqPar[LRWFFreqFreq].Length)
-              ||
-              (2*LRWFFreqPar[LRWFFreqTilt].Length  != LRWFFreqPar[LRWFFreqFreq].Length) )
+          if (
+                  (LRWFFreqPar[LRWFFreqQ].Length     != LRWFFreqPar[LRWFFreqFreq].Length)
+                  ||
+                  (tlrKcountFact*LRWFFreqPar[LRWFFreqK].Length != LRWFFreqPar[LRWFFreqFreq].Length)
+                  ||
+                  (2*LRWFFreqPar[LRWFFreqTilt].Length  != LRWFFreqPar[LRWFFreqFreq].Length) )
           {
             sprintf(message,"Error: WF.TLR %d vector parameters have unequal length",
                     count2+1) ;
@@ -7081,10 +7206,10 @@ void VerifyLattice( )
           break ;
       }
     }
-	}
+  }
   
   /* Now we verify each of the tables, which is a semi-repetitive operation with
-   a few differences for each table */
+   * a few differences for each table */
   
   for (count0 = ElementTable ; count0<=KlystronTable ; count0++)
   {
@@ -7092,7 +7217,6 @@ void VerifyLattice( )
     {
       nDat = nElem ;
       Keywd = ElemStr ;
-      KEYWD = BEAMLINEStr ;
       ElemP = 0 ;
     }
     else if (count0 == PSTable)
@@ -7101,7 +7225,6 @@ void VerifyLattice( )
       Dictionary = PSPar ;
       nDat = nPS ;
       Keywd = PSStr ;
-      KEYWD = PSStr ;
       ElemP = PSElem ;
     }
     else if (count0 == GirderTable)
@@ -7110,7 +7233,6 @@ void VerifyLattice( )
       Dictionary = GirderPar ;
       nDat = nGirder ;
       Keywd = GirderStr ;
-      KEYWD = GIRDERStr ;
       ElemP = GirderElem ;
     }
     else if (count0 == KlystronTable)
@@ -7119,14 +7241,13 @@ void VerifyLattice( )
       Dictionary = KlystronPar ;
       nDat = nKlys ;
       Keywd = KlysStr ;
-      KEYWD = KLYSStr ;
       ElemP = KlysElem ;
     }
     
-    for (count1 = 0 ; count1 < nDat ; count1++) 
+    for (count1 = 0 ; count1 < nDat ; count1++)
     {
       /* for elements, assign dictionary etc now */
-      if (count0 == ElementTable) 
+      if (count0 == ElementTable)
       {
         ZeroLenOK = 0 ;
         ElemClass = GetElemClass( count1 ) ;
@@ -7162,8 +7283,8 @@ void VerifyLattice( )
           continue ;
         }
         else if ( (strcmp(ElemClass,"QUAD") == 0) ||
-                 (strcmp(ElemClass,"SEXT") == 0) ||
-                 (strcmp(ElemClass,"OCTU") == 0)   )/* quad, sext, octupole magnet */
+                (strcmp(ElemClass,"SEXT") == 0) ||
+                (strcmp(ElemClass,"OCTU") == 0)   )/* quad, sext, octupole magnet */
         {
           Dictionary = QuadPar ;
           nPar = nQuadPar ;
@@ -7201,7 +7322,7 @@ void VerifyLattice( )
           PSIndex = MultPS ;
           KlysIndex = 0 ;
           WFIndex = 0 ;
-          LradIndex = MultLrad ; 
+          LradIndex = MultLrad ;
           ZeroLenOK = 1 ;
         }
         else if (strcmp(ElemClass,"SBEN") == 0) /* sector bend */
@@ -7244,8 +7365,8 @@ void VerifyLattice( )
           WFIndex = TcavWakes ;
         }
         else if ( (strcmp(ElemClass,"HMON") == 0) ||
-                 (strcmp(ElemClass,"VMON") == 0) ||
-                 (strcmp(ElemClass,"MONI") == 0)    ) /* BPM */
+                (strcmp(ElemClass,"VMON") == 0) ||
+                (strcmp(ElemClass,"MONI") == 0)    ) /* BPM */
         {
           Dictionary = BPMPar ;
           nPar = nBPMPar ;
@@ -7259,11 +7380,11 @@ void VerifyLattice( )
           WFIndex = 0 ;
         }
         else if ( (strcmp(ElemClass,"PROF") == 0) ||
-                 (strcmp(ElemClass,"WIRE") == 0) ||
-                 (strcmp(ElemClass,"BLMO") == 0) ||
-                 (strcmp(ElemClass,"SLMO") == 0) ||
-                 (strcmp(ElemClass,"IMON") == 0) ||
-                 (strcmp(ElemClass,"INST") == 0)    ) /* instrument */
+                (strcmp(ElemClass,"WIRE") == 0) ||
+                (strcmp(ElemClass,"BLMO") == 0) ||
+                (strcmp(ElemClass,"SLMO") == 0) ||
+                (strcmp(ElemClass,"IMON") == 0) ||
+                (strcmp(ElemClass,"INST") == 0)    ) /* instrument */
         {
           Dictionary = InstPar ;
           nPar = nInstPar ;
@@ -7277,7 +7398,7 @@ void VerifyLattice( )
           WFIndex = 0 ;
         }
         else if ( (strcmp(ElemClass,"XCOR") == 0) ||
-                 (strcmp(ElemClass,"YCOR") == 0)    ) /* corrector */
+                (strcmp(ElemClass,"YCOR") == 0)    ) /* corrector */
         {
           Dictionary = CorrectorPar ;
           nPar = nCorrectorPar ;
@@ -7365,7 +7486,7 @@ void VerifyLattice( )
       }
       
       stat = VerifyParameters( count1, nPar, Dictionary, count0,
-                              paramstat, paramlenstat ) ;
+              paramstat, paramlenstat ) ;
       if (stat != 1)
       {
         for (count2 = 0 ; count2 < nPar ; count2++)
@@ -7374,16 +7495,16 @@ void VerifyLattice( )
           parname = Dictionary[count2].name ;
           
           /* If this is a girder with no mover, we only actually need 1 info message about missing
-           mover parameters (there are 4 such parameters).  Suppress the unwanted ones. */
+           * mover parameters (there are 4 such parameters).  Suppress the unwanted ones. */
           
           if ( (count0 == GirderTable) &&
-              ( (count2==GirderMoverPos)   || 
-               (count2==GirderMoverSetpt) ||
-               (count2==GirderMoverStep)     ) )
+                  ( (count2==GirderMoverPos)   ||
+                  (count2==GirderMoverSetpt) ||
+                  (count2==GirderMoverStep)     ) )
             continue ;
           if ( (count0 == GirderTable) &&
-              (count2 == GirderMover) &&
-              (paramstat[count2]==-1)    )
+                  (count2 == GirderMover) &&
+                  (paramstat[count2]==-1)    )
           {
             sprintf(message, MissPar, InfoStr, Keywd, count1+1, optStr, parname) ;
             AddMessage(message,0) ;
@@ -7391,13 +7512,13 @@ void VerifyLattice( )
           }
           
           /* If the element has no klystron, PS, or girder, but that table doesn't exist at all,
-           don't issue a message (the message about no klystron, PS, or girder table should
-           be sufficient */
+           * don't issue a message (the message about no klystron, PS, or girder table should
+           * be sufficient */
           
           if ( (count0 == ElementTable) &&
-              ( ( (count2==GirderIndex) && (GirderIndex != 0) && (nGirder==0) ) ||
-               ( (count2==KlysIndex)   && (KlysIndex != 0)   && (nKlys==0)   ) ||
-               ( (count2==PSIndex)     && (PSIndex != 0)     && (nPS==0)     )    ) )
+                  ( ( (count2==GirderIndex) && (GirderIndex != 0) && (nGirder==0) ) ||
+                  ( (count2==KlysIndex)   && (KlysIndex != 0)   && (nKlys==0)   ) ||
+                  ( (count2==PSIndex)     && (PSIndex != 0)     && (nPS==0)     )    ) )
             continue ;
           
           switch ( paramstat[count2] )
@@ -7440,13 +7561,9 @@ void VerifyLattice( )
         }
         else
         {
-          for (count2=0 ; count2 < Dictionary[ElemP].Length ; count2++) 
+          for (count2=0 ; count2 < Dictionary[ElemP].Length ; count2++)
           {
             elemno = (int)(*(Dictionary[ElemP].ValuePtr+count2))-1 ;
-            /*					retval = GetElemNumericPar( elemno,Keywd, NULL) ;
-             if (retval!=NULL)
-             retvalderef = *retval ;
-             if ( (retval==NULL) || ((int)retvalderef != count1+1) ) */
             retval = GetElemNumericPar( elemno, Keywd, &retlen ) ;
             if (retval!=NULL)
             {
@@ -7454,7 +7571,7 @@ void VerifyLattice( )
               if (stat == -1)
                 
               {
-                sprintf(message, Inconsis, WarnStr, Keywd, 
+                sprintf(message, Inconsis, WarnStr, Keywd,
                         count1+1, ElemStr, elemno+1) ;
                 AddMessage( message, 0 ) ;
               }
@@ -7464,7 +7581,7 @@ void VerifyLattice( )
       }
       
       /* for klystrons, we additionally check that the klystron status is present
-       and valid */
+       * and valid */
       
       if (count0 == KlystronTable)
       {
@@ -7476,10 +7593,10 @@ void VerifyLattice( )
           AddMessage( message, 0 ) ;
         }
         else if ( (*kstat != TRIPPED) &&
-                 (*kstat != STANDBY) &&
-                 (*kstat != STANDBYTRIP) &&
-                 (*kstat != ON) &&
-                 (*kstat != MAKEUP) )
+                (*kstat != STANDBY) &&
+                (*kstat != STANDBYTRIP) &&
+                (*kstat != ON) &&
+                (*kstat != MAKEUP) )
         {
           sprintf( message, "Error: Klystron %d Status value invalid",
                   count1+1 ) ;
@@ -7489,7 +7606,7 @@ void VerifyLattice( )
       
       /* for girders, there may be magnet movers which need checking */
       
-      if (count0 == GirderTable) 
+      if (count0 == GirderTable)
       {
         if (Dictionary[GirderMover].ValuePtr != NULL)
         {
@@ -7515,7 +7632,7 @@ void VerifyLattice( )
         /* start with elements with illegal lengths (not all classes are involved */
         
         if ( (LIndex > 0) && (*(Dictionary[LIndex].ValuePtr)<=0) &&
-            (ZeroLenOK == 0)                                       )
+                (ZeroLenOK == 0)                                       )
         {
           sprintf( message, "Error: Element %d length <= 0",count1+1 ) ;
           AddMessage( message, 0 ) ;
@@ -7523,7 +7640,7 @@ void VerifyLattice( )
         
         /* now momentum <= 0 */
         
-        if (*(Dictionary[PIndex].ValuePtr)<=0)  
+        if (*(Dictionary[PIndex].ValuePtr)<=0)
         {
           sprintf( message, "Error: Element %d design momentum <= 0",count1+1 ) ;
           AddMessage( message, 0 ) ;
@@ -7534,14 +7651,14 @@ void VerifyLattice( )
         if (PSIndex != 0)
         {	int CountPSVec ;
           LenPSVec = Dictionary[PSIndex].Length ;
-          LenPSVec = (LenPSVec<=MaxPSPerDevice) 
+          LenPSVec = (LenPSVec<=MaxPSPerDevice)
           ? LenPSVec : MaxPSPerDevice ;
-          for (CountPSVec=0 ; 
-               CountPSVec<LenPSVec ; 
-               CountPSVec++          )
+          for (CountPSVec=0 ;
+          CountPSVec<LenPSVec ;
+          CountPSVec++          )
           {
-            PSVec[CountPSVec] = 
-						(int)*(Dictionary[PSIndex].ValuePtr+CountPSVec) ;
+            PSVec[CountPSVec] =
+                    (int)*(Dictionary[PSIndex].ValuePtr+CountPSVec) ;
           }
         }
         else
@@ -7553,14 +7670,14 @@ void VerifyLattice( )
         if (GirderIndex != 0)
         {	int CountGirderVec ;
           LenGirderVec = Dictionary[GirderIndex].Length ;
-          LenGirderVec = (LenGirderVec<=MaxGirderPerDevice) 
+          LenGirderVec = (LenGirderVec<=MaxGirderPerDevice)
           ? LenGirderVec : MaxGirderPerDevice ;
-          for (CountGirderVec=0 ; 
-               CountGirderVec<LenGirderVec ; 
-               CountGirderVec++              )
+          for (CountGirderVec=0 ;
+          CountGirderVec<LenGirderVec ;
+          CountGirderVec++              )
           {
-            GirderVec[CountGirderVec] = 
-						(int)*(Dictionary[GirderIndex].ValuePtr+CountGirderVec) ;
+            GirderVec[CountGirderVec] =
+                    (int)*(Dictionary[GirderIndex].ValuePtr+CountGirderVec) ;
           }
         }
         else
@@ -7572,14 +7689,14 @@ void VerifyLattice( )
         if (KlysIndex != 0)
         {	int CountKlysVec ;
           LenKlysVec = Dictionary[KlysIndex].Length ;
-          LenKlysVec = (LenKlysVec<=MaxKlysPerDevice) 
+          LenKlysVec = (LenKlysVec<=MaxKlysPerDevice)
           ? LenKlysVec : MaxKlysPerDevice ;
-          for (CountKlysVec=0 ; 
-               CountKlysVec<LenKlysVec ; 
-               CountKlysVec++            )
+          for (CountKlysVec=0 ;
+          CountKlysVec<LenKlysVec ;
+          CountKlysVec++            )
           {
-            KlysVec[CountKlysVec] = 
-						(int)*(Dictionary[KlysIndex].ValuePtr+CountKlysVec) ;
+            KlysVec[CountKlysVec] =
+                    (int)*(Dictionary[KlysIndex].ValuePtr+CountKlysVec) ;
           }
         }
         else
@@ -7654,7 +7771,7 @@ void VerifyLattice( )
         if (strcmp(ElemClass,"MULT")==0)
         {
           if ( (MultPar[MultB].Length != MultPar[MultTilt].Length)      ||
-              (MultPar[MultB].Length != MultPar[MultPoleIndex].Length)    )
+                  (MultPar[MultB].Length != MultPar[MultPoleIndex].Length)    )
           {
             sprintf(message,"Error: Element %d multipole parameters not equal in length",
                     count1+1) ;
@@ -7672,25 +7789,25 @@ void VerifyLattice( )
         }
         
         /* now we make sure that its girder, klystron, or PS are pointed at an existing
-         table entry, and that that entry points back at this element */
+         * table entry, and that that entry points back at this element */
         
         for (count3=PSTable; count3<=KlystronTable ; count3++)
         {
           char* Keywd2 ;
-          int TablIndx ; 
+          int TablIndx ;
           int TablElem ;
           int nTabl ;
           int HardwareCount ;
-          switch (count3) 
+          switch (count3)
           {
-            case PSTable: 
+            case PSTable:
               Keywd2 = PSStr ;
               /*					TablIndx = PSIndex ; */
               HardwareVec = PSVec ;
               LenHardwareVec = LenPSVec ;
               nTabl = nPS ;
-              TablElem = PSElem ; 
-              Dictionary = PSPar ; 
+              TablElem = PSElem ;
+              Dictionary = PSPar ;
               break ;
             case GirderTable :
               Keywd2 = GirderStr ;
@@ -7698,8 +7815,8 @@ void VerifyLattice( )
               HardwareVec = GirderVec ;
               LenHardwareVec = LenGirderVec ;
               nTabl = nGirder ;
-              TablElem = GirderElem ; 
-              Dictionary = GirderPar ; 
+              TablElem = GirderElem ;
+              Dictionary = GirderPar ;
               break ;
             case KlystronTable:
               Keywd2 = KlysStr ;
@@ -7707,8 +7824,8 @@ void VerifyLattice( )
               HardwareVec = KlysVec ;
               LenHardwareVec = LenKlysVec ;
               nTabl = nKlys ;
-              TablElem = KlysElem ; 
-              Dictionary = KlystronPar ; 
+              TablElem = KlysElem ;
+              Dictionary = KlystronPar ;
               break ;
           }
           for (HardwareCount=0 ; HardwareCount<LenHardwareVec ; HardwareCount++)
@@ -7727,16 +7844,16 @@ void VerifyLattice( )
                 switch (count3)
                 {
                   case PSTable:
-                    retval = GetPSNumericPar( TablIndx-1, 
-                                             Dictionary[TablElem].name, &retlen ) ; 
+                    retval = GetPSNumericPar( TablIndx-1,
+                            Dictionary[TablElem].name, &retlen ) ;
                     break ;
                   case GirderTable:
-                    retval = GetGirderNumericPar( TablIndx-1, 
-                                                 Dictionary[TablElem].name, &retlen ) ; 
+                    retval = GetGirderNumericPar( TablIndx-1,
+                            Dictionary[TablElem].name, &retlen ) ;
                     break ;
                   case KlystronTable:
-                    retval = GetKlystronNumericPar( TablIndx-1, 
-                                                   Dictionary[TablElem].name, &retlen ) ; 
+                    retval = GetKlystronNumericPar( TablIndx-1,
+                            Dictionary[TablElem].name, &retlen ) ;
                     break ;
                 }
                 stat = ElemIndexLookup( count1+1, retval, retlen ) ;
@@ -7766,14 +7883,14 @@ void VerifyLattice( )
           for (count2=0 ; count2 < NUM_TRACK_FLAGS ; count2++)
           {
             if ( (AllowedTrackFlag[count2]==0) &&
-                (TrackFlagSet[count2]>0)         )
+                    (TrackFlagSet[count2]>0)         )
             {
               sprintf( message, "Warning:  Element %d TrackFlag %s is not valid",
                       count1+1, TrackFlagNames[count2] ) ;
               AddMessage( message, 0 ) ;
             }
             else if ( (AllowedTrackFlag[count2]==1) &&
-                     (TrackFlagSet[count2]==0)         )
+                    (TrackFlagSet[count2]==0)         )
             {
               sprintf( message, "Warning:  Element %d TrackFlag %s is not present",
                       count1+1, TrackFlagNames[count2] ) ;
@@ -7786,8 +7903,8 @@ void VerifyLattice( )
               AddMessage( message, 0 ) ;
             }
             else if ( (ActualTrackFlag[count2] > TrackFlagMaxValue[count2])
-                     ||
-                     (ActualTrackFlag[count2] < TrackFlagMinValue[count2]) )
+            ||
+                    (ActualTrackFlag[count2] < TrackFlagMinValue[count2]) )
             {
               sprintf( message, "Warning:  Element %d TrackFlag %s value out of bounds",
                       count1+1, TrackFlagNames[count2] ) ;
@@ -7795,8 +7912,8 @@ void VerifyLattice( )
             }
           }
           if ( (AllowedTrackFlag[Aper]==1) &&
-              (ActualTrackFlag[Aper]>0)   &&
-              (aperindex > 0)                )
+                  (ActualTrackFlag[Aper]>0)   &&
+                  (aperindex > 0)                )
           {
             if (GetDBValue(Dictionary+aperindex) == 0.)
             {
@@ -7805,7 +7922,7 @@ void VerifyLattice( )
               AddMessage( message, 0 ) ;
             }
             if ( (Dictionary[aperindex].Length==2)        &&
-                (Dictionary[aperindex].ValuePtr[1] == 0)    )
+                    (Dictionary[aperindex].ValuePtr[1] == 0)    )
             {
               sprintf( message, "Error:  Element %d TrackFlag %s set but aperture == 0",
                       count1+1, TrackFlagNames[Aper] ) ;
@@ -7813,16 +7930,16 @@ void VerifyLattice( )
             }
           }
           if (    (ActualTrackFlag[SynRad] > SR_None)    &&
-              ( (strcmp(ElemClass,"MULT")) ||
-               (strcmp(ElemClass,"XCOR")) ||
-               (strcmp(ElemClass,"YCOR"))           )     )
+                  ( (strcmp(ElemClass,"MULT")) ||
+                  (strcmp(ElemClass,"XCOR")) ||
+                  (strcmp(ElemClass,"YCOR"))           )     )
           {
             double Lrad = GetDBValue(Dictionary+LradIndex) ;
             if (Lrad<=0)
               Lrad = GetDBValue(Dictionary+LIndex) ;
             if (Lrad<=0)
             {
-              sprintf( message, 
+              sprintf( message,
                       "Error: Element %d TrackFlag %s enabled but L/Lrad <= 0",
                       count1+1, TrackFlagNames[SynRad] ) ;
               AddMessage( message, 0 ) ;
@@ -7837,136 +7954,133 @@ void VerifyLattice( )
     } /* end of loop over tables */
   }
   
-	return ;
+  return ;
   
 }
 
 /*=====================================================================*/
 
 /* Get the parameters for a given element, klystron, PS or girder out
- of the data structures, for purposes of the verification algorithm.
- This function is similar to GetDatabaseParameters, but sufficiently
- different that a separate function was mandated.
- 
- /* RET:    +1 if all required parameters are present, and
- all parameters with a required length tolerance
- are within that tolerance
- -1 if optional parameters are missing, or parameters for which
- the length tolerance is optional are not within tolerance
- 0 if required parameters are missing, or parameters with a
- required length tolerance are not within tolerance.
- In addition, the slots in paramstat and paramlenstat are 
- filled to indicate to the calling routine exactly which parameters
- are troubled and which are not.
- /* ABORT:  Never.
- /* FAIL:   Never. */
+ * of the data structures, for purposes of the verification algorithm.
+ * This function is similar to GetDatabaseParameters, but sufficiently
+ * different that a separate function was mandated.
+ *
+ * /* RET:    +1 if all required parameters are present, and
+ * all parameters with a required length tolerance
+ * are within that tolerance
+ * -1 if optional parameters are missing, or parameters for which
+ * the length tolerance is optional are not within tolerance
+ * 0 if required parameters are missing, or parameters with a
+ * required length tolerance are not within tolerance.
+ * In addition, the slots in paramstat and paramlenstat are
+ * filled to indicate to the calling routine exactly which parameters
+ * are troubled and which are not.
+ * /* ABORT:  Never.
+ * /* FAIL:   Never. */
 
-int VerifyParameters( int elemno, int nParam, 
-                     struct LucretiaParameter Dictionary[],
-                     int WhichTable,
-                     int paramstat[], int paramlenstat[] )
+int VerifyParameters( int elemno, int nParam,
+        struct LucretiaParameter Dictionary[],
+        int WhichTable,
+        int paramstat[], int paramlenstat[] )
 {
   
   int count ;
-	int stat = 1 ;
-	int errors = 0 ;
-	int warnings = 0 ;
-	int LengthOK ;
+  int errors = 0 ;
+  int warnings = 0 ;
+  int LengthOK ;
   
   /* loop over parameters */
   
-	for (count=0 ; count < nParam ; count++)
-	{
+  for (count=0 ; count < nParam ; count++)
+  {
     
     /* figure out which table to interrogate, and go to it! */
     
-		paramlenstat[count] = 1 ;
-		switch( WhichTable )
-		{
+    paramlenstat[count] = 1 ;
+    switch( WhichTable )
+    {
       case ElementTable:
-        Dictionary[count].ValuePtr = 
-        GetElemNumericPar( elemno, 
-                          Dictionary[count].name,
-                          &(Dictionary[count].Length) ) ;
+        Dictionary[count].ValuePtr =
+                GetElemNumericPar( elemno,
+                Dictionary[count].name,
+                &(Dictionary[count].Length) ) ;
         break ;
       case PSTable:
-        Dictionary[count].ValuePtr = 
-        GetPSNumericPar( elemno, 
-                        Dictionary[count].name,
-                        &(Dictionary[count].Length) ) ;
+        Dictionary[count].ValuePtr =
+                GetPSNumericPar( elemno,
+                Dictionary[count].name,
+                &(Dictionary[count].Length) ) ;
         break ;
-      case GirderTable:			Dictionary[count].ValuePtr = 
-        GetGirderNumericPar( elemno, 
-                            Dictionary[count].name,
-                            &(Dictionary[count].Length) ) ;
-        break ;
+      case GirderTable:			Dictionary[count].ValuePtr =
+              GetGirderNumericPar( elemno,
+              Dictionary[count].name,
+              &(Dictionary[count].Length) ) ;
+      break ;
       case KlystronTable:
-        Dictionary[count].ValuePtr = 
-        GetKlystronNumericPar( elemno, 
-                              Dictionary[count].name,
-                              &(Dictionary[count].Length) ) ;
+        Dictionary[count].ValuePtr =
+                GetKlystronNumericPar( elemno,
+                Dictionary[count].name,
+                &(Dictionary[count].Length) ) ;
         break ;
       case TLRTable:
-        Dictionary[count].ValuePtr = 
-        GetTLRNumericPar( elemno, 
-                         Dictionary[count].name,
-                         &(Dictionary[count].Length) ) ;
+        Dictionary[count].ValuePtr =
+                GetTLRNumericPar( elemno,
+                Dictionary[count].name,
+                &(Dictionary[count].Length) ) ;
         break ;
-		}
+    }
     
     /* handle a missing parameter */
     
-		if (Dictionary[count].ValuePtr == NULL)
-		{
-			if ( (Dictionary[count].Requirement[RmatPars]==Required) ||
-          (Dictionary[count].Requirement[TrackPars]==Required)   )
-			{
-				errors++ ;
-				paramstat[count] = 0 ;
-			}
-			else
-			{
-				warnings++ ;
-				paramstat[count] = -1 ;
-			}
-		}
+    if (Dictionary[count].ValuePtr == NULL)
+    {
+      if ( (Dictionary[count].Requirement[RmatPars]==Required) ||
+              (Dictionary[count].Requirement[TrackPars]==Required)   )
+      {
+        errors++ ;
+        paramstat[count] = 0 ;
+      }
+      else
+      {
+        warnings++ ;
+        paramstat[count] = -1 ;
+      }
+    }
     
     /* if the parameter is not missing, handle any requirements on its length */
     
-		else 
-		{
-			paramstat[count] = 1 ;
-			if ( (Dictionary[count].LengthRequirement[RmatPars] != Ignored) ||
-          (Dictionary[count].LengthRequirement[TrackPars] != Ignored)   )
-			{
-				LengthOK = ( (Dictionary[count].Length >= Dictionary[count].MinLength) &&
-                    (Dictionary[count].Length <= Dictionary[count].MaxLength)    ) ;
-				if ( !LengthOK )
-				{
-					if ( (Dictionary[count].LengthRequirement[RmatPars]==Required) ||
-              (Dictionary[count].LengthRequirement[TrackPars]==Required)   )
-					{
-						errors++ ;
-						paramlenstat[count] = 0 ;
-					}
-					else
-					{
-						warnings++ ;
-						paramlenstat[count] = -1 ;
-					}
-				}
-			}
-		}
-	}
+    else
+    {
+      paramstat[count] = 1 ;
+      if ( (Dictionary[count].LengthRequirement[RmatPars] != Ignored) ||
+              (Dictionary[count].LengthRequirement[TrackPars] != Ignored)   )
+      {
+        LengthOK = ( (Dictionary[count].Length >= Dictionary[count].MinLength) &&
+                (Dictionary[count].Length <= Dictionary[count].MaxLength)    ) ;
+        if ( !LengthOK )
+        {
+          if ( (Dictionary[count].LengthRequirement[RmatPars]==Required) ||
+                  (Dictionary[count].LengthRequirement[TrackPars]==Required)   )
+          {
+            errors++ ;
+            paramlenstat[count] = 0 ;
+          }
+          else
+          {
+            warnings++ ;
+            paramlenstat[count] = -1 ;
+          }
+        }
+      }
+    }
+  }
   
-egress:
-  
-	if (errors != 0)
-		return 0 ;
-	else if (warnings != 0)
-		return -1 ;
-	else
-		return 1 ;
+  if (errors != 0)
+    return 0 ;
+  else if (warnings != 0)
+    return -1 ;
+  else
+    return 1 ;
   
 }
 
@@ -7975,328 +8089,325 @@ egress:
 /* look up an element's index number in a vector of element numbers */
 
 /* RET:    The position of the element index in the vector, or -1 if
- not found. 
- /* ABORT:  never.
- /* FAIL:   if veclen > the actual length of vector */
+ * not found.
+ * /* ABORT:  never.
+ * /* FAIL:   if veclen > the actual length of vector */
 
 int ElemIndexLookup( int ElemIndex, double* vector, int veclen )
 {
-	int i ;
-	int position = -1 ;
+  int i ;
+  int position = -1 ;
   
-	if (vector==NULL) 
-		goto egress ;
-	if (veclen==0)
-		goto egress ;
+  if (vector==NULL)
+    goto egress ;
+  if (veclen==0)
+    goto egress ;
   
-	for (i=0 ; i<veclen ; i++)
-	{
-		if (ElemIndex==(int)vector[i])
-		{
-			position = i ;
-			break ;
-		}
-	}
+  for (i=0 ; i<veclen ; i++)
+  {
+    if (ElemIndex==(int)vector[i])
+    {
+      position = i ;
+      break ;
+    }
+  }
   
-egress:
-  
-	return position ;
-  
+  egress:
+    
+    return position ;
+    
 }
 
 /*=====================================================================*/
 
 /* Get pointers to real data for frequency-mode LRWFs and put into a
- convenient array for later use. */
+ * convenient array for later use. */
 
 /* RET:    A pointer to the array which is allocated and filled.  As
- a side effect, a status integer is set to 1 if successful, 
- 0 if unsuccessful (dynamic allocation problem and/or 
- corrupted data in the Matlab tables).
- /* ABORT:  never.
- /* FAIL:   never. */
+ * a side effect, a status integer is set to 1 if successful,
+ * 0 if unsuccessful (dynamic allocation problem and/or
+ * corrupted data in the Matlab tables).
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
-struct LRWFFreqData* UnpackLRWFFreqData( int nWakes, int WhichTable, 
-                                        int* maxmodes, int* Status )
+struct LRWFFreqData* UnpackLRWFFreqData( int nWakes, int WhichTable,
+        int* maxmodes, int* Status )
 {
-	struct LRWFFreqData* backbone ;
-	int WakeLoop ;
-	int WakeClass ;
-	char Message[90] ;
+  struct LRWFFreqData* backbone ;
+  int WakeLoop ;
+  int WakeClass ;
+  char Message[90] ;
   
   /* assume failure for now */
   
-	*Status = 0 ;
+  *Status = 0 ;
   
   /* allocate the return data structure (or try to) */
-  
-	backbone = calloc(nWakes,sizeof(struct LRWFFreqData)) ;
-	if (backbone == NULL)
-	{
-		AddMessage("Unable to allocate memory for LRWF data",0) ;
-		*maxmodes = 0 ;
-		goto egress ;
-	}
+  backbone = (struct LRWFFreqData*)calloc(nWakes,sizeof(struct LRWFFreqData)) ;
+  if (backbone == NULL)
+  {
+    AddMessage("Unable to allocate memory for LRWF data",0) ;
+    *maxmodes = 0 ;
+    goto egress ;
+  }
   
   /* loop over the desired wakes and find out whether they are frequency-
-   or time-domain */
+   * or time-domain */
   
-	for (WakeLoop = 0 ; WakeLoop < nWakes ; WakeLoop++)
-	{
-		if ( WhichTable == TLRTable )
+  for (WakeLoop = 0 ; WakeLoop < nWakes ; WakeLoop++)
+  {
+    if ( WhichTable == TLRTable )
       WakeClass = GetTLRWakeClass( WakeLoop ) ;
-		else
+    else
       WakeClass = GetTLRErrWakeClass( WakeLoop ) ;
-		if (WakeClass == TIMEDOMAIN)
-			continue ;
-		if (WakeClass == UNKNOWNDOMAIN)
-		{
-			if (WhichTable == TLRTable)
+    if (WakeClass == TIMEDOMAIN)
+      continue ;
+    if (WakeClass == UNKNOWNDOMAIN)
+    {
+      if (WhichTable == TLRTable)
         sprintf(Message,
                 "Frequency domain TLR # %d corrupted",WakeLoop+1) ;
-			else
+      else
         sprintf(Message,
                 "Frequency domain error TLR # %d corrupted",WakeLoop+1) ;
-			AddMessage(Message,0) ;
-			goto egress ;
-		}
+      AddMessage(Message,0) ;
+      goto egress ;
+    }
     
     /* if frequency domain, get its parameters */
     
-		*Status = GetDatabaseParameters( WakeLoop, nLRWFFreqPar, 
-                                    LRWFFreqPar, TrackPars, WhichTable ) ;
-		if (*Status != 1)
-		{
-			if (WhichTable == TLRTable)
+    *Status = GetDatabaseParameters( WakeLoop, nLRWFFreqPar,
+            LRWFFreqPar, TrackPars, WhichTable ) ;
+    if (*Status != 1)
+    {
+      if (WhichTable == TLRTable)
         sprintf(Message,
                 "Frequency domain TLR # %d corrupted",WakeLoop+1) ;
-			else
+      else
         sprintf(Message,
                 "Frequency domain error TLR # %d corrupted",WakeLoop+1) ;
-			AddMessage(Message,0) ;
-			goto egress ;
-		}
+      AddMessage(Message,0) ;
+      goto egress ;
+    }
     
     /* Make sure that the vector parameters are of correct length:
-     For regular wakes the Freq and Q vectors should be 2x as long as
-     the K and Tilt vectors;
-     For error wakes the Freq, Q, and K vectors should be 2x as long as
-     the Tilt vector; 
-     in all cases the Tilt vector length gives the number of modes */
+     * For regular wakes the Freq and Q vectors should be 2x as long as
+     * the K and Tilt vectors;
+     * For error wakes the Freq, Q, and K vectors should be 2x as long as
+     * the Tilt vector;
+     * in all cases the Tilt vector length gives the number of modes */
     
-		if ( WhichTable == TLRTable )
-		{
-      if ( 
-          (LRWFFreqPar[LRWFFreqFreq].Length != 
-           LRWFFreqPar[LRWFFreqQ].Length     ) ||
-          (LRWFFreqPar[LRWFFreqFreq].Length != 
-           2*LRWFFreqPar[LRWFFreqK].Length     ) ||
-          (LRWFFreqPar[LRWFFreqFreq].Length != 
-           2*LRWFFreqPar[LRWFFreqTilt].Length  )    )
+    if ( WhichTable == TLRTable )
+    {
+      if (
+              (LRWFFreqPar[LRWFFreqFreq].Length !=
+              LRWFFreqPar[LRWFFreqQ].Length     ) ||
+              (LRWFFreqPar[LRWFFreqFreq].Length !=
+              2*LRWFFreqPar[LRWFFreqK].Length     ) ||
+              (LRWFFreqPar[LRWFFreqFreq].Length !=
+              2*LRWFFreqPar[LRWFFreqTilt].Length  )    )
       {
         sprintf(Message,
                 "Frequency domain TLR # %d corrupted",WakeLoop+1) ;
         AddMessage(Message,0) ;
         goto egress ;
       }
-		}
-		else
-		{
-      if ( 
-          (LRWFFreqPar[LRWFFreqFreq].Length != 
-           LRWFFreqPar[LRWFFreqQ].Length       ) ||
-          (LRWFFreqPar[LRWFFreqFreq].Length != 
-           LRWFFreqPar[LRWFFreqK].Length       ) ||
-          (LRWFFreqPar[LRWFFreqFreq].Length != 
-           2*LRWFFreqPar[LRWFFreqTilt].Length  )    )
+    }
+    else
+    {
+      if (
+              (LRWFFreqPar[LRWFFreqFreq].Length !=
+              LRWFFreqPar[LRWFFreqQ].Length       ) ||
+              (LRWFFreqPar[LRWFFreqFreq].Length !=
+              LRWFFreqPar[LRWFFreqK].Length       ) ||
+              (LRWFFreqPar[LRWFFreqFreq].Length !=
+              2*LRWFFreqPar[LRWFFreqTilt].Length  )    )
       {
         sprintf(Message,
                 "Frequency domain error TLR # %d corrupted",WakeLoop+1) ;
         AddMessage(Message,0) ;
         goto egress ;
       }
-		}
+    }
     
     
     /* fill up the backbone data structure */
     
-		backbone[WakeLoop].Freq  = LRWFFreqPar[LRWFFreqFreq].ValuePtr ;
-		backbone[WakeLoop].Q     = LRWFFreqPar[LRWFFreqQ].ValuePtr ;
-		backbone[WakeLoop].K     = LRWFFreqPar[LRWFFreqK].ValuePtr ;
-		backbone[WakeLoop].Tilt  = LRWFFreqPar[LRWFFreqTilt].ValuePtr ;
-		backbone[WakeLoop].BinWidth = *(LRWFFreqPar[LRWFFreqBinWidth].ValuePtr) ;
-		backbone[WakeLoop].nModes = LRWFFreqPar[LRWFFreqTilt].Length ;
-		if (backbone[WakeLoop].nModes > *maxmodes)
-			*maxmodes = backbone[WakeLoop].nModes ;
+    backbone[WakeLoop].Freq  = LRWFFreqPar[LRWFFreqFreq].ValuePtr ;
+    backbone[WakeLoop].Q     = LRWFFreqPar[LRWFFreqQ].ValuePtr ;
+    backbone[WakeLoop].K     = LRWFFreqPar[LRWFFreqK].ValuePtr ;
+    backbone[WakeLoop].Tilt  = LRWFFreqPar[LRWFFreqTilt].ValuePtr ;
+    backbone[WakeLoop].BinWidth = *(LRWFFreqPar[LRWFFreqBinWidth].ValuePtr) ;
+    backbone[WakeLoop].nModes = LRWFFreqPar[LRWFFreqTilt].Length ;
+    if (backbone[WakeLoop].nModes > *maxmodes)
+      *maxmodes = backbone[WakeLoop].nModes ;
     
-	}
+  }
   
   /* set status and return */
   
-	*Status = 1 ;
+  *Status = 1 ;
   
-egress:
-  
-	if (*Status == 1)
-		return backbone ;
-	else
-		return NULL ;
-  
+  egress:
+    
+    if (*Status == 1)
+      return backbone ;
+    else
+      return NULL ;
+    
 }
 
 /*=====================================================================*/
 
-/* function to compute the frequency damping factor, exp(-wt/2Q), for 
- all the modes in a selected wakefield, based on the intra-bunch 
- spacing.  Since there can be different frequencies for the x and the
- y modes, the calculation is made to get a damping factor for each
- mode. */
+/* function to compute the frequency damping factor, exp(-wt/2Q), for
+ * all the modes in a selected wakefield, based on the intra-bunch
+ * spacing.  Since there can be different frequencies for the x and the
+ * y modes, the calculation is made to get a damping factor for each
+ * mode. */
 
 /* RET:    a pointer to a vector of complex values, where the x damping
- factor is in the Real component and the y damping factor is
- in the Imag component.  Returns NULL if calculation was not
- successful.
- /* ABORT:  never.
- /* FAIL:   never. */
+ * factor is in the Real component and the y damping factor is
+ * in the Imag component.  Returns NULL if calculation was not
+ * successful.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
 
 struct LucretiaComplex* ComputeLRWFFreqDamping( double dt,
-                                               double* Freq, double* Q, int nModes )
+        double* Freq, double* Q, int nModes )
 {
-	struct LucretiaComplex* damping ;
-	double wx,wy ;
-	int count ;
+  struct LucretiaComplex* damping ;
+  double wx,wy ;
+  int count ;
   
   /* start by allocating a vector of LucretiaComplex to hold the results */
-	
-	damping = calloc( nModes, sizeof(struct LucretiaComplex) ) ;
-	if (damping == NULL)
-	{
-		AddMessage("Allocation failure in ComputeLRWFFreqDamping",0) ;
-		goto egress ;
-	}
+  damping = (struct LucretiaComplex*)calloc( nModes, sizeof(struct LucretiaComplex) ) ;
+  if (damping == NULL)
+  {
+    AddMessage("Allocation failure in ComputeLRWFFreqDamping",0) ;
+    goto egress ;
+  }
   
   /* loop over modes and perform the calculations */
   
-	for (count=0 ; count < nModes ; count++)
-	{
-		wx = 2*PI*( Freq[2*count]  ) * 1e6 ;
-		wy = 2*PI*( Freq[2*count+1] ) * 1e6 ;
-		damping[count].Real = exp(-wx*dt/2/Q[2*count]) ;
-		damping[count].Imag = exp(-wy*dt/2/Q[2*count+1]) ;
-	}
-egress:
-  
-	return damping ;
-  
+  for (count=0 ; count < nModes ; count++)
+  {
+    wx = 2*PI*( Freq[2*count]  ) * 1e6 ;
+    wy = 2*PI*( Freq[2*count+1] ) * 1e6 ;
+    damping[count].Real = exp(-wx*dt/2/Q[2*count]) ;
+    damping[count].Imag = exp(-wy*dt/2/Q[2*count+1]) ;
+  }
+  egress:
+    
+    return damping ;
+    
 }
 
 /*=====================================================================*/
 
 /* function to return the bunch-to-bunch complex phase advance vector
- for all the modes in a frequency-domain long-range wakefield */
+ * for all the modes in a frequency-domain long-range wakefield */
 
 struct LucretiaComplex* ComputeLRWFFreqPhase( double dt,
-                                             double* Freq, int flag, int nModes )
+        double* Freq, int flag, int nModes )
 {
-	struct LucretiaComplex* phase ;
-	double w ;
-	int count ;
+  struct LucretiaComplex* phase ;
+  double w ;
+  int count ;
   
   /* start by allocating a vector of LucretiaComplex to hold the results */
-	
-	phase = calloc( nModes, sizeof(struct LucretiaComplex) ) ;
-	if (phase == NULL)
-	{
-		AddMessage("Allocation failure in ComputeLRWFFreqPhase",0) ;
-		goto egress ;
-	}
+  phase = (struct LucretiaComplex*)calloc( nModes, sizeof(struct LucretiaComplex) ) ;
+  if (phase == NULL)
+  {
+    AddMessage("Allocation failure in ComputeLRWFFreqPhase",0) ;
+    goto egress ;
+  }
   
   /* loop over modes and perform the calculations */
   
-	for (count=0 ; count < nModes ; count++)
-	{
-		if (flag==0) /* x frequency */
-			w = 2*PI*( Freq[2*count]  ) * 1e6 ;
-		else         /* y frequency */
-			w = 2*PI*( Freq[2*count+1]  ) * 1e6 ;
-		phase[count].Real =  cos(w*dt) ;
-		phase[count].Imag = -sin(w*dt) ;
-	}
+  for (count=0 ; count < nModes ; count++)
+  {
+    if (flag==0) /* x frequency */
+      w = 2*PI*( Freq[2*count]  ) * 1e6 ;
+    else         /* y frequency */
+      w = 2*PI*( Freq[2*count+1]  ) * 1e6 ;
+    phase[count].Real =  cos(w*dt) ;
+    phase[count].Imag = -sin(w*dt) ;
+  }
   
-egress:
-  
-	return phase ;
+  egress:
+    
+    return phase ;
 }
 
 /*=====================================================================*/
 
 /* Master function which performs all necessary preparations for a bunch
- to interact with short- and long-range wakefields */
+ * to interact with short- and long-range wakefields */
 
 /* RET:   +1 if successful, 0 if unsuccessful.
- Side effects: */
+ * Side effects: */
 /* ABORT: never.
- /* FAIL:  never */
+ * /* FAIL:  never */
 
-int PrepareAllWF( 
-/* pure inputs */
-                 double* WakeIndices, int NumWakeIndices, int* TrackFlag,
-                 int elemno, int bunchno,  
-/* inputs which are modified during execution */
-                 struct Beam* TheBeam, 
-/* pure outputs */
-                 int* ZSRno, int* TSRno, int* TLRno,    int* TLRErrno,
-                 int* TLRClass, int* TLRErrClass,
-                 struct SRWF** ThisZSR, struct SRWF** ThisTSR,
-                 struct LRWFFreq** ThisTLRFreq, 
-                 struct LRWFFreq** ThisTLRErrFreq,
-                 struct LRWFFreqKick** ThisElemTLRFreqKick, 
-                 struct LRWFFreqKick** ThisElemTLRErrFreqKick )
-/* 18 arguments as of 03-mar-2005, a new record for me! -PT */
+int PrepareAllWF(
+        /* pure inputs */
+        double* WakeIndices, int NumWakeIndices, int* TrackFlag,
+        int elemno, int bunchno,
+        /* inputs which are modified during execution */
+        struct Beam* TheBeam,
+        /* pure outputs */
+        int* ZSRno, int* TSRno, int* TLRno,    int* TLRErrno,
+        int* TLRClass, int* TLRErrClass,
+        struct SRWF** ThisZSR, struct SRWF** ThisTSR,
+        struct LRWFFreq** ThisTLRFreq,
+        struct LRWFFreq** ThisTLRErrFreq,
+        struct LRWFFreqKick** ThisElemTLRFreqKick,
+        struct LRWFFreqKick** ThisElemTLRErrFreqKick )
+        /* 18 arguments as of 03-mar-2005, a new record for me! -PT */
 {
   
-	struct Bunch* ThisBunch ;
-	int stat = 1 ;
+  struct Bunch* ThisBunch ;
+  int stat = 1 ;
   
   /* initialize the variables for the current wakefields to their "do nothing"
-   state */
+   * state */
   
-	*ZSRno    = -1 ;
-	*TSRno    = -1 ;
-	*TLRno    = -1 ;
-	*TLRErrno = -1 ;
-	*TLRClass    = UNKNOWNDOMAIN ;
-	*TLRErrClass = UNKNOWNDOMAIN ;
-	*ThisZSR = NULL ;
-	*ThisTSR = NULL ;
-	*ThisTLRFreq    = NULL ;
-	*ThisTLRErrFreq = NULL ;
-	*ThisElemTLRFreqKick    = NULL ;
-	*ThisElemTLRErrFreqKick = NULL ;
+  *ZSRno    = -1 ;
+  *TSRno    = -1 ;
+  *TLRno    = -1 ;
+  *TLRErrno = -1 ;
+  *TLRClass    = UNKNOWNDOMAIN ;
+  *TLRErrClass = UNKNOWNDOMAIN ;
+  *ThisZSR = NULL ;
+  *ThisTSR = NULL ;
+  *ThisTLRFreq    = NULL ;
+  *ThisTLRErrFreq = NULL ;
+  *ThisElemTLRFreqKick    = NULL ;
+  *ThisElemTLRErrFreqKick = NULL ;
   
   /* make a shortcut to the current bunch */
   
-	ThisBunch = TheBeam->bunches[bunchno] ;
+  ThisBunch = TheBeam->bunches[bunchno] ;
   
   /* start with short-range, longitudinal wakefields */
   
-	if ( (NumWakeIndices > 0) && (TrackFlag[SRWF_L] > 0) )
-	{
-		*ZSRno = (int)(WakeIndices[0]) - 1 ;
+  if ( (NumWakeIndices > 0) && (TrackFlag[SRWF_L] > 0) )
+  {
+    *ZSRno = (int)(WakeIndices[0]) - 1 ;
     
     /* protect against a ZSRno that exceeds the total number of ZSRs in WF */
     
-		if ( (*ZSRno)+1 > numwakes[0] )
-		{
-			stat = 0 ;
+    if ( (*ZSRno)+1 > numwakes[0] )
+    {
+      stat = 0 ;
       BadSRWFMessage( *(ZSRno)+1, 0 ) ;
-			goto egress ;
-		}
+      goto egress ;
+    }
     
     /* another special case:  No ZSRs, element points to ZSR # 0, but SRWF_Z flag is ON */
     
-		if (*ZSRno > -1)
-		{
+    if (*ZSRno > -1)
+    {
       stat = ConvolveSRWFWithBeam( ThisBunch, *ZSRno, 0 ) ;
       if (stat == 0)
       {
@@ -8309,225 +8420,225 @@ int PrepareAllWF(
       }
       else
         *ThisZSR = ThisBunch->ZSR[*ZSRno] ;
-		}
-	}
+    }
+  }
   
   /* now short-range transverse wakes, pretty similar */
   
-	if ( (NumWakeIndices > 1) && (TrackFlag[SRWF_T] > 0) )
-	{
-		*TSRno = (int)(WakeIndices[1]) - 1 ;
+  if ( (NumWakeIndices > 1) && (TrackFlag[SRWF_T] > 0) )
+  {
+    *TSRno = (int)(WakeIndices[1]) - 1 ;
     
     /* protect against a ZSRno that exceeds the total number of ZSRs in WF */
     
-		if ( (*TSRno)+1 > numwakes[1] )
-		{
-			stat = 0 ;
+    if ( (*TSRno)+1 > numwakes[1] )
+    {
+      stat = 0 ;
       BadSRWFMessage( *(TSRno)+1, 1 ) ;
-			goto egress ;
-		}
+      goto egress ;
+    }
     /* another special case:  No TSRs, element points to TSR # 0, but SRWF_T flag is ON */
     
-		if (*TSRno > -1)
-		{
-			stat = ConvolveSRWFWithBeam( ThisBunch, *TSRno, 1 ) ;
-			if (stat == 0)
-			{
-				goto egress ;
-			}
-			else if (stat == -1)
-			{
-				stat = 1 ;
-				*TSRno = -1 ;
-			}
-			else
-				*ThisTSR = ThisBunch->TSR[*TSRno] ;
-		}
-	}
+    if (*TSRno > -1)
+    {
+      stat = ConvolveSRWFWithBeam( ThisBunch, *TSRno, 1 ) ;
+      if (stat == 0)
+      {
+        goto egress ;
+      }
+      else if (stat == -1)
+      {
+        stat = 1 ;
+        *TSRno = -1 ;
+      }
+      else
+        *ThisTSR = ThisBunch->TSR[*TSRno] ;
+    }
+  }
   
   /* for long-range transverse wakes, we also need to unpack the wakefield data
-   from the Matlab structures, figure out whether this is a frequency or time
-   domain wakefield, compute damping for the frequency domain type, and get a
-   pointer to the earlier wakefield kicks at this structure */
+   * from the Matlab structures, figure out whether this is a frequency or time
+   * domain wakefield, compute damping for the frequency domain type, and get a
+   * pointer to the earlier wakefield kicks at this structure */
   
-	if ( (NumWakeIndices > 2)    &&
-      (TrackFlag[LRWF_T] > 0) &&
-      (WakeIndices[2] > 0)        )
-	{
-		*TLRno = (int)(WakeIndices[2]) - 1 ;
-		if ( (*TLRno > numwakes[2]-1) || (*TLRno < -1) )
-		{
-			NonExistentLRWFmessage( elemno+1, *TLRno+1, TLRTable ) ;
-			stat = 0 ;
-			goto egress ;
-		}
-		if ( TLRFreqData[*TLRno].Freq != NULL )
-			*TLRClass = FREQDOMAIN ;
-		else
-			*TLRClass = TIMEDOMAIN ;
-		if (*TLRClass == FREQDOMAIN)
-		{
-			if (TheBeam->TLRFreqDamping[*TLRno] == NULL)
-			{
-				TheBeam->TLRFreqDamping[*TLRno] = 
-        ComputeLRWFFreqDamping(
-                               TheBeam->interval, 
-                               TLRFreqData[*TLRno].Freq,
-                               TLRFreqData[*TLRno].Q,
-                               TLRFreqData[*TLRno].nModes ) ;
-				if (TheBeam->TLRFreqDamping[*TLRno] == NULL)
-				{
-					stat = 0 ;
-					goto egress ;
-				}
-				TheBeam->TLRFreqxPhase[*TLRno] = 
-        ComputeLRWFFreqPhase(
-                             TheBeam->interval, 
-                             TLRFreqData[*TLRno].Freq,
-                             0,
-                             TLRFreqData[*TLRno].nModes ) ;
-				if (TheBeam->TLRFreqxPhase[*TLRno] == NULL)
-				{
-					stat = 0 ;
-					goto egress ;
-				}
-				TheBeam->TLRFreqyPhase[*TLRno] = 
-        ComputeLRWFFreqPhase(
-                             TheBeam->interval, 
-                             TLRFreqData[*TLRno].Freq,
-                             1,
-                             TLRFreqData[*TLRno].nModes ) ;
-				if (TheBeam->TLRFreqyPhase[*TLRno] == NULL)
-				{
-					stat = 0 ;
-					goto egress ;
-				}
-			}
-			stat = PrepareBunchForLRWFFreq( ThisBunch,
-                                     *TLRno, 0, 
-                                     TLRFreqData[*TLRno].Freq, 
-                                     TLRFreqData[*TLRno].K,
-                                     TLRFreqData[*TLRno].nModes, 
-                                     TLRFreqData[*TLRno].BinWidth,
-                                     TheBeam->interval ) ;
-			if (stat==0)
-				goto egress ;
-			else if (stat == -1)
-			{
-				*TLRno = -1 ;
-				stat = 1 ;
-			}
-			else if (stat == 1)
-			{
-				*ThisTLRFreq = ThisBunch->TLRFreq[*TLRno] ;
-				*ThisElemTLRFreqKick = 
-        GetThisElemTLRFreqKick( elemno, bunchno, 0 ) ;
-				if (*ThisElemTLRFreqKick == NULL)
-				{
-					stat = 0 ; 
-					goto egress ;
-				}
-			}
-		}
-	}
+  if ( (NumWakeIndices > 2)    &&
+          (TrackFlag[LRWF_T] > 0) &&
+          (WakeIndices[2] > 0)        )
+  {
+    *TLRno = (int)(WakeIndices[2]) - 1 ;
+    if ( (*TLRno > numwakes[2]-1) || (*TLRno < -1) )
+    {
+      NonExistentLRWFmessage( elemno+1, *TLRno+1, TLRTable ) ;
+      stat = 0 ;
+      goto egress ;
+    }
+    if ( TLRFreqData[*TLRno].Freq != NULL )
+      *TLRClass = FREQDOMAIN ;
+    else
+      *TLRClass = TIMEDOMAIN ;
+    if (*TLRClass == FREQDOMAIN)
+    {
+      if (TheBeam->TLRFreqDamping[*TLRno] == NULL)
+      {
+        TheBeam->TLRFreqDamping[*TLRno] =
+                ComputeLRWFFreqDamping(
+                TheBeam->interval,
+                TLRFreqData[*TLRno].Freq,
+                TLRFreqData[*TLRno].Q,
+                TLRFreqData[*TLRno].nModes ) ;
+        if (TheBeam->TLRFreqDamping[*TLRno] == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+        TheBeam->TLRFreqxPhase[*TLRno] =
+                ComputeLRWFFreqPhase(
+                TheBeam->interval,
+                TLRFreqData[*TLRno].Freq,
+                0,
+                TLRFreqData[*TLRno].nModes ) ;
+        if (TheBeam->TLRFreqxPhase[*TLRno] == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+        TheBeam->TLRFreqyPhase[*TLRno] =
+                ComputeLRWFFreqPhase(
+                TheBeam->interval,
+                TLRFreqData[*TLRno].Freq,
+                1,
+                TLRFreqData[*TLRno].nModes ) ;
+        if (TheBeam->TLRFreqyPhase[*TLRno] == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+      }
+      stat = PrepareBunchForLRWFFreq( ThisBunch,
+              *TLRno, 0,
+              TLRFreqData[*TLRno].Freq,
+              TLRFreqData[*TLRno].K,
+              TLRFreqData[*TLRno].nModes,
+              TLRFreqData[*TLRno].BinWidth,
+              TheBeam->interval ) ;
+      if (stat==0)
+        goto egress ;
+      else if (stat == -1)
+      {
+        *TLRno = -1 ;
+        stat = 1 ;
+      }
+      else if (stat == 1)
+      {
+        *ThisTLRFreq = ThisBunch->TLRFreq[*TLRno] ;
+        *ThisElemTLRFreqKick =
+                GetThisElemTLRFreqKick( elemno, bunchno, 0 ) ;
+        if (*ThisElemTLRFreqKick == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+      }
+    }
+  }
   
   /* the long-range error wake is very much parallel to the long range dipole
-   wake, so much so that a truly awesome programmer (ie, a better one than I
-   am) would write a separate function that does either TLR or TLRErr depending
-   on its arguments.  I am obviously not that programmer. */
+   * wake, so much so that a truly awesome programmer (ie, a better one than I
+   * am) would write a separate function that does either TLR or TLRErr depending
+   * on its arguments.  I am obviously not that programmer. */
   
-	if ( (NumWakeIndices > 3)     && 
-      (TrackFlag[LRWF_ERR] > 0) &&
-      (WakeIndices[3] > 0)          )
-	{
-		*TLRErrno = (int)(WakeIndices[3]) - 1 ;
-		if ( (*TLRErrno > numwakes[3]-1) || (*TLRErrno < -1) )
-		{
-			NonExistentLRWFmessage( elemno+1, *TLRErrno+1, TLRErrTable ) ;
-			stat = 0 ;
-			goto egress ;
-		}
-		if ( TLRErrFreqData[*TLRErrno].Freq != NULL )
-			*TLRErrClass = FREQDOMAIN ;
-		else
-			*TLRErrClass = TIMEDOMAIN ;
-		if (*TLRErrClass == FREQDOMAIN)
-		{
-			if (TheBeam->TLRErrFreqDamping[*TLRErrno] == NULL)
-			{
-				TheBeam->TLRErrFreqDamping[*TLRErrno] = 
-        ComputeLRWFFreqDamping(
-                               TheBeam->interval, 
-                               TLRErrFreqData[*TLRErrno].Freq,
-                               TLRErrFreqData[*TLRErrno].Q,
-                               TLRErrFreqData[*TLRErrno].nModes ) ;
-				if (TheBeam->TLRErrFreqDamping[*TLRErrno] == NULL)
-				{
-					stat = 0 ;
-					goto egress ;
-				}
-				TheBeam->TLRErrFreqxPhase[*TLRErrno] = 
-        ComputeLRWFFreqPhase(
-                             TheBeam->interval, 
-                             TLRErrFreqData[*TLRErrno].Freq,
-                             0,
-                             TLRErrFreqData[*TLRErrno].nModes ) ;
-				if (TheBeam->TLRErrFreqxPhase[*TLRErrno] == NULL)
-				{
-					stat = 0 ;
-					goto egress ;
-				}
-				TheBeam->TLRErrFreqyPhase[*TLRErrno] = 
-        ComputeLRWFFreqPhase(
-                             TheBeam->interval, 
-                             TLRErrFreqData[*TLRErrno].Freq,
-                             1,
-                             TLRErrFreqData[*TLRErrno].nModes ) ;
-				if (TheBeam->TLRErrFreqyPhase[*TLRErrno] == NULL)
-				{
-					stat = 0 ;
-					goto egress ;
-				}
-			}
-			stat = PrepareBunchForLRWFFreq( ThisBunch,
-                                     *TLRErrno, 1, 
-                                     TLRErrFreqData[*TLRErrno].Freq, 
-                                     TLRErrFreqData[*TLRErrno].K,
-                                     TLRErrFreqData[*TLRErrno].nModes, 
-                                     TLRErrFreqData[*TLRErrno].BinWidth,
-                                     TheBeam->interval ) ;
-			if (stat==0)
-				goto egress ;
-			else if (stat == -1)
-			{
-				*TLRErrno = -1 ;
-				stat = 1 ;
-			}
-			else if (stat == 1)
-			{
-				*ThisTLRErrFreq = ThisBunch->TLRErrFreq[*TLRErrno] ;
-				*ThisElemTLRErrFreqKick = 
-        GetThisElemTLRFreqKick( elemno, bunchno, 1 ) ;
-				if (*ThisElemTLRErrFreqKick == NULL)
-				{
-					stat = 0 ; 
-					goto egress ;
-				}
-			}
-		}
-	}
+  if ( (NumWakeIndices > 3)     &&
+          (TrackFlag[LRWF_ERR] > 0) &&
+          (WakeIndices[3] > 0)          )
+  {
+    *TLRErrno = (int)(WakeIndices[3]) - 1 ;
+    if ( (*TLRErrno > numwakes[3]-1) || (*TLRErrno < -1) )
+    {
+      NonExistentLRWFmessage( elemno+1, *TLRErrno+1, TLRErrTable ) ;
+      stat = 0 ;
+      goto egress ;
+    }
+    if ( TLRErrFreqData[*TLRErrno].Freq != NULL )
+      *TLRErrClass = FREQDOMAIN ;
+    else
+      *TLRErrClass = TIMEDOMAIN ;
+    if (*TLRErrClass == FREQDOMAIN)
+    {
+      if (TheBeam->TLRErrFreqDamping[*TLRErrno] == NULL)
+      {
+        TheBeam->TLRErrFreqDamping[*TLRErrno] =
+                ComputeLRWFFreqDamping(
+                TheBeam->interval,
+                TLRErrFreqData[*TLRErrno].Freq,
+                TLRErrFreqData[*TLRErrno].Q,
+                TLRErrFreqData[*TLRErrno].nModes ) ;
+        if (TheBeam->TLRErrFreqDamping[*TLRErrno] == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+        TheBeam->TLRErrFreqxPhase[*TLRErrno] =
+                ComputeLRWFFreqPhase(
+                TheBeam->interval,
+                TLRErrFreqData[*TLRErrno].Freq,
+                0,
+                TLRErrFreqData[*TLRErrno].nModes ) ;
+        if (TheBeam->TLRErrFreqxPhase[*TLRErrno] == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+        TheBeam->TLRErrFreqyPhase[*TLRErrno] =
+                ComputeLRWFFreqPhase(
+                TheBeam->interval,
+                TLRErrFreqData[*TLRErrno].Freq,
+                1,
+                TLRErrFreqData[*TLRErrno].nModes ) ;
+        if (TheBeam->TLRErrFreqyPhase[*TLRErrno] == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+      }
+      stat = PrepareBunchForLRWFFreq( ThisBunch,
+              *TLRErrno, 1,
+              TLRErrFreqData[*TLRErrno].Freq,
+              TLRErrFreqData[*TLRErrno].K,
+              TLRErrFreqData[*TLRErrno].nModes,
+              TLRErrFreqData[*TLRErrno].BinWidth,
+              TheBeam->interval ) ;
+      if (stat==0)
+        goto egress ;
+      else if (stat == -1)
+      {
+        *TLRErrno = -1 ;
+        stat = 1 ;
+      }
+      else if (stat == 1)
+      {
+        *ThisTLRErrFreq = ThisBunch->TLRErrFreq[*TLRErrno] ;
+        *ThisElemTLRErrFreqKick =
+                GetThisElemTLRFreqKick( elemno, bunchno, 1 ) ;
+        if (*ThisElemTLRErrFreqKick == NULL)
+        {
+          stat = 0 ;
+          goto egress ;
+        }
+      }
+    }
+  }
   
-egress:
-  
-	return stat ;
-  
+  egress:
+    
+    return stat ;
+    
 }
 
 /*=====================================================================*/
 
 /* Now the Get and Put functions for LRWF frequency domain kick vectors
- need to see the LRWF kick buffer, so the buffer gets scope above the
- function level */
+ * need to see the LRWF kick buffer, so the buffer gets scope above the
+ * function level */
 
 struct LRWFFreqKick* TLRFreqBuffer    = NULL ;
 struct LRWFFreqKick* TLRErrFreqBuffer = NULL ;
@@ -8535,136 +8646,136 @@ struct LRWFFreqKick* TLRErrFreqBuffer = NULL ;
 /* now the functions that handle them */
 
 /* function to return a LRWF frequency-domain kick vector for the current
- element */
+ * element */
 
-struct LRWFFreqKick* GetThisElemTLRFreqKick( int elemno, int bunchno, 
-                                            int flag     )
+struct LRWFFreqKick* GetThisElemTLRFreqKick( int elemno, int bunchno,
+        int flag     )
 {
-	struct LRWFFreqKick* retval ;
+  struct LRWFFreqKick* retval ;
   
   /* do different things for TLR versus TLR error */
   
-	if (flag==0) /* TLR */
-	{
-		retval = TLRFreqKickDat[elemno] ;
-		if (retval == NULL)
-		{
-			retval = TLRFreqBuffer ;
-			TLRFreqBuffer = NULL ;
-		}
-	}
-	else         /* TLRErr */
-	{
-		retval = TLRErrFreqKickDat[elemno] ;
-		if (retval == NULL)
-		{
-			retval = TLRErrFreqBuffer ;
-			TLRErrFreqBuffer = NULL ;
-		}
-	}
+  if (flag==0) /* TLR */
+  {
+    retval = TLRFreqKickDat[elemno] ;
+    if (retval == NULL)
+    {
+      retval = TLRFreqBuffer ;
+      TLRFreqBuffer = NULL ;
+    }
+  }
+  else         /* TLRErr */
+  {
+    retval = TLRErrFreqKickDat[elemno] ;
+    if (retval == NULL)
+    {
+      retval = TLRErrFreqBuffer ;
+      TLRErrFreqBuffer = NULL ;
+    }
+  }
   
   /* if the buffer still is null, need to allocate something */
   
-	if (retval == NULL)
-	{
-		retval = calloc(1,sizeof(struct LRWFFreqKick)) ;
-		retval->LastBunch = -1 ;
-		if (retval != NULL)
-		{
-			retval->xKick = calloc(maxNmode,sizeof(struct LucretiaComplex)) ;
-			retval->yKick = calloc(maxNmode,sizeof(struct LucretiaComplex)) ;
-			if ( (retval->xKick == NULL) || (retval->yKick == NULL) )
-			{
-				FreeAndNull(&(retval->xKick)) ;
-				FreeAndNull(&(retval->yKick)) ;
-				FreeAndNull(&retval) ;
-			}
-		}
-	}
+  if (retval == NULL)
+  {
+    retval = (struct LRWFFreqKick *)calloc(1,sizeof(struct LRWFFreqKick)) ;
+    retval->LastBunch = -1 ;
+    if (retval != NULL)
+    {
+      retval->xKick = (struct LucretiaComplex*)calloc(maxNmode,sizeof(struct LucretiaComplex)) ;
+      retval->yKick = (struct LucretiaComplex*)calloc(maxNmode,sizeof(struct LucretiaComplex)) ;
+      if ( (retval->xKick == NULL) || (retval->yKick == NULL) )
+      {
+        FreeAndNull((void**)&(retval->xKick)) ;
+        FreeAndNull((void**)&(retval->yKick)) ;
+        FreeAndNull((void**)&retval) ;
+      }
+    }
+  }
   
-	return retval ;
+  return retval ;
   
 }
 
 void PutThisElemTLRFreqKick( struct LRWFFreqKick** ThisKick, int elemno,
-                            int bunchno, int lastbunch, int bunchwise, 
-                            int flag ) 
+        int bunchno, int lastbunch, int bunchwise,
+        int flag )
 {
-	struct LRWFFreqKick* TheKick ;
+  struct LRWFFreqKick* TheKick ;
   
-	TheKick = *ThisKick ;
+  TheKick = *ThisKick ;
   
   /* if there are more bunches coming in this track operation, then we want to
-   save this kick vector on the element backbone.  If there are no more bunches
-   we still want to save it if we are doing bunchwise tracking, since in that
-   case it's likely the next track will also do bunchwise on the same set of
-   elements */
+   * save this kick vector on the element backbone.  If there are no more bunches
+   * we still want to save it if we are doing bunchwise tracking, since in that
+   * case it's likely the next track will also do bunchwise on the same set of
+   * elements */
   
-	if ( (bunchno+1 < lastbunch) || (bunchwise == 1) )
-	{
-		if (flag==0)
-			TLRFreqKickDat[elemno]    = *ThisKick ;
-		else
-			TLRErrFreqKickDat[elemno] = *ThisKick ;
-	}
-	else /* done with elementwise tracking, check this buffer back in.  Note
-        that if we previously did bunchwise tracking, then lots of RF units
-        have a kick vector allocated to them.  The first one we check back
-        in can go "on the hook" of TLRFreqBuffer, but the rest need to be
-        deallocated */
-	{
-		TheKick->LastBunch = -1 ;
-		if (flag==0)
-		{
-			if (TLRFreqBuffer == NULL)
-				TLRFreqBuffer    = *ThisKick ;
-			else
-			{
-				FreeAndNull(&(TheKick->xKick)) ;
-				FreeAndNull(&(TheKick->yKick)) ;
-				FreeAndNull(&TheKick) ;
-			}
-			TLRFreqKickDat[elemno] = NULL ;
-		}
-		else
-		{
-			if (TLRErrFreqBuffer == NULL)
-				TLRErrFreqBuffer = *ThisKick ;
-			else
-			{
-				FreeAndNull(&(TheKick->xKick)) ;
-				FreeAndNull(&(TheKick->yKick)) ;
-				FreeAndNull(&TheKick) ;
-			}
-			TLRErrFreqKickDat[elemno] = NULL ;
-		}
-	}
-	*ThisKick = NULL ;
+  if ( (bunchno+1 < lastbunch) || (bunchwise == 1) )
+  {
+    if (flag==0)
+      TLRFreqKickDat[elemno]    = *ThisKick ;
+    else
+      TLRErrFreqKickDat[elemno] = *ThisKick ;
+  }
+  else /* done with elementwise tracking, check this buffer back in.  Note
+   * that if we previously did bunchwise tracking, then lots of RF units
+   * have a kick vector allocated to them.  The first one we check back
+   * in can go "on the hook" of TLRFreqBuffer, but the rest need to be
+   * deallocated */
+  {
+    TheKick->LastBunch = -1 ;
+    if (flag==0)
+    {
+      if (TLRFreqBuffer == NULL)
+        TLRFreqBuffer    = *ThisKick ;
+      else
+      {
+        FreeAndNull((void**)&(TheKick->xKick)) ;
+        FreeAndNull((void**)&(TheKick->yKick)) ;
+        FreeAndNull((void**)&TheKick) ;
+      }
+      TLRFreqKickDat[elemno] = NULL ;
+    }
+    else
+    {
+      if (TLRErrFreqBuffer == NULL)
+        TLRErrFreqBuffer = *ThisKick ;
+      else
+      {
+        FreeAndNull((void**)&(TheKick->xKick)) ;
+        FreeAndNull((void**)&(TheKick->yKick)) ;
+        FreeAndNull((void**)&TheKick) ;
+      }
+      TLRErrFreqKickDat[elemno] = NULL ;
+    }
+  }
+  *ThisKick = NULL ;
   
-	return ;
+  return ;
   
 }
 
 /* The function to clear the old LRWF kicks also needs to see the
- buffers */
+ * buffers */
 
 void ClearOldLRWFFreqKicks( int flag )
 {
-	int count ;
+  int count ;
   
-	for (count=0 ; count<nElemOld ; count++)
-	{
-		if (flag==0)
-		{
-			FreeAndNull( &(TLRFreqKickDat[count]) ) ;
-			FreeAndNull( &(TLRFreqBuffer) ) ;
-		}
-		else
-		{
-			FreeAndNull( &(TLRErrFreqKickDat[count]) ) ;
-			FreeAndNull( &(TLRFreqBuffer) ) ;
-		}
-	}
+  for (count=0 ; count<nElemOld ; count++)
+  {
+    if (flag==0)
+    {
+      FreeAndNull( (void**)&(TLRFreqKickDat[count]) ) ;
+      FreeAndNull( (void**)&(TLRFreqBuffer) ) ;
+    }
+    else
+    {
+      FreeAndNull( (void**)&(TLRErrFreqKickDat[count]) ) ;
+      FreeAndNull( (void**)&(TLRFreqBuffer) ) ;
+    }
+  }
   
 }
 
@@ -8674,8 +8785,8 @@ void ClearOldLRWFFreqKicks( int flag )
 
 void ComputeTSRKicks( struct SRWF* ThisTSR, double L )
 {
-	int ibin, jbin;
-	double *Kbin ;
+  int ibin, jbin;
+  double *Kbin ;
   
   
   
@@ -8689,9 +8800,9 @@ void ComputeTSRKicks( struct SRWF* ThisTSR, double L )
     {
       Kbin = &(ThisTSR->K[ThisTSR->nbin*ibin+jbin]) ;
       ThisTSR->binVx[jbin] += (*Kbin) *
-      ThisTSR->binx[ibin] ;
+              ThisTSR->binx[ibin] ;
       ThisTSR->binVy[jbin] += (*Kbin) *
-      ThisTSR->biny[ibin] ;
+              ThisTSR->biny[ibin] ;
     }
   for (ibin=0 ; ibin<ThisTSR->nbin ; ibin++)
   {
@@ -8710,13 +8821,13 @@ void ComputeTSRKicks( struct SRWF* ThisTSR, double L )
 /* accumulate ray position into appropriate WF bins */
 
 void AccumulateWFBinPositions( double* binx, double* biny, int binno,
-                              double xpos, double ypos, double Q )
+        double xpos, double ypos, double Q )
 {
   
-	binx[binno] += Q * xpos ;
-	biny[binno] += Q * ypos ;
+  binx[binno] += Q * xpos ;
+  biny[binno] += Q * ypos ;
   
-	return ;
+  return ;
   
 }
 
@@ -8739,27 +8850,31 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   L = GetElemNumericPar(elemNo, "L", NULL) ;
   /* Drift or other downstream of bend element */
   if ( classTag > 1 ) {
+    if (elemNo == 0) return 0; /* Return if first element in deck*/
     *csrSmoothFactor = smoothFactor ;
     angle = 0 ;
-    usL = 0 ;
-    if ( lPointer >= 1000 || *L == 0 )
+    if ( *L == 0 )
       return 0 ;
-    if ( dsL[lPointer] == 0 )
+    while (dsL[lPointer] < *S && dsL[lPointer]!=0 && lPointer<1000 )
+      lPointer++ ;
+    if ( lPointer >= 1000 || dsL[lPointer] == 0 )
       return 0 ;
-    if ( dsL[lPointer] > ( *S + *L ) )
-      return 0 ;
-    
-    lPointer++ ;
-    if ( TFlag[CSR] == 0 ) 
+    lPointer++;
+    if ( TFlag[CSR] == 0 )
       TFlag[CSR] = nhistbins ;
     if ( TFlag[CSR_SmoothFactor] == 0 )
       TFlag[CSR_SmoothFactor] = smoothFactor ;
     *csrSmoothFactor = TFlag[CSR_SmoothFactor] ;
-    *thisS = dsL[lPointer-1] ;
-    if ( dsL[lPointer] >= ( *S + *L ) )
-      return *S + *L - usL ;
-    else
-      return *thisS - usL ;
+    
+    /* if next pointer after element or after CSR consideration point, return bin to end else return dl and l*/
+    if (dsL[lPointer]>(*S+*L) || dsL[lPointer] == 0) {
+      *thisS = *S+*L ;
+      return -((*S+*L)-usL) ; /* return negative distance to u/s bend to show last time to call CSR for this ele*/
+    }
+    else {
+      *thisS = dsL[lPointer-1] ;
+      return *thisS - usL ; /* distance to u/s bend face */
+    }
   }
   /* Otherwise this is a bend */
   
@@ -8797,16 +8912,17 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   }
   
   
-  /* Record Bend dowstrem face location and Angle */
-  usL += *S + *L ;
+  /* Record Bend downstrem face location and Angle */
+  usL = *S + *L ;
+  /*printf("S1: %f L1: %f usL1: %f\n",*S,*L,usL);*/
   ANG = GetElemNumericPar(elemNo, "Angle", NULL) ;
+  R=*L / ( 2 * sin(fabs(*ANG)/2) );
   angle += *ANG ;
   
   /* Calculate downstream splits */
   if ( TFlag[CSR_DriftSplit] > 0 ) {
     rmsDim = GetRMSCoord( ThisBunch, 4 ) ;
-    R=usL/(2.0*sin(angle/2.));
-    lDecay=3.0*pow(24*rmsDim*pow(R,2),1/3);
+    lDecay=3.0*pow(24*rmsDim*pow(fabs(R),2),0.333333333);
     for ( iL=0; iL<1000; iL++ ) {
       if ( iL < TFlag[CSR_DriftSplit]-1 )
         dsL[iL] = usL + pow(10,-3.0+iL*3.0/(TFlag[CSR_DriftSplit]-1)) * lDecay ;
@@ -8819,8 +8935,16 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   else
     dsL[0] = 0 ;
   lPointer = 0 ;
+  /*printf("ldecay: %f S: %f L: %f usL: %f calc: %f\n",lDecay,*S,*L,usL,24*rmsDim*pow(fabs(R),2));
+  printf("dL:");
+  for (iL=0; iL<1000; iL++) {
+    if (dsL[iL]==0) break;
+    printf(" %f",dsL[iL]);
+  }
+  printf("\n");*/
   
   thisS = NULL ;
   
   return (double)trackIter ;
 }
+

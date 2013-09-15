@@ -36,7 +36,7 @@ void AddMessage( const char* NewMessage, int display )
 
 /* Create a new backbone with one additional slot */
 
-	NewMsgList = mxMalloc( (Nmsg+1) * sizeof(char*) ) ;
+	NewMsgList = (char**)mxMalloc( (Nmsg+1) * sizeof(char*) ) ;
 	if (NewMsgList == NULL)
 		mexErrMsgTxt("Unable to allocate status message table!") ;
 
@@ -57,7 +57,7 @@ void AddMessage( const char* NewMessage, int display )
 
 /* add the new message */ 
 
-	NewMsgLcl = mxMalloc( (1+strlen(NewMessage)) * sizeof(char) ) ;
+	NewMsgLcl = (char*)mxMalloc( (1+strlen(NewMessage)) * sizeof(char) ) ;
 	if (NewMsgLcl == NULL)
 		mexErrMsgTxt("Unable to allocate status message table!") ;
 	NewMsgLcl = strcpy( NewMsgLcl, NewMessage ) ;

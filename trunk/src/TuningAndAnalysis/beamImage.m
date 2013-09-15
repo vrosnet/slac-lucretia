@@ -145,6 +145,8 @@ ylabel('dP (%)')
 subplot(224)
 % [v,u]=hist(z(z>337),nbin);
 [v,u]=hist(z,nbin);
+dQ=sum(beam.Bunch.Q(~beam.Bunch.stop))/sum(~beam.Bunch.stop);
+v=1e-3.*v.*(dQ/(((u(2)-u(1))*1e-6)/299792458));
 warning off MATLAB:rankDeficientMatrix
 warning off MATLAB:nearlySingularMatrix
 if (asym)
@@ -161,8 +163,9 @@ set(h2,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
 hold on
 plot(u,xfit,'r-')
 hold off
-title(sprintf('\\sigma_z = %.1f um',abs(sigx)))
+title(sprintf('\\sigma_z = %.1f um I(pk) = %.1f kA',abs(sigx),max(v)))
 xlabel('z (um)')
+ylabel('I (kA)');
 
 ulim=max(abs([xlim,ylim]));
 if (~exist('alim','var'))

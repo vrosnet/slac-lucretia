@@ -15,6 +15,14 @@
 
 #define LUCRETIA_GLOBAL_ACCESS
 
+#ifdef __CUDACC__
+  #include "curand_kernel.h"
+#endif
+
+/* Return the random number seed from the Matlab caller workspace */
+
+void getLucretiaRandSeed( unsigned long long *rseed );
+
 /* define an enumeration type for klystron status */
 
 enum KlystronStatus {ON, STANDBY, TRIPPED, MAKEUP, STANDBYTRIP} ;
@@ -53,7 +61,7 @@ double* GetKlystronNumericPar( int, char*, int* ) ;
 
 /* get a klystron's status */
 
-enum KlystronStatus* GetKlystronStatus( int ) ;
+enum KlystronStatus *GetKlystronStatus( int ) ;
 
 /* how many wakefields of each type */
 
@@ -89,13 +97,21 @@ char** GetAndClearMessages( int* ) ;
 
 /* use Matlab randn function to get a vector of Gaussian-
    distributed random numbers */
-
+#ifdef __CUDACC__
+__device__ double RanGaussVecPtr_gpu( curandState_t *rState ) ;
+__host__ double* RanGaussVecPtr( int ) ;
+#endif
 double* RanGaussVecPtr( int ) ;
 
 /* use Matlab rand function to get a vector of uniform-
-   distributed random numbers */
+   distributed random numbers if host, else use cudaRand library*/
 
+#ifdef __CUDACC__
+__device__ double RanFlatVecPtr_gpu( curandState_t *state) ;
+__host__ double* RanFlatVecPtr( int ) ;
+#else
 double* RanFlatVecPtr( int ) ;
+#endif
 
 /* Use Matlab sort function to get a sortkey for the rays in  
    a bunch, along a given DOF */
@@ -115,9 +131,19 @@ double* SplineSRWF( double*, double*, double*, int, int, int ) ;
 /* Use Matlab's pascal function to get a Pascal matrix for use in
    multipole field expansions */
 
-double* GetPascalMatrix( ) ;
+#ifdef __CUDACC__
+__host__ double* GetFactorial( ) ;
+__host__ double* GetPascalMatrix( ) ;
+__host__ double  GetMaxMultipoleIndex( ) ;
+__host__ double* GetFactorial_gpu( ) ;
+__host__ double* GetPascalMatrix_gpu( ) ;
+__host__ double*  GetMaxMultipoleIndex_gpu( ) ;
+#else
 double* GetFactorial( ) ;
 double  GetMaxMultipoleIndex( ) ;
+double* GetPascalMatrix( ) ;
+#endif
+
 void    ClearMaxMultipoleStuff( ) ;
 void    ComputeNewMultipoleStuff( double ) ;
 
@@ -145,7 +171,12 @@ int GetCollimatorGeometry( int ) ;
 
 /* get log of gamma function */
 
+#ifdef __CUDACC__
+__device__ double GammaLog_gpu( double ) ;
+__host__ double GammaLog( double ) ;
+#else
 double GammaLog( double ) ;
+#endif
 
 /* get cube root of R-matrix determinant */
 

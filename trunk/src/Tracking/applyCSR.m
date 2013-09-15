@@ -1,4 +1,4 @@
-function [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,driftDL)
+function [beam, W, dE, zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,driftDL)
 % [beam W dE zOut]=applyCSR(beam,nbin,smoothVal,itrack,driftL,driftDL)
 %  Calculate CSR wake and change provided momentum profile
 %   - This function is designed to be called from the mex tracking
@@ -35,7 +35,7 @@ else
   splitfrac=1;
   nsplit=1;
 end
-if splitfrac>1; error('Iterating element %d too many times!',itrack); end;
+if splitfrac>1; error('Iterating element %d too many times - Try to fix by issuing command: ''clear applyCSR''',itrack); end;
 lastInd=itrack;
 
 % Find distance from start of bend
@@ -84,29 +84,37 @@ else
   PHI=abs(sum(arrayfun(@(x) BEAMLINE{x}.Angle(1),bendele)));
   L=sum(arrayfun(@(x) BEAMLINE{x}.L,bendele));
   R=L/(2*sin(PHI/2));
-  % --- distance from bend
+  % --- distance from bend from center of section being considered
   if exist('driftL','var')
-    X=driftL/R ;
+    X=(driftL-driftDL/2)/R ;
   else
     X=((BEAMLINE{itrack}.S+BEAMLINE{itrack}.L)-(BEAMLINE{bendele(1)}.S+BEAMLINE{bendele(1)}.L))/R;
   end
   lDecay=3*(24*std(beam(5,:))*R^2)^(1/3);
+%   fprintf('iele: %d driftL: %g driftDL: %g\n',itrack,driftL-driftDL/2,driftDL)
   if X*R > lDecay; return; end;
+  % get bins and smoothing parameter from upstream bend element
+  if isfield(BEAMLINE{bendele(1)},'TrackFlag') && isfield(BEAMLINE{bendele(1)}.TrackFlag,'CSR_SmoothFactor')
+    smoothVal=BEAMLINE{bendele(1)}.TrackFlag.CSR_SmoothFactor;
+  end
+  if isfield(BEAMLINE{bendele(1)},'TrackFlag') && isfield(BEAMLINE{bendele(1)}.TrackFlag,'CSR')
+    nbin=BEAMLINE{bendele(1)}.TrackFlag.CSR;
+  end
 end
 
 % Generate longitudinal grid, only when beam length changes by
 % more than 10%
-if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1
+% if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1
   zmin=min(-beam(5,:));
   zmax=max(-beam(5,:));
   if zmin==zmax
     error('Need some spread in z-distribution of bunch to compute CSR!')
   end
   z=linspace(zmin,zmax,nbin);
-  [count,bininds] = histc(-beam(5,:),z);
-  [Z ZSP]=meshgrid(z,z);
-  lastsz=std(beam(5,:));
-end
+  [~,bininds] = histc(-beam(5,:),z);
+  [Z, ZSP]=meshgrid(z,z);
+%   lastsz=std(beam(5,:));
+% end
 
 % Bin beam particle longitudinal direction
 q = accumarray(bininds',beamQ')';
@@ -131,8 +139,8 @@ if strcmp(BEAMLINE{itrack}.Class,'SBEN')
   end
   IND1=abs(Z-(ZSP-(R*PHI^3)/6));
   IND2=abs(Z-(ZSP-(R*PHI^3)/24));
-  [Y I1]=min(IND1,[],2);
-  [Y I2]=min(IND2,[],2);
+  [~, I1]=min(IND1,[],2);
+  [~, I2]=min(IND2,[],2);
   W=-(4/(R*PHI)).*q(I1)' + (4/(R*PHI)).*q(I2)' + (2/((3*R^2)^(1/3))).*ZINT;
   dE=(W'.*Q.*(BEAMLINE{itrack}.L./nsplit))./(1e9*qe); % GeV
 else % DRIFT or other element following bend
@@ -157,9 +165,9 @@ else % DRIFT or other element following bend
     ZINT(is)=sum((1./(psi(isp)+2.*X)).*dq(isp).*bw);
   end
   IND1=abs(Z-(ZSP-(R/6)*PHI^2*(PHI+3*X)));
-  [Y I]=min(IND1,[],2);
+  [~, I]=min(IND1,[],2);
   IND2=abs(Z-(ZSP-dsmax));
-  [Y I1]=min(IND2,[],2);
+  [~, I1]=min(IND2,[],2);
   W = (4/R)*( (q(I1)'./(PHI+2*X)) + ZINT ) - (4/R)*(1/(PHI+2*X)).*q(I)' ;
   if exist('driftDL','var')
     dE=(W'.*Q.*driftDL)./(1e9*qe); % GeV

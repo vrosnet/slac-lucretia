@@ -584,6 +584,9 @@ classdef Track < handle
       [stat, beamout, instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
     end
     function data=procBeamData(beam,dims)
+%       data.qloss=sum(beam.Bunch.Q(:,beam.Bunch.stop>0));
+%       beam.Bunch.x=beam.Bunch.x(:,~beam.Bunch.stop);
+%       beam.Bunch.Q=beam.Bunch.Q(:,~beam.Bunch.stop);
       gamma=mean(beam.Bunch.x(6,:))/0.511e-3;
       if any(ismember(dims,'x'))
         [fitTerm,fitCoef,bsize_corrected,bsize] = beamTerms(1,beam);
