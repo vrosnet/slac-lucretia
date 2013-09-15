@@ -1,4 +1,4 @@
-function [sigx,sigy,rmsx,rmsy]=beamImage(beam,nsig,E0,alim)
+function [sigx,sigy,rmsx,rmsy,pkI]=beamImage(beam,nsig,E0,alim)
 % [sigx,sigy,rmsx,rmsy]=beamImage(beam,nsig [,E0,alim])
 %
 % Graphical plot of Lucretia beam in transverse plane including gaussian fits
@@ -8,6 +8,8 @@ function [sigx,sigy,rmsx,rmsy]=beamImage(beam,nsig,E0,alim)
 % alim (optional) = force axis limits
 %
 % ===========================================
+% GW, Sept 15, 2013
+%   - add longitudinal and options
 % MDW, Oct 10 2012
 
 id=find(beam.Bunch.stop==0);
@@ -164,6 +166,7 @@ hold on
 plot(u,xfit,'r-')
 hold off
 title(sprintf('\\sigma_z = %.1f um I(pk) = %.1f kA',abs(sigx),max(v)))
+pkI=max(v);
 xlabel('z (um)')
 ylabel('I (kA)');
 
