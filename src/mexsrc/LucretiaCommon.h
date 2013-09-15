@@ -42,6 +42,8 @@
 #define COLL_RECTANGLE 1
 #define COLL_UNKNOWN   2
 
+void AddMessage( const char*, int ) ;
+
 /* data structure definitions: */
 
 /* definition of a data structure for initial Twiss parameters */
@@ -181,7 +183,7 @@ struct Bunch {
 	int ngoodray ;              /* number unstopped rays in bunch */
 	int StillTracking ;         /* are we still tracking the bunch? */
 	double* x ;                 /* pointer to coords  */
-#ifdef __CUDA_ARCH__  
+#ifdef __CUDACC__  
 	double* x_gpu ;             /* pointer to coords memory in GPU memory*/
   double* y ;                 /* second coordinate pointer in GPU memory*/
   double* Q_gpu ;                 /* pointer to charge vector */
@@ -328,9 +330,9 @@ void TrackThruMain( struct TrackArgsStruc* ) ;
 
 /* tracking a bunch through various elements */
 int TrackBunchThruDrift( int, int, struct TrackArgsStruc*, int*, double ) ;
-int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int, double, double ) ;
-int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int*, double, double ) ;
-int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, int ) ;
+int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int, double, double, unsigned long long* ) ;
+int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int*, double, double, unsigned long long* ) ;
+int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, int, unsigned long long* ) ;
 int TrackBunchThruRF( int, int, struct TrackArgsStruc*, int*, int ) ;
 int TrackBunchThruBPM( int, int, struct TrackArgsStruc*, int*, double ) ;
 int TrackBunchThruInst( int, int, struct TrackArgsStruc*, int*, double ) ;
@@ -350,21 +352,34 @@ int GetTotalOffsetXfrms( double*, double*,
 								 double[6][2] ) ;
 
 /* apply complete offsets (upstream and downstream) for an element */
-
+#ifdef __CUDACC__
+__host__ __device__ void ApplyTotalXfrm( double[6][2], int, int*, double, double *x, double *px, double *y, double *py, double *z, double *p0 ) ;
+#else
 void ApplyTotalXfrm( double[6][2], int, int*, double, double *x, double *px, double *y, double *py, double *z, double *p0 ) ;
+#endif
 
 /* check whether a particle needs to stop on aperture */
-
+#ifdef __CUDACC__
+__host__ __device__ int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray, int, double*, int, int,
+					   int*, double, int* ) ;
+#else
 int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray, int, double*, int, int,
-					   int*, double ) ;
+					   int*, double, int* ) ;
+#endif
 
 /* check whether a particle needs to stop for P0 <= 0 */
-
-int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int, int, double, int ) ;
+#ifdef __CUDACC__
+__host__ __device__ int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int, int, double, int, int* ) ;
+#else
+int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int, int, double, int, int* ) ;
+#endif
 
 /* check whether a particle needs to stop for |Pperp| >= 1 */
-
-int CheckPperpStopPart( double*, int*, int, int, double*, double* ) ;
+#ifdef __CUDACC__
+__host__ __device__ int CheckPperpStopPart( double*, int*, int, int, double*, double*, int* ) ;
+#else
+int CheckPperpStopPart( double*, int*, int, int, double*, double*, int* ) ;
+#endif
 
 /* initialization for BPM/INST operations */
 
@@ -454,16 +469,22 @@ double GetSpecialSBendPar(struct LucretiaParameter*, int) ;
 double GetDesignLorentzDelay( double* ) ;
 
 /* exchange x and y coord vectors in a bunch */
-
+#ifdef __CUDACC__
+__host__ void XYExchange( double**, double**, int ) ;
+#else
 void XYExchange( double**, double**, int ) ;
+#endif
 
 /* perform initial check of total and transverse momenta */
 
 int InitialMomentumCheck( struct TrackArgsStruc* ) ;
 
 /* point local coords at desired entry in a data vector */
-
+#ifdef __CUDACC__
+__host__ __device__ void GetLocalCoordPtrs( double[], int, double**, double**, double**, double**, double**, double** ) ;
+#else
 void GetLocalCoordPtrs( double[], int, double**, double**, double**, double**, double**, double** ) ;
+#endif
 
 /* do additional consistency checking of girder mover parameters */
 
@@ -547,34 +568,36 @@ double GetCsrTrackFlags( int, int*, int*, int, struct Bunch*, double* ) ;
 /* GPU specific functions and tracking kernels         */
 /* =================================================== */
 
-#ifdef __CUDA_ARCH__
+#ifdef __CUDACC__
 /* Memory copy routines GPU <-> CPU */
 void XCPU2GPU( struct TrackArgsStruc* ) ;
 void XGPU2CPU( struct TrackArgsStruc* ) ;
 #endif
 
 /* Tracking kernels */
-#ifdef __CUDA_ARCH__
+#ifdef __CUDACC__
 __global__ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 __global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod) ;
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod,
+        int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed) ;
 __global__ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, double L, double MultBValue, double MultTiltValue, double MultPoleIndex, int MultPoleIndexLength,
-        double MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale) ;
+        int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
+        double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale,
+        int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed) ;
 __global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2) ;
+        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed) ;
 #else
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,
-        double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod) ;
+        double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod, int* stp) ;
 void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray, int elemno, double aper2,
         double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength, double* MultAngleValue,
-        double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale) ;
+        double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp) ;
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2) ;
+        double H2, double hgapx, double fintx, double hgapx2, int* stp) ;
 #endif
 

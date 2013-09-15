@@ -6,12 +6,9 @@
 
 /* standard words commonly used: */
 
-	char* KLYSStr = "KLYSTRON" ;
 	char* KlysStr = "Klystron" ;
 	char* PSStr = "PS" ;
-	char* GIRDERStr = "GIRDER" ;
 	char* GirderStr = "Girder" ;
-	char* BEAMLINEStr = "BEAMLINE" ;
 	char* ElemStr = "Element" ;
 	char* ErrStr = "Error" ;
 	char* WarnStr = "Warning" ;
@@ -22,7 +19,6 @@
 	char* TLRErrStr = "WF.TLRErr" ;
 
 	char* Keywd ;
-	char* KEYWD ;
 	char* parname ;
 
 /* standard messages */

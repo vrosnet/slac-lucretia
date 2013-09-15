@@ -7,6 +7,9 @@
   #include "LucretiaCommon.h"
 #endif
 #define LUCRETIA_PHYSICS
+#ifdef __CUDACC__
+  #include "curand_kernel.h"
+#endif
 
 /* define some constants */
 
@@ -37,21 +40,32 @@
 char* LucretiaPhysicsVersion( ) ;
 
 /* return the R matrix of a drift space */
-
+#ifdef __CUDACC__
+__host__ __device__ void GetDriftMap( double, Rmat ) ;
+#else
 void GetDriftMap( double, Rmat ) ;
+#endif
 
 /* return the R matrix and T5xx terms of a quad */
-
+#ifdef __CUDACC__
+__host__ __device__ void GetQuadMap( double, double, double, double, Rmat, double[] ) ;
+#else
 void GetQuadMap( double, double, double, double, Rmat, double[] ) ;
+#endif
 
 /* return the R matrix and T5xx terms of a solenoid */
-
+#ifdef __CUDACC__
+__host__ __device__ void GetSolenoidMap( double, double, double, Rmat, double[] ) ;
+#else
 void GetSolenoidMap( double, double, double, Rmat, double[] ) ;
+#endif
 
 /* return the T matrix terms for a sextupole */
-
-void GetSextMap( double, double, double, double, 
-			 double[4][10] ) ;
+#ifdef __CUDACC__
+__host__ __device__ void GetSextMap( double, double, double, double, double[4][10] ) ;
+#else
+void GetSextMap( double, double, double, double, double[4][10] ) ;
+#endif
 
 /* return the R matrix for an RF structure */
 
@@ -60,10 +74,18 @@ void GetLcavMap( double, double, double, double, double,
 
 /* propagate the transverse coordinates of a ray thru a thin-lens
    multipole */
-
+#ifdef __CUDACC__
+__device__ void PropagateRayThruMult_gpu( double, double*, double*, double*, int, double*,
+						   double, double, double*, double*, int, int, double,
+							double*, int*, double*, double*, int, int, double, double*, double*, double*, curandState_t *rState ) ;
+__host__ void PropagateRayThruMult( double, double*, double*, double*, int, double*,
+						   double, double, double*, double*, int, int, double,
+							double*, int*, double*, double*, int, int, double ) ;
+#else
 void PropagateRayThruMult( double, double*, double*, double*, int, double*,
 						   double, double, double*, double*, int, int, double,
 							double*, int*, double*, double*, int, int, double ) ;
+#endif
 
 /* emulation of the MAD transport map for a sector bend */
 
@@ -72,16 +94,26 @@ void GetMADSBendMap( double, double, double, double,
 							double[10], int ) ;
 
 /* transfer map for a sector bend, Lucretia native form: */
-
+#ifdef __CUDACC__
+__host__ __device__ void GetLucretiaSBendMap( double , double, double, double,
+						  double, Rmat, double[10] ) ;
+#else
 void GetLucretiaSBendMap( double , double, double, double,
 						  double, Rmat, double[10] ) ;
+#endif
 
 /* return the R matrix for a sector bend fringe field */
-
+#ifdef __CUDACC__
+__host__ __device__ void GetBendFringeMap( double, double, double, 
+					   double, double, double, 
+					   double, double, double, 
+					   Rmat, double[10] ) ;
+#else
 void GetBendFringeMap( double, double, double, 
 					   double, double, double, 
 					   double, double, double, 
 					   Rmat, double[10] ) ;
+#endif
 
 /* perform a rotation of an R-matrix through an xy angle */
 
@@ -124,26 +156,45 @@ struct LucretiaComplex ComplexProduct( struct LucretiaComplex,
 												   struct LucretiaComplex ) ;
 
 /* synchrotron radiation parameters */
-
-void CalculateSRPars( double, double, double, 
-							 double*, double*, double*, double* ) ;
+#ifdef __CUDACC__
+__host__ __device__ void CalculateSRPars( double, double, double, double*, double*, double*, double* ) ;
+#else
+void CalculateSRPars( double, double, double, double*, double*, double*, double* ) ;
+#endif
 
 /* Poisson-distributed random numbers */
-
+#ifdef __CUDACC__
+__host__ int poidev( double ) ;
+__device__ int poidev_gpu( double, curandState_t *rState ) ;
+#else
 int poidev( double ) ;
+#endif
 
 /* SR photon distribution via Wolski's method */
-
+#ifdef __CUDACC__
+__device__ double SRSpectrumAW_gpu( curandState_t *rState ) ;
+__host__ double SRSpectrumAW( ) ;
+#else
 double SRSpectrumAW( ) ;
+#endif
 
 /* SR photon distribution via Burkhardt's method */
-
+#ifdef __CUDACC__
+__device__ double SRSpectrumHB_gpu( curandState_t *rState ) ;
+__host__ double SRSpectrumHB( ) ;
+__host__ __device__ double SynRadC( double ) ;
+#else
 double SRSpectrumHB( ) ;
 double SynRadC( double ) ;
+#endif
 
 /* master SR loss function */
-
-double ComputeSRMomentumLoss( double, double, double, int ) ;
+#ifdef __CUDACC__
+  __device__ double ComputeSRMomentumLoss_gpu( double, double, double, int, curandState_t *rState ) ;
+  __host__ double ComputeSRMomentumLoss( double, double, double, int ) ;
+#else
+  double ComputeSRMomentumLoss( double, double, double, int ) ;
+#endif
 
 /* transfer map for a coordinate-change element */
 
