@@ -313,7 +313,7 @@ C
       I2=IPARM2;
       WRITE(*,*),MAXPAR,IPARM2, MAXPOS
       ELEMENTS = mxCreateStructMatrix( IELEM1, 1, 5, ELEMFIELDS )
-      PARAMS = mxCreateStructMatrix( MAXPAR-IPARM2+1, 1, 2, PARFIELDS )
+      PARAMS=mxCreateStructMatrix( MAXPAR-IPARM2+1, 1, 2, PARFIELDS )
       USEDLINE = mxCreateStructMatrix( MAXPOS, 1, 2, LINEFIELDS )
 	BEAMBETA0 = mxCreateStructMatrix( 1, 1, 2, 
      &                BEAMBETA0FIELDS )
@@ -420,8 +420,8 @@ C
           pMATLAB = mxCreateCellMatrix(NUM_LWAKE,1)
           DO LOOP_COUNT = 1,NUM_LWAKE
 
-	        pWAKEFILE = mxCreateString(
-     &           ARR_TO_STR(LWAKE_FILE(LOOP_COUNT).FNAM_PTR) )
+      pWAKEFILE=
+     & mxCreateString(ARR_TO_STR(LWAKE_FILE(LOOP_COUNT)%FNAM_PTR))
 	        CALL mxSetCell( pMATLAB, LOOP_COUNT, pWAKEFILE )
 	    
 	    ENDDO
@@ -432,7 +432,7 @@ C
           DO LOOP_COUNT = 1,NUM_TWAKE
 
 	        pWAKEFILE = mxCreateString(
-     &           ARR_TO_STR(TWAKE_FILE(LOOP_COUNT).FNAM_PTR) )
+     &           ARR_TO_STR(TWAKE_FILE(LOOP_COUNT)%FNAM_PTR) )
 	        CALL mxSetCell( pMATLAB, LOOP_COUNT, pWAKEFILE )
 	    
 	    ENDDO

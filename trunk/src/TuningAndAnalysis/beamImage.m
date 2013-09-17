@@ -158,7 +158,7 @@ else
 end
 warning on MATLAB:rankDeficientMatrix
 warning on MATLAB:nearlySingularMatrix
-sigx=q(4);
+sigz=q(4);
 h2=bar(u,v);
 xlim=get(gca,'XLim');
 set(h2,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
@@ -176,9 +176,9 @@ if (~exist('alim','var'))
 end
 % subplot(221),set(gca,'YLim',[-alim,alim]),axis square
 % subplot(224),set(gca,'XLim',[-alim,alim]),axis square
-
 subplot(222)
 id=intersect(idz,iddp);
+rmsz=std(z(id));
 beamprof=hist2(z(id),dp(id), ...
   linspace(xlim(1),xlim(2),npix),linspace(ylim(1),ylim(2),npix));
 imagesc(xlim,ylim,beamprof)
