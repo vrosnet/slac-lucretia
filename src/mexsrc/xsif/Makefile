@@ -10,7 +10,8 @@
 # 	* Type "make realclean" to start fresh
 #	* Edit FORCOMP variable to point at you system Matlab mex binary
 #	* Edit MEXEXT to correspond to the correct mex file extension
-#	  for your architecture ("mexglx" for 32-bit, "mexa64" for 64-bit)
+#	  for your architecture ("mexglx" for 32-bit linux, "mexa64" for 64-bit linux, "mexmaci64" for OSX)
+#       * "make install" to move built files to respective Lucretia directories
 # MOD:
 #     GW, 05Aug2011:
 #		Setup to build mex files
@@ -63,26 +64,31 @@
 # assuming gnu make
 # OSTYPE should be defined as environment variable or argument to make
 
-  MEXEXT = mexa64
-  OSSUF = _linux
-  FORCOMP =  /var/MATLAB/R2011a/bin/mex
+  MEXEXT = mexmaci64
+  OSSUF = _maci64
+  FORCOMP =  /Applications/MATLAB_R2013b.app/bin/mex
+#  FORCOMP =  gfortran
   MODSUF = .mod
   CFLG = -c
 
  LCLPATH = .
  XSIFLIBS = libxsif$(OSSUF).a
 #
-XSIFParse.$(MEXEXT): libxsif$(OSSUF).a XSIFParse.f GetXSIFDictionary.$(MEXEXT)
-	$(FORCOMP) XSIFParse.f -I. -L. -lxsif$(OSSUF)
+XSIFParse.$(MEXEXT): libxsif$(OSSUF).a XSIFParse.F GetXSIFDictionary.$(MEXEXT)
+	$(FORCOMP) XSIFParse.F -I. -L. -lxsif$(OSSUF)
 
-GetXSIFDictionary.$(MEXEXT): libxsif$(OSSUF).a GetXSIFDictionary.f
-	$(FORCOMP) GetXSIFDictionary.f -I. -L. -lxsif$(OSSUF)
+GetXSIFDictionary.$(MEXEXT): libxsif$(OSSUF).a GetXSIFDictionary.F
+	$(FORCOMP) GetXSIFDictionary.F -I. -L. -lxsif$(OSSUF)
 
-libxsif$(OSSUF).a(%.o):	%.f
+install:: GetXSIFDictionary.$(MEXEXT) XSIFParse.$(MEXEXT)
+	mv GetXSIFDictionary.$(MEXEXT) ../../LatticeGeneration/
+	mv XSIFParse.$(MEXEXT) ../../LatticeGeneration/
+
+libxsif$(OSSUF).a(%.o): %.F
 	$(FORCOMP) $(CFLG) $<
 	ar ru $@ $%
 	ranlib $@
-	rm -f $%	
+	rm -f $%     
 
 # dimad_* is used in others
 
