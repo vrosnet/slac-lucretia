@@ -1084,9 +1084,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   int NewStopped = 0 ;
   int iter, csrSmoothFactor=0 ;
   double trackIter ;
-  double lastS, thisS, *sp, *lp;
+  double lastS, thisS, *sp;
   unsigned long long *rSeed=NULL ;
   
+  /* Make a GPU copy of the TrackFlags integer array */
+#ifdef __CUDACC__
+  int* TFlag_gpu ;
+  cudaMalloc(&TFlag_gpu, sizeof(int)*(NUM_TRACK_FLAGS+1));
+#endif
+
   /* initialize the pointers to freq-domain wakefield data */
   TLRFreqData    = NULL ;
   TLRErrFreqData = NULL ;
@@ -1311,7 +1317,10 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           BadTrackFlagMessage( (*ElemLoop)+1 ) ;
           goto egress ;
         }
-        
+	/* Copy TFlag over to GPU */
+#ifdef __CUDACC__
+	cudaMemcpy(TFlag_gpu, TFlag, sizeof(int)*NUM_TRACK_FLAGS, cudaMemcpyHostToDevice) ;
+#endif        
         
         /* get the element class string */
         
@@ -1884,12 +1893,16 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
       else /* default = drift */
       {
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lp = GetElemNumericPar( *ElemLoop, "L", NULL ) ;
+        /*lp = GetElemNumericPar( *ElemLoop, "L", NULL ) ;*/
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
+#ifdef __CUDACC__
+	    TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS ) ;
+#else
             TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
+#endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1911,7 +1924,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
+#ifdef __CUDACC__
+          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0 ) ;
+#else
+	  TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
+#endif
+	  if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -2001,6 +2022,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 #ifdef __CUDACC__
     free(rSeed);
     cudaFreeHost(StoppedParticles) ;
+    cudaFree(TFlag_gpu) ;
 #endif
     
     return ;
@@ -2067,7 +2089,13 @@ int TrackBunchThruDrift( int elemno, int bunchno,
 #ifdef __CUDACC__
   int threadsPerBlock = 256 ; // Max = 1024
   int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
-  TrackBunchThruDrift_kernel<<<blocksPerGrid, threadsPerBlock>>>(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop_gpu, TrackFlag, ThisBunch->nray);
+  double* Lfull_gpu ;
+  double* dZmod_gpu ;
+  cudaMalloc(&Lfull_gpu, sizeof(double)) ; cudaMalloc(&dZmod_gpu, sizeof(double)) ;
+  cudaMemcpy(Lfull_gpu, &Lfull, sizeof(double), cudaMemcpyHostToDevice) ;
+  cudaMemcpy(dZmod_gpu, &dZmod, sizeof(double), cudaMemcpyHostToDevice) ;
+  TrackBunchThruDrift_kernel<<<blocksPerGrid, threadsPerBlock>>>(Lfull_gpu, dZmod_gpu, ThisBunch->y, ThisBunch->stop_gpu, TrackFlag, ThisBunch->nray);
+  cudaFree(Lfull_gpu); cudaFree(dZmod_gpu);
 #else
   for ( rayloop=0 ; rayloop<ThisBunch->nray ; rayloop++ )
     TrackBunchThruDrift_kernel(&Lfull, &dZmod, ThisBunch->y, ThisBunch->stop, TrackFlag, rayloop);
@@ -2090,7 +2118,7 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
 #else
   i = N;
 #endif
-  
+
   /* if the bunch was previously stopped on an aperture, loop */
   if (stop[i] != 0.) return ;
   
@@ -2100,9 +2128,7 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
   if (TrackFlag[ZMotion] == 1)
     dZdL += 0.5*(yb[6*i+1] * yb[6*i+1] +
             yb[6*i+3] * yb[6*i+3]   ) ;
-  
   /* otherwise put in the change in x, y, z positions */
-  
   yb[6*i]   += yb[6*i+1] * *Lfull ;
   yb[6*i+2] += yb[6*i+3] * *Lfull ;
   yb[6*i+4] += *Lfull * dZdL ;
@@ -5117,7 +5143,7 @@ void RmatProduct( Rmat Rlate, Rmat Rearly, Rmat Rprod )
 /* RET:    a vector of ints with the values of the flags.  Note that
  * the last of the flags returned is a status, which indicates
  * whether subsidiary procedure GetTrackFlagGlobals executed
- * successfully.  Alson indicates which flags are set, and how
+ * successfully.  Also indicates which flags are set, and how
  * many times, via the global TrackFlagSet vector.
  * /* ABORT:  never.
  * /* FAIL:   never. */

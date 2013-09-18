@@ -21,9 +21,9 @@
 #===================================================================
 
 # Link to matlab installation directory
- MATPATH = /Applications/MATLAB_R2013b.app
+ MATPATH = /var/MATLAB/R2013a
 # Name of mex file extension for this architecture (mexglx or mexa64 or mexmaci64)
- MEXEXT = mexmaci64
+ MEXEXT = mexa64
 
  MCOMP = $(MATPATH)/bin/mex
  CCOMP = $(MATPATH)/bin/mex -c
@@ -38,12 +38,13 @@ cpu : cpu_init GetRmats.$(MEXEXT) GetTwiss.$(MEXEXT) RmatAtoB.$(MEXEXT) TrackThr
 
 gpu : gpu_init TrackThru_gpu.$(MEXEXT)
 
-release::
+install::
 	-mv GetRmats.$(MEXEXT) ../RMatrix
 	-mv GetTwiss.$(MEXEXT) ../Twiss
 	-mv RmatAtoB.$(MEXEXT) ../RMatrix
 	-mv TrackThru.$(MEXEXT) ../Tracking
 	-mv VerifyLattice.$(MEXEXT) ../LatticeVerification
+	-mv TrackThru_gpu.$(MEXEXT) ../Tracking
 
 cpu_init::
 	-cp mexopts_gcc.sh mexopts.sh
@@ -96,7 +97,7 @@ $(LMAIN)(LucretiaCommon.o) : \
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaCommon.c
 	ar -ru $(LMAIN) LucretiaCommon.o
 	rm LucretiaCommon.o
-	
+
 
 $(LMAIN)(LucretiaPhysics.o) : \
    LucretiaPhysics.c LucretiaCommon.h LucretiaPhysics.h \
@@ -104,7 +105,7 @@ $(LMAIN)(LucretiaPhysics.o) : \
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaPhysics.c
 	ar -ru $(LMAIN) LucretiaPhysics.o
 	rm LucretiaPhysics.o
-	
+
 
 $(LMATL)(LucretiaMatlab.o) : \
    LucretiaMatlab.c LucretiaGlobalAccess.h LucretiaMatlab.h \
@@ -112,14 +113,14 @@ $(LMATL)(LucretiaMatlab.o) : \
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlab.c
 	ar -ru $(LMATL) LucretiaMatlab.o
 	rm LucretiaMatlab.o
-	
+
 
 $(LMATL)(LucretiaMatlabErrMsg.o) : \
    LucretiaMatlabErrMsg.c LucretiaGlobalAccess.h
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlabErrMsg.c
 	ar -ru $(LMATL) LucretiaMatlabErrMsg.o
 	rm LucretiaMatlabErrMsg.o
-	
+
 
 # GPU object file dependencies:
 
@@ -133,7 +134,7 @@ LucretiaCommon_gpu.o : \
 	sed -i 's/void TrackBunchThruMult_kernel/__global__ void TrackBunchThruMult_kernel/g' LucretiaCommon_gpu.cu
 	sed -i 's/void TrackBunchThruSBend_kernel/__global__ void TrackBunchThruSBend_kernel/g' LucretiaCommon_gpu.cu
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) LucretiaCommon_gpu.cu
-	
+
 
 LucretiaPhysics_gpu.o : \
    LucretiaPhysics.c LucretiaCommon.h LucretiaPhysics.h \
@@ -146,17 +147,17 @@ LucretiaMatlab_gpu.o : \
    LucretiaVersionProto.h
 	-cp LucretiaMatlab.c LucretiaMatlab_gpu.cu
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlab_gpu.cu
-	
+
 
 LucretiaMatlabErrMsg_gpu.o : \
    LucretiaMatlabErrMsg.c LucretiaGlobalAccess.h
 	-cp LucretiaMatlabErrMsg.c LucretiaMatlabErrMsg_gpu.cu
 	$(CCOMP) $(CFLAGS) $(COPTIMFLAGS) -I$(MATPATH)/extern/include LucretiaMatlabErrMsg_gpu.cu
-	
+
 
 TrackThru_gpu.o : TrackThru_gpu.cu
 	$(NVCC) -c  -I$(MATPATH)/extern/include -I$(MATPATH)/simulink/include -DMATLAB_MEX_FILE --relocatable-device-code=true -gencode=arch=compute_20,code=sm_20 -I$(MATPATH)/toolbox/distcomp/gpu/extern/include --compiler-options=-ansi,-D_GNU_SOURCE,-fPIC,-fno-omit-frame-pointer,-pthread  -DLUCRETIA_DPREC -DMX_COMPAT_32 -O $(CFLAGS)  "TrackThru_gpu.cu"
-	
+
 
 TrackThru_gpu.cu : \
    TrackThru.c
