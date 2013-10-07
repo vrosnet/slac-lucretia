@@ -19,6 +19,13 @@
   #include "curand_kernel.h"
 #endif
 
+/* Floating point precision to use everywhere */
+#ifdef LUCRETIA_DPREC
+  #define FPREC double
+#else
+  #define FPREC float
+#endif
+
 /* Return the random number seed from the Matlab caller workspace */
 
 void getLucretiaRandSeed( unsigned long long *rseed );

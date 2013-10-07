@@ -128,10 +128,18 @@
  * with an improperly-handled return status (==2) in the calling
  * routine (GetTotalOffsetXfrms).
  */
+/* --- CUDA STUFF --- */
 #ifdef __CUDACC__
-#include "curand_kernel.h"
-#include "gpu/mxGPUArray.h"
+  #include <curand_kernel.h>
+  #include <cuda.h>
+  #include <curand.h>
+  #include "gpu/mxGPUArray.h"
+  #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
+    printf("Error at %s:%d\n",__FILE__,__LINE__); \
+    return EXIT_FAILURE;}} while(0)
+  #define threadsPerBlock 256
 #endif
+/* --- */
 #include "LucretiaCommon.h"       /* data & prototypes for this file */
 #include "LucretiaDictionary.h"   /* dictionary data */
 #include "LucretiaPhysics.h"      /* data & prototypes for physics module */
@@ -142,7 +150,15 @@
 #include <math.h>
 #include <stdio.h>
 
+
+
 /* File-scoped variables: */
+#ifdef __CUDACC__
+/* rng CUDA variables */
+unsigned long long *rSeed = NULL ; /* rng seed sourced from Matlab workspace */
+curandState *rngStates = NULL ; /* device generated random number state */
+int blocksPerGrid = threadsPerBlock ; /* number of blocks per CUDA grid */
+#endif
 
 char LucretiaCommonVers[] = "LucretiaCommon Version = 02-August-2007" ;
 Rmat Identity ={
@@ -1082,15 +1098,32 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   int TrackStatus ;     /* status returned from functions */
   int GlobalStatus = 1; /* overall status of this function */
   int NewStopped = 0 ;
-  int iter, csrSmoothFactor=0 ;
+  int iter, csrSmoothFactor=0, maxpart=0, ib ;
   double trackIter ;
   double lastS, thisS, *sp;
-  unsigned long long *rSeed=NULL ;
-  
-  /* Make a GPU copy of the TrackFlags integer array */
+
 #ifdef __CUDACC__
+  /* Get random number seed from Matlab workspace */  
+  rSeed = (unsigned long long*) calloc(1,sizeof(unsigned long long)) ;
+  getLucretiaRandSeed(rSeed) ; 
+
+  /* Get Max particles in any bunch of the beam */
+  for (ib=0; ib<TrackArgs->TheBeam->nBunch; ib++) {
+    if (TrackArgs->TheBeam->bunches[ib]->nray>maxpart)
+      maxpart=TrackArgs->TheBeam->bunches[ib]->nray;
+  }
+
+  /* Define blocks per grid for CUDA computations */
+  blocksPerGrid = (maxpart + threadsPerBlock - 1) / threadsPerBlock;
+
+  /* Make a GPU copy of the TrackFlags integer array */
   int* TFlag_gpu ;
   cudaMalloc(&TFlag_gpu, sizeof(int)*(NUM_TRACK_FLAGS+1));
+
+  /* CUDA rng states*/
+  cudaMalloc((void **)&rngStates, blocksPerGrid * threadsPerBlock * 
+                  sizeof(curandState));
+  rngSetup_kernel<<<blocksPerGrid, threadsPerBlock>>>(rngStates, *rSeed); /* make rng states for each thread*/
 #endif
 
   /* initialize the pointers to freq-domain wakefield data */
@@ -1100,10 +1133,6 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   /* initialize StoppedParticles to the "none stopped" state */
   StoppedParticles = (int*) calloc(1,sizeof(int)) ;
   *StoppedParticles = 0 ;
-  
-  /* Get random number seed from Matlab workspace */
-  rSeed = (unsigned long long*) calloc(1,sizeof(unsigned long long)) ;
-  getLucretiaRandSeed(rSeed) ;
   
   /* Map StoppedParticles int onto both host and device memory for CUDA*/
 #ifdef __CUDACC__
@@ -1344,7 +1373,11 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, thisS-lastS, lastS, rSeed ) ;
+#ifdef __CUDACC__
+	    TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
+#else
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
+#endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1365,7 +1398,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, 0, 0, rSeed ) ;
+#ifdef __CUDACC__
+	  TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, 0, 0, TFlag[Aper] ) ;
+#else
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, 0, 0, TFlag[Aper] ) ;
+#endif
+	  if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -1386,7 +1427,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS, rSeed ) ;
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
 #ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -1403,7 +1444,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0, rSeed ) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0, TFlag[Aper] ) ;
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -1420,7 +1461,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, thisS-lastS, lastS, rSeed ) ;
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1441,7 +1482,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0, rSeed ) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0, TFlag[Aper] ) ;
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -1458,7 +1499,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, thisS-lastS, lastS, rSeed ) ;
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1479,7 +1520,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0, rSeed ) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0, TFlag[Aper] ) ;
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -1496,7 +1537,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS, rSeed ) ;
+            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1517,7 +1558,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, rSeed ) ;
+          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -1541,7 +1582,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         /* Track first split element with just upstream edge effects allowed */
         if ( TFlag[Split]>0 || trackIter > 0 ) {
           TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                  TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0, rSeed  ) ;
+                  TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0  ) ;
           
 #ifdef __CUDACC__
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
@@ -1559,7 +1600,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         if ( TFlag[Split] > 0 ) {
           for (iter = 0; iter < TFlag[Split]-2; iter++) {
             TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                    TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1, rSeed  ) ;
+                    TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
             
 #ifdef __CUDACC__
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
@@ -1579,11 +1620,11 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         } /* If no splits or CSR requested, just track once as normal */
         else if ( TFlag[Split]==0 && trackIter==0 )
           TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                  TrackArgs, TFlag, 1, 1, 1, 0, rSeed  ) ;
+                  TrackArgs, TFlag, 1, 1, 1, 0  ) ;
         /* If tracking split then track last split with downstream edge allowed only now */
         if ( TFlag[Split] > 0 || trackIter > 0 )
           TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                  TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1, rSeed  ) ;
+                  TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
 #ifdef __CUDACC__
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                 TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
@@ -2023,6 +2064,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
     free(rSeed);
     cudaFreeHost(StoppedParticles) ;
     cudaFree(TFlag_gpu) ;
+    cudaFree(rngStates) ;
 #endif
     
     return ;
@@ -2087,8 +2129,6 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   
   /* execute ray tracking kernel (loop over rays) */
 #ifdef __CUDACC__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
   double* Lfull_gpu ;
   double* dZmod_gpu ;
   cudaMalloc(&Lfull_gpu, sizeof(double)) ; cudaMalloc(&dZmod_gpu, sizeof(double)) ;
@@ -2151,7 +2191,7 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
 
 int TrackBunchThruQSOS( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc,
-        int* TrackFlag, int nPoleFlag, double splitScale, double splitS, unsigned long long *rSeed )
+			int* TrackFlag, int nPoleFlag, double splitScale, double splitS, int TFlagAper )
 {
   
   double L,B,Tilt ;              /* some basic parameters */
@@ -2170,9 +2210,8 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
   struct LucretiaParameter *ElemPar ;
   int nPar ;
 #ifdef __CUDACC__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = 1 ;
   double *PascalMatrix, *Bang, *MaxMultInd ;
+  double *Xfrms_flat = NULL ;
 #endif
   /* get the element parameters from BEAMLINE; exit with bad status if
    * parameters are missing or corrupted. */
@@ -2218,7 +2257,7 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
   /* if aperture is zero but aperture track flag is on,
    * it's an error.  Set error status and exit. */
   
-  if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
+  if ( (aper2 == 0.) && (TFlagAper == 1) )
   {
     BadApertureMessage( elemno+1 ) ;
     stat = 0 ;
@@ -2309,11 +2348,14 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
   PascalMatrix = GetPascalMatrix_gpu( ) ;
   Bang         = GetFactorial_gpu( ) ;
   MaxMultInd = GetMaxMultipoleIndex_gpu( ) ;
-  threadsPerBlock = 256 ; // Max = 1024
-  blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
+  double *Xfrms_gpu ;
+  cudaMalloc((void **)&Xfrms_gpu, sizeof(double)*12) ;
+  Xfrms_flat = &(Xfrms[0][0]) ;
+  cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(double)*12, cudaMemcpyHostToDevice) ;
   TrackBunchThruQSOS_kernel<<<blocksPerGrid, threadsPerBlock>>>(ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->y, ThisBunch->x_gpu, TrackFlag,
-          ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms, dZmod, StoppedParticles_gpu,
-          PascalMatrix, Bang, MaxMultInd, *rSeed ) ;
+          ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms_gpu, dZmod, StoppedParticles_gpu,
+								PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates ) ;
+  cudaFree(Xfrms_gpu);
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruQSOS_kernel(ray, ThisBunch->stop, ThisBunch->y, ThisBunch->x, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, nPoleFlag,
@@ -2327,16 +2369,16 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
 }
 
 
-/* Quad, Sext, Octu, Solenoid Tracking kernel */
+/* Quad, Sext, Octu, Solenoid Tracking kernel*/
 #ifdef __CUDACC__
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
-        int skew, double Xfrms[6][2], double dZmod, int* stp, double* PascalMatrix, double* Bang,
-        double* MaxMultInd, unsigned long long rSeed)
+			       int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
+			       int skew, double* pXfrms, double dZmod, int* stp, double* PascalMatrix, double* Bang,
+			       double* MaxMultInd, unsigned long long rSeed, curandState *rState)
 #else
-        void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
-        int skew, double Xfrms[6][2], double dZmod, int* stp)
+void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
+			       int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
+			       int skew, double Xfrms[6][2], double dZmod, int* stp)
 #endif
 {
   int ray,coord,raystart,doStop,icount ;
@@ -2347,7 +2389,14 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
 #ifndef __CUDA_ARCH__
   double LastRayP = 0. ;
 #else
-  curandState_t *rState = NULL ;
+  curandState rState_local ;
+#endif
+#ifdef __CUDACC__
+  double Xfrms[6][2] ;
+  int irw, icol ;
+  for (irw=0;irw<6;irw++)
+    for (icol=0;icol<2;icol++)
+      Xfrms[irw][icol]=pXfrms[(2*irw)+icol] ;
 #endif
   double TijkTransv[4][10] ;
   double nPoleOctu = 3. ;
@@ -2361,9 +2410,9 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
 #endif
   raystart = 6*ray ;
   
-  /* initialise random number sequence*/
+  /* copy rng state to local memory for efficiency */
 #ifdef __CUDA_ARCH__
-  curand_init(rSeed,(unsigned long long)ray,0,rState) ;
+  rState_local = rState[ray] ;
 #endif
   
   /* if the ray was previously stopped just copy it over */
@@ -2372,7 +2421,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   {
     for (coord=0 ; coord<6 ; coord++) {
       yb[raystart+coord] = xb[raystart+coord] ;
-      return ; }
+      goto egress ; }
   }
   
   /* make ray coordinates into local ones, including offsets etc which
@@ -2390,7 +2439,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
     doStop = CheckAperStopPart( xb, yb, stop, ngoodray,elemno,&aper2,ray,UPSTREAM,
             NULL, 0, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
   }
   
   /* Compute the SR momentum loss, if required, and apply 1/2 of the
@@ -2408,14 +2457,14 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
     if ( nPoleFlag >= 4 )
       rpow *= r / 3 ;
 #ifdef __CUDA_ARCH__
-    SR_dP = ComputeSRMomentumLoss_gpu( *p0, rpow*fabs(B), L, TrackFlag[SynRad], rState ) ;
+    SR_dP = ComputeSRMomentumLoss_gpu( *p0, rpow*fabs(B), L, TrackFlag[SynRad], &rState_local ) ;
 #else
     SR_dP = ComputeSRMomentumLoss( *p0, rpow*fabs(B), L, TrackFlag[SynRad] ) ;
 #endif
     yb[raystart+5] = *p0 - SR_dP ;
     doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
     *p0 -= SR_dP / 2 ;
   }
   else
@@ -2547,7 +2596,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
               &(xb[raystart]),
               &(yb[raystart]),
               TrackFlag[ZMotion], SR_None, 0,
-              stop,ngoodray,xb,yb, elemno, ray, 1, PascalMatrix, Bang, MaxMultInd, rState ) ;
+              stop,ngoodray,xb,yb, elemno, ray, 1, PascalMatrix, Bang, MaxMultInd, &rState_local ) ;
 #else
       PropagateRayThruMult( L, &B, &Tilt, &nPoleOctu, 1, AngVecOctu,
               1.0, 0.0,
@@ -2572,7 +2621,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,DOWNSTREAM,
             NULL, 0, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
   }
   
   /* undo the coordinate transformations */
@@ -2586,6 +2635,13 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   doStop = CheckPperpStopPart( stop, ngoodray , elemno, ray,
           px, py, stp ) ;
   
+ egress:
+  /* Copy rng state back to global memory */
+#ifdef __CUDA_ARCH__
+  rState[ray] = rState_local ;
+#endif
+  return ;
+
 }
 
 /*=====================================================================*/
@@ -2601,8 +2657,7 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
  * BEAMLINE{elemno} is not some sort of magnet.  */
 
 int TrackBunchThruMult( int elemno, int bunchno,
-        struct TrackArgsStruc* ArgStruc,
-        int* TrackFlag, double splitScale, double splitS, unsigned long long *rSeed  )
+        struct TrackArgsStruc* ArgStruc, int* TrackFlag, double splitScale, double splitS  )
 {
   
   double dB, Tilt, L ;           /* some basic parameters */
@@ -2622,8 +2677,6 @@ int TrackBunchThruMult( int elemno, int bunchno,
   int stat = 1 ;
   double Lrad ;
 #ifdef __CUDACC__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = 1;
   double *PascalMatrix, *Bang, *MaxMultInd ;
 #endif
   
@@ -2768,13 +2821,11 @@ int TrackBunchThruMult( int elemno, int bunchno,
   PascalMatrix = GetPascalMatrix_gpu( ) ;
   Bang = GetFactorial_gpu( ) ;
   MaxMultInd = GetMaxMultipoleIndex_gpu( ) ;
-  threadsPerBlock = 256 ; // Max = 1024
-  blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
   TrackBunchThruMult_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->x_gpu, ThisBunch->y, TrackFlag,
           ThisBunch->ngoodray_gpu, elemno, aper2, L, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr,
           MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
           MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale,
-          StoppedParticles_gpu, PascalMatrix, Bang, MaxMultInd, *rSeed) ;
+								 StoppedParticles_gpu, PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates) ;
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruMult_kernel( ray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, L,
@@ -2791,7 +2842,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
 void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
         double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp,
-        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed)
+			       double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState)
 #else
         void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
@@ -2802,18 +2853,13 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   int ray, raystart, coord, doStop ;
   double *x, *px, *y, *py, *z, *p0 ;
 #ifdef __CUDA_ARCH__
-  curandState_t *rState = NULL ;
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
   if ( ray >= nray ) return;
+  curandState rState_local = rState[ray];
 #else
   ray = nray;
 #endif
   raystart = 6*ray ;
-  
-  /* initialise random number sequence*/
-#ifdef __CUDA_ARCH__
-  curand_init(rSeed,(unsigned long long)ray,0,rState) ;
-#endif
   
   /* if the ray was previously stopped copy it over */
   
@@ -2821,7 +2867,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   {
     for (coord=0 ; coord<6 ; coord++)
       yb[raystart+coord] = xb[raystart+coord] ;
-    return ;
+    goto egress ;
   }
   
   /* make ray coordinates into local ones, including offsets etc which
@@ -2841,7 +2887,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,UPSTREAM,
             NULL, 0, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
   }
   
   /* Propagate through, and perform SR energy loss within the multipole
@@ -2861,7 +2907,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
           &(yb[raystart]),
           TrackFlag[ZMotion],
           TrackFlag[SynRad], Lrad,stop,ngoodray,xb,yb,
-          elemno, ray, splitScale, PascalMatrix, Bang, MaxMultInd, rState ) ;
+          elemno, ray, splitScale, PascalMatrix, Bang, MaxMultInd, &rState_local ) ;
 #else
   PropagateRayThruMult( L,
           MultBValue,
@@ -2888,7 +2934,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,DOWNSTREAM,
             NULL, 0, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
   }
   
   /* undo the coordinate transformations */
@@ -2900,6 +2946,13 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   /* check amplitude of outgoing angular momentum */
   
   doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py, stp ) ;
+
+ egress:
+  /* copy rng state back to global memory */
+#ifdef __CUDA_ARCH__
+  rState[ray] = rState_local ;
+#endif
+  return ;
 }
 
 
@@ -2920,7 +2973,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
 
 int TrackBunchThruSBend( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc,
-        int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit, unsigned long long *rSeed )
+			 int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit )
 {
   
   double L,Tilt ;                /* some basic parameters */
@@ -2945,12 +2998,6 @@ int TrackBunchThruSBend( int elemno, int bunchno,
   int stat = 1 ;
   double OffsetFromTiltError ;
   double AngleFromTiltError ;
-  
-#ifdef __CUDACC__
-  int threadsPerBlock = 256 ; // Max = 1024
-  int blocksPerGrid = 1;
-#endif
-  
   
   /* get the element parameters from BEAMLINE; exit with bad status if
    * parameters are missing or corrupted. */
@@ -3111,11 +3158,9 @@ int TrackBunchThruSBend( int elemno, int bunchno,
   
   /* execute ray tracking kernel (loop over rays) */
 #ifdef __CUDACC__
-  threadsPerBlock = 256 ; // Max = 1024
-  blocksPerGrid = (ThisBunch->nray + threadsPerBlock - 1) / threadsPerBlock;
   TrackBunchThruSBend_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->x_gpu, ThisBunch->y, ThisBunch->stop_gpu,
           TrackFlag, Xfrms, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
-          elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed) ;
+								  elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed, rngStates) ;
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruSBend_kernel(ray, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, Xfrms, cTT, sTT, Tx, Ty,
@@ -3132,7 +3177,7 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed)
+				double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState)
 #else
         void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
@@ -3146,8 +3191,6 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   double *x, *px, *y, *py, *z, *p0 ;
 #ifndef __CUDA_ARCH__
   double LastRayP = 0. ;
-#else
-  curandState_t *rState = NULL ;
 #endif
   Rmat Rface1, Rface2, Rbody ; /* linear maps */
   double T5xx1[10], T5xx2[10], T5xxbody[10] ; /* 2nd order maps */
@@ -3156,12 +3199,9 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
 #ifdef __CUDA_ARCH__
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
   if ( ray >= nray ) return;
+  curandState rState_local = rState[ray] ;
 #else
   ray = nray;
-#endif
-  
-#ifdef __CUDA_ARCH__
-  curand_init(rSeed,(unsigned long long)ray,0,rState) ;
 #endif
   
   raystart = 6*ray ;
@@ -3172,7 +3212,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   {
     for (coord=0 ; coord<6 ; coord++)
       yb[raystart+coord] = xb[raystart+coord] ;
-    return ;
+    goto egress ;
   }
   
   /* make ray coordinates into local ones, including offsets etc which
@@ -3201,7 +3241,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&hgap2,ray,UPSTREAM,
             NULL, 0, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
   }
   
   yb[raystart+5] = *p0 ;
@@ -3218,13 +3258,13 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
     Bx = intG * (*y) ;
     Beff = sqrt(Bx*Bx + By*By) ;
 #ifdef __CUDA_ARCH__
-    SR_dP = ComputeSRMomentumLoss_gpu( *p0, Beff, L, TrackFlag[SynRad], rState ) ;
+    SR_dP = ComputeSRMomentumLoss_gpu( *p0, Beff, L, TrackFlag[SynRad], &rState_local ) ;
 #else
     SR_dP = ComputeSRMomentumLoss( *p0, Beff, L, TrackFlag[SynRad] ) ;
 #endif
     doStop = CheckP0StopPart( stop,ngoodray,xb,yb,elemno,ray,*p0-SR_dP, UPSTREAM, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
     *p0 -= SR_dP / 2 ;
   }
   
@@ -3332,7 +3372,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&hgapx2,ray,DOWNSTREAM,
             NULL, 0, stp ) ;
     if (doStop == 1)
-      return ;
+      goto egress ;
   }
   
   /* apply the 2nd half of SR eloss here */
@@ -3369,7 +3409,13 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   /* finally, if the transverse momentum has gotten too high, stop the particle */
   
   doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py, stp ) ;
-  
+
+ egress:
+#ifdef __CUDA_ARCH__  
+  /* Copy rng state back to global memory */
+  rState[ray] = rState_local ;
+#endif  
+  return ;
 }
 
 /*=====================================================================*/
@@ -6828,21 +6874,21 @@ void XGPU2CPU( struct TrackArgsStruc* ArgStruc )
             6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
     if (cerr == cudaSuccess)
     {
-      printf("CUDA OK!\n");
+      /*printf("CUDA OK!\n");*/
     }
     else printf("CUDA FAIL! (%d)\n",cerr);
     cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q, ArgStruc->TheBeam->bunches[i]->Q_gpu,
             ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
     if (cerr == cudaSuccess)
     {
-      printf("CUDA OK!\n");
+      /*printf("CUDA OK!\n");*/
     }
     else printf("CUDA FAIL!\n");
     cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop, ArgStruc->TheBeam->bunches[i]->stop_gpu,
             ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
     if (cerr == cudaSuccess)
     {
-      printf("CUDA OK!\n");
+      /*printf("CUDA OK!\n");*/
     }
     else printf("CUDA FAIL!\n");
   }
@@ -8974,3 +9020,13 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   return (double)trackIter ;
 }
 
+/* Kernel to setup CUDA random number generator */
+#ifdef __CUDACC__
+__global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed)
+{
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    /* Each thread gets same seed, a different sequence 
+       number, no offset */
+    curand_init(rSeed, id, 0, &state[id]);
+}
+#endif
