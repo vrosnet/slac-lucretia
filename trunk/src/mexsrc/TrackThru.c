@@ -46,6 +46,7 @@
 
 /* include files */
 
+
 #include "mex.h"                /* Matlab API prototypes */
 #include "matrix.h"
 #include "LucretiaMatlab.h"     /* Lucretia-specific matlab fns */
@@ -54,8 +55,9 @@
 #endif
 #include "LucretiaGlobalAccess.h"
 #include <string.h>
+/* --- CUDA STUFF --- */
 #ifdef __CUDACC__
-#include "gpu/mxGPUArray.h"
+  #include "gpu/mxGPUArray.h"
 #endif
 
 /* file-scoped variables */
@@ -76,11 +78,6 @@ void mexFunction( int nlhs, mxArray *plhs[],
   
   struct TrackArgsStruc* TrackArgs ;           /* arguments for trackin' */
   int DidTracking = 0 ;
-  
-  /* Initialize the MathWorks GPU API. */
-#ifdef __CUDACC__
-  mxInitGPU();
-#endif
   
   /* process the calling arguments and make sure that they are well-conditioned.
    * Return a pointer to the TrackArgs summary */

@@ -63,7 +63,7 @@ gpu_init::
 	$(MCOMP) $(MFLAGS) -v TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
  VerifyLattice.$(MEXEXT) : $(LMAIN) $(LMATL) VerifyLattice.c
 	$(MCOMP) $(MFLAGS) VerifyLattice.c -L. -lLucretiaMatlab -lLucretiaMain
- TrackThru_gpu.$(MEXEXT) : TrackThru_gpu.o GPULINK
+ TrackThru_gpu.$(MEXEXT) : GPULINK TrackThru_gpu.o
 	g++ -O -pthread -shared -Wl,--version-script,$(MATPATH)/extern/lib/glnxa64/mexFunction.map -Wl,--no-undefined -o  "TrackThru_gpu.$(MEXEXT)"  TrackThru_gpu.o  "LucretiaMatlab_gpu.o"  "LucretiaMatlabErrMsg_gpu.o"  "LucretiaPhysics_gpu.o"  "LucretiaCommon_gpu.o" "gpulink.o"  -Wl,-rpath-link,$(MATPATH)/bin/glnxa64 -L$(MATPATH)/bin/glnxa64 -lmx -lmex -lmat -lm -lmwgpu $(MATPATH)/bin/glnxa64/libcudart.so.5.0
 
 

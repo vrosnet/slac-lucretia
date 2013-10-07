@@ -18,7 +18,9 @@
                           */
 
 #define LUCRETIA_COMMON
-
+#ifdef __CUDACC__
+#include "curand_kernel.h"
+#endif
 /* some parameters related to whether a corrector is an XCOR, a YCOR, or an XYCOR */
 
 #define XCOR  0
@@ -281,7 +283,7 @@ struct TrackArgsStruc{
 	int LastBunch ;             /* last bunch in beam for tracking */
 	int nBunch ;                /* saves recalculating it all the time */
 	int BunchwiseTracking ;     /* bunch-by-bunch or element-by-element tracking? */
-   struct Beam* TheBeam ;      /* pointer to the beam data structure */
+        struct Beam* TheBeam ;      /* pointer to the beam data structure */
 	struct BPMdat** bpmdata ;   /* pointer to array of BPM data */
 	struct INSTdat** instdata ; /* pointer to array of instrument data */
 	struct SBPMdat** sbpmdata ; /* pointer to array of SBPM data */
@@ -330,9 +332,9 @@ void TrackThruMain( struct TrackArgsStruc* ) ;
 
 /* tracking a bunch through various elements */
 int TrackBunchThruDrift( int, int, struct TrackArgsStruc*, int*, double ) ;
-int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int, double, double, unsigned long long* ) ;
-int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int*, double, double, unsigned long long* ) ;
-int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, int, unsigned long long* ) ;
+int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int, double, double, int ) ;
+int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int*, double, double ) ;
+int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, int ) ;
 int TrackBunchThruRF( int, int, struct TrackArgsStruc*, int*, int ) ;
 int TrackBunchThruBPM( int, int, struct TrackArgsStruc*, int*, double ) ;
 int TrackBunchThruInst( int, int, struct TrackArgsStruc*, int*, double ) ;
@@ -574,20 +576,30 @@ void XCPU2GPU( struct TrackArgsStruc* ) ;
 void XGPU2CPU( struct TrackArgsStruc* ) ;
 #endif
 
+/* CUDA-related kernels */
+#ifdef __CUDACC__
+__global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed) ;
+#endif
+
 /* Tracking kernels */
 #ifdef __CUDACC__
 __global__ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 __global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double* Xfrms, double dZmod,
+					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
+
+__global__ void TrackBunchThruQSOS_kernel2(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod,
-        int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed) ;
+					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
+
 __global__ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
         double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale,
-        int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed) ;
+					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
 __global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed) ;
+					   double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState) ;
 #else
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,

@@ -73,6 +73,10 @@
  * Bugfix: don't destroy mxArray which contains the vector
  * of factorials until ready to generate a new one!
  */
+#ifdef __CUDACC__
+  #include "gpu/mxGPUArray.h"
+  #include "curand_kernel.h" /* CUDA device-based random number generator*/
+#endif
 #include <string.h>
 #include <math.h>
 #include "mex.h"
@@ -81,10 +85,7 @@
 #include "LucretiaMatlab.h"       /* gets LucretiaCommon.h for free */
 #include "LucretiaGlobalAccess.h" /* manipulate Lucretia globals */
 #include "LucretiaVersionProto.h" /* prototypes for version functions */
-#ifdef __CUDACC__
-  #include "gpu/mxGPUArray.h"
-  #include "curand_kernel.h" /* CUDA device-based random number generator*/
-#endif
+
 
 /* File-scoped variables */
 
