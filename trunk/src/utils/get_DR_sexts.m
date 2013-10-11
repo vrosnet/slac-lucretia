@@ -36,6 +36,8 @@ function varargout=get_DR_sexts(opCode,energy,varargin)
 %   Isext = DR sextupole family currents (amps) [2 element array]
 
 % ==============================================================================
+% 10-DEC-2012, M. Woodley
+%    Sextupole signs changed ... bending direction changed in Nov 2009
 % 22-FEB-2009, M. Woodley
 %    Do either I-to-KL and KL-to-I conversion
 % ==============================================================================
@@ -115,7 +117,7 @@ sleff=0.07077;
 
 % SAD K2 signs
 
-ssgn=[1;-1]; % [SF1R;SD1R]
+ssgn=[-1;1]; % [SF1R;SD1R]
 
 % "Kubo" fudge factors (unknown whether such things exist ...)
 
