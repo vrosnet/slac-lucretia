@@ -57,6 +57,9 @@ function varargout=get_DR_quads(opCode,energy,varargin)
 %   Iquad = DR quadrupole family currents (amps) [26 element array]
 
 % ==============================================================================
+% 10-DEC-2010, M. Woodley
+%    Switch polarity of QM2R (was QD) ... design model wants it QF (turned OFF
+%    for normal operations)
 % 26-FEB-2009, M. Woodley
 %    Correct Nm(=49) and Nt(=20) for QEA quads per IHEP drawing
 % 22-FEB-2009, M. Woodley
@@ -213,6 +216,7 @@ qtype=[1;5;3;2;2;3;4;4;7;7;4;4;6;9;10;11;6;4;4;4;4;3;2;2;3;8];
 % polarities
 
 qsgn=[1;1;1;-1;-1;1;1;-1;1;1;-1;1;-1;1;-1;1;-1;1;-1;-1;1;1;-1;-1;1;1];
+qsgn(4)=+1; % QM2R
 
 % "Kubo" fudge factors
 % (NOTE: set fudge factors to zero ... who knows what they are now)
