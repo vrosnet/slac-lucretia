@@ -141,7 +141,7 @@ if axhan(1)~=0
   axis(sh,'off');
   text(0.1,0.8,sprintf('rms X = %g',rmsx),'Parent',sh);
   text(0.1,0.6,sprintf('rms Y = %g',rmsy),'Parent',sh);
-  
+  text(0.1,0.4,sprintf('Q = %g nC',1e9*sum(beam.Bunch.Q(~beam.Bunch.stop))),'Parent',sh)
 end
 
 if length(axhan)==1 || axhan(2)==0; return; end;
@@ -166,7 +166,7 @@ set(h1,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
 hold(sh,'on')
 plot(sh,yfit,xi,'r-')
 hold(sh,'off')
-title(sh,sprintf('\\sigma_E = %.1f %% RMS = %.1f %%',abs(sigE),100*(std(E)/mean(E))))
+% title(sh,sprintf('\\sigma_E = %.1f %% RMS = %.1f %%',abs(sigE),100*(std(E)/mean(E))))
 ylabel(sh,'dP (%)')
 
 sh=subplot(2,2,4,'Parent',axhan(2));
