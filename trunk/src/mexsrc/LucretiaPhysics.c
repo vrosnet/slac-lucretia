@@ -682,7 +682,7 @@ __device__ void PropagateRayThruMult_gpu( double L, double* Bvec, double* Tvec,
   
   /* loop over multipole moments and over terms in each moment, and
    build the BxL and ByL fields */
-  
+//   *(xf) = 999 ; *(xf+1) = nTerms; return ;
   for (count=0 ; count<nTerms ; count++)
   {
     PInd = abs((int)(PIvec[count])) ;
@@ -718,7 +718,7 @@ __device__ void PropagateRayThruMult_gpu( double L, double* Bvec, double* Tvec,
   
   /* If SR is required, calculate it and apply 1/2 of it here, 1/2 at end of elt */
   
-  if (SRFlag > SR_None)
+  if (SRFlag > SR_None && Lrad>0)
   {
     SR_dP = ComputeSRMomentumLoss_gpu( P0,sqrt(BxL*BxL+ByL*ByL), Lrad, SRFlag, rState ) ;
     *(xf+5) = P0 - SR_dP ;
@@ -833,7 +833,7 @@ void PropagateRayThruMult( double L, double* Bvec, double* Tvec,
   
   /* If SR is required, calculate it and apply 1/2 of it here, 1/2 at end of elt */
   
-  if (SRFlag > SR_None)
+  if (SRFlag > SR_None && Lrad>0)
   {
     SR_dP = ComputeSRMomentumLoss( P0,sqrt(BxL*BxL+ByL*ByL), Lrad, SRFlag ) ;
     *(xf+5) = P0 - SR_dP ;

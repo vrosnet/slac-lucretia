@@ -79,6 +79,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
   struct TrackArgsStruc* TrackArgs ;           /* arguments for trackin' */
   int DidTracking = 0 ;
   
+  /* Initialize Matlab GPU library */
+#ifdef __CUDACC__  
+  mxInitGPU() ;
+#endif  
+  
   /* process the calling arguments and make sure that they are well-conditioned.
    * Return a pointer to the TrackArgs summary */
   
@@ -147,6 +152,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
   egress:
     
     TrackThruSetReturn( TrackArgs, nlhs, plhs, DidTracking ) ;
+//     cudaDeviceReset() ; // For profiling
     
 }
 
@@ -192,14 +198,15 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
   mxArray* IntervalField ;                   /* pointer beam interval field */
   mxArray* BunchField ;                      /* pointer to beam bunch field */
   mxArray* newBunchField ;                   /* beam bunch field on exit beam */
-  mxArray *x, *q, *stop ;                    /* more mxArray pointers */
+#ifdef __CUDACC__
+  mwSize xArraySize ;
+#endif
+  mxArray *x, *q, *stop ;                    /* Bunch data for CPU code */
+  double *stop_local ;
   int i,j ;                                  /* counters */
   int npart ;                                /* # particles / bunch */
   int goodargs ;
   int wCount, sCount ;
-#ifdef __CUDACC__
-  cudaError_t cerr;
-#endif
   
   /* begin by setting the initial default values of the ArgStruc */
   
@@ -330,7 +337,6 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
       goto egress ;
     
     /* as long as we are here, verify that the fields for "Bunch" are okay */
-    
     x = mxGetField(BunchField,0,BunchFieldName[0]) ;
     q = mxGetField(BunchField,0,BunchFieldName[1]) ;
     stop = mxGetField(BunchField,0,BunchFieldName[2]) ;
@@ -472,39 +478,26 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
     {
       j = i + 1 - ArgStruc.FirstBunch ;
       x=mxGetField(BunchField,i,BunchFieldName[0]) ;
+#ifdef __CUDACC__ /* check for existence of Matlab GPU arrays if running GPU version */
+      TheBeam.bunches[i]->x_gpu = mxGPUCopyFromMxArray( x ) ;
+      xArraySize = mxGPUGetNumberOfElements( TheBeam.bunches[i]->x_gpu ) / 6;
+      npart = (int)xArraySize;
+#else
       if ( (mxGetM(x)!=6) || (!mxIsDouble(x)) )
         goto egress ;
       npart = mxGetN(x) ;
+#endif      
       TheBeam.bunches[i]->nray = npart ;
       TheBeam.bunches[i]->ngoodray = npart ;
-      mxSetField(newBunchField,j,BunchFieldName[0],
-              mxDuplicateArray(x)               ) ;
-      /* If using GPU, then make an additional copy of the bits of the bunch
-       * data that get regularly used in tracking in the GPU memory*/
+#ifdef __CUDACC__
+      TheBeam.bunches[i]->x=(double *)mxGPUGetData(TheBeam.bunches[i]->x_gpu) ;
+      TheBeam.bunches[i]->y_gpu = mxGPUCopyGPUArray(TheBeam.bunches[i]->x_gpu) ;
+      TheBeam.bunches[i]->y=(double *)mxGPUGetData(TheBeam.bunches[i]->y_gpu) ;
+      cudaMalloc((void**)&TheBeam.bunches[i]->ngoodray_gpu, sizeof(int)) ;
+#else
+      mxSetField(newBunchField,j,BunchFieldName[0], mxDuplicateArray(x) ) ;
       TheBeam.bunches[i]->x = mxGetPr(mxGetField(newBunchField,j,
               BunchFieldName[0])) ;
-#ifdef __CUDACC__
-      cerr=cudaMalloc((void**)&TheBeam.bunches[i]->x_gpu, 6*npart*sizeof(double)) ;
-      if (cerr != cudaSuccess)
-      {
-        printf("CUDA Failed to allocate bunch memory!\n");
-        ArgStruc.Status = -1 ;
-        goto egress ;
-      }
-      cerr=cudaMemcpy(TheBeam.bunches[i]->x_gpu, TheBeam.bunches[i]->x, 6*npart*sizeof(double), cudaMemcpyHostToDevice) ;
-      if (cerr != cudaSuccess)
-      {
-        printf("CUDA Failed to copy bunch data to device!\n");
-        ArgStruc.Status = -1 ;
-        goto egress ;
-      }
-      cudaMalloc((void**)&TheBeam.bunches[i]->Q_gpu, npart*sizeof(double)) ;
-      cudaMalloc((void**)&TheBeam.bunches[i]->stop_gpu, npart*sizeof(double)) ;
-      cudaMalloc((void**)&TheBeam.bunches[i]->y, 6*npart*sizeof(double)) ;
-      cudaMemcpy(TheBeam.bunches[i]->y, TheBeam.bunches[i]->x, 6*npart*sizeof(double), cudaMemcpyHostToDevice) ;
-      cudaMalloc((void**)&TheBeam.bunches[i]->ngoodray_gpu, sizeof(int)) ;
-      cudaMemcpy(TheBeam.bunches[i]->ngoodray_gpu, &TheBeam.bunches[i]->ngoodray, sizeof(int), cudaMemcpyHostToDevice) ;
-#else
       TheBeam.bunches[i]->y = (double*)mxMalloc(6*npart*sizeof(double)) ;
 #endif
       if (nWakes[0] > 0)
@@ -540,41 +533,47 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
       else
         TheBeam.bunches[i]->TLRErrFreq = NULL ;
       
-      
       q=mxGetField(BunchField,i,BunchFieldName[1]) ;
+#ifdef __CUDACC__
+      TheBeam.bunches[i]->Q_gpu = mxGPUCopyFromMxArray( q ) ;
+      TheBeam.bunches[i]->Q = (double *)mxGPUGetData(TheBeam.bunches[i]->Q_gpu) ;
+#else      
+      mxSetField(newBunchField,j,BunchFieldName[1], mxDuplicateArray(q) ) ;
       if ( (mxGetM(q)!=1)     ||
               (mxGetN(q)!=npart) ||
               (!mxIsDouble(q)  )    )
         goto egress ;
-      mxSetField(newBunchField,j,BunchFieldName[1],
-              mxDuplicateArray(q)               ) ;
       TheBeam.bunches[i]->Q = mxGetPr(mxGetField(newBunchField,j,
               BunchFieldName[1])) ;
-      /* copy to GPU device memory */
-#ifdef __CUDACC__
-//      printf("cmem_gpu2dev1: size=%d\n",npart);
-      cudaMemcpy(TheBeam.bunches[i]->Q_gpu, TheBeam.bunches[i]->Q, npart*sizeof(double), cudaMemcpyHostToDevice) ;
-//      printf("done cmem_gpu2dev1\n");
-#endif
+#endif 
       stop=mxGetField(BunchField,i,BunchFieldName[2]) ;
+#ifdef __CUDACC__
+      TheBeam.bunches[i]->stop_gpu = mxGPUCopyFromMxArray( stop ) ;
+      TheBeam.bunches[i]->stop = (double *)mxGPUGetData(TheBeam.bunches[i]->stop_gpu) ;
+#else      
+      mxSetField(newBunchField,j,BunchFieldName[2], mxDuplicateArray(stop) ) ;
       if ( (mxGetM(stop)!=1)     ||
               (mxGetN(stop)!=npart) ||
               (!mxIsDouble(stop)  )    )
         goto egress ;
-      mxSetField(newBunchField,j,BunchFieldName[2],
-              mxDuplicateArray(stop)               ) ;
       TheBeam.bunches[i]->stop = mxGetPr(mxGetField(newBunchField,j,
               BunchFieldName[2])) ;
-      /* copy to GPU device memory */
+#endif      
 #ifdef __CUDACC__
-//      printf("cmem_gpu2dev2\n");
-      cudaMemcpy(TheBeam.bunches[i]->stop_gpu, TheBeam.bunches[i]->stop, npart*sizeof(double), cudaMemcpyHostToDevice) ;
+      stop_local = (double *) calloc(TheBeam.bunches[i]->nray,sizeof(double)) ;
+      cudaMemcpy(stop_local, TheBeam.bunches[i]->stop, sizeof(double)*TheBeam.bunches[i]->nray, cudaMemcpyDeviceToHost) ;
+#else
+      stop_local = TheBeam.bunches[i]->stop ;
 #endif
-      
       for (sCount=0 ; sCount<TheBeam.bunches[i]->nray ; sCount++)
-        if (TheBeam.bunches[i]->stop[sCount] != 0)
+        if (stop_local[sCount] != 0)
           TheBeam.bunches[i]->ngoodray-- ;
       TheBeam.bunches[i]->StillTracking = 1 ;
+#ifdef __CUDACC__      
+      cudaMemcpy(TheBeam.bunches[i]->ngoodray_gpu, &TheBeam.bunches[i]->ngoodray, sizeof(int), cudaMemcpyHostToDevice) ;
+      free(stop_local) ;
+#endif      
+      
     }
     
     /* hook the newBunchField to the output beam data structure */
@@ -642,7 +641,6 @@ void TrackThruSetReturn( struct TrackArgsStruc* TrackArgs,
   int is,js ;
   int status = 1 ;            /* default to good status */
   mxArray* ReturnBunches ;
-  mxArray* raycoord ;
   mxArray* bpmdat ;
   mxArray* instdat ;
   mxArray* sbpmdat ;
@@ -681,11 +679,14 @@ void TrackThruSetReturn( struct TrackArgsStruc* TrackArgs,
     /* get a pointer to the ray position field in the i'th bunch,
      * remembering that the bunches in TheBeam are not set up from 0 to
      * nBunch-1 but from FirstBunch-1 to LastBunch-1*/
-    
     j = i + TrackArgs->FirstBunch - 1 ;
-    raycoord = mxGetField( ReturnBunches, i, BunchFieldName[0] ) ;
-    mxSetPr( raycoord, TrackArgs->TheBeam->bunches[j]->x ) ;
-    
+#ifdef __CUDACC__ /* If running on GPU, just return mxGPUArray links back to tracked beam data*/
+    mxSetField( ReturnBunches, i, BunchFieldName[0], mxGPUCreateMxArrayOnGPU(TrackArgs->TheBeam->bunches[j]->x_gpu) ) ;
+    mxSetField( ReturnBunches, i, BunchFieldName[1], mxGPUCreateMxArrayOnGPU(TrackArgs->TheBeam->bunches[j]->Q_gpu) ) ;
+    mxSetField( ReturnBunches, i, BunchFieldName[2], mxGPUCreateMxArrayOnGPU(TrackArgs->TheBeam->bunches[j]->stop_gpu) ) ;
+#else    
+    mxSetPr( mxGetField( ReturnBunches, i, BunchFieldName[0] ), TrackArgs->TheBeam->bunches[j]->x ) ;
+#endif    
   }
   
   /* if no instrument data was to be returned, jump to the exit */
@@ -942,11 +943,14 @@ void TrackThruSetReturn( struct TrackArgsStruc* TrackArgs,
       for (i = TrackArgs->FirstBunch-1 ; i < TrackArgs->LastBunch ; i++)
       {
 #ifdef __CUDACC__
-        cudaFree( TrackArgs->TheBeam->bunches[i]->x_gpu ) ;
-        cudaFree( TrackArgs->TheBeam->bunches[i]->Q_gpu ) ;
-        cudaFree( TrackArgs->TheBeam->bunches[i]->stop_gpu ) ;
-        cudaFree( TrackArgs->TheBeam->bunches[i]->y ) ;
+        /* This doesn't actually clear the x, Q, stop data whilst there is still a
+         * GPUArray object linking to these in Matlab in the beamout structure. these
+         * Can only be cleared with a reset command to the GPU device from Matlab */
+        mxGPUDestroyGPUArray( TrackArgs->TheBeam->bunches[i]->x_gpu ) ;
+        mxGPUDestroyGPUArray( TrackArgs->TheBeam->bunches[i]->Q_gpu ) ;
+        mxGPUDestroyGPUArray( TrackArgs->TheBeam->bunches[i]->stop_gpu ) ;
         cudaFree( TrackArgs->TheBeam->bunches[i]->ngoodray_gpu ) ;
+        mxGPUDestroyGPUArray( TrackArgs->TheBeam->bunches[i]->y_gpu ) ;
 #else
         mxFree( TrackArgs->TheBeam->bunches[i]->y ) ;
 #endif

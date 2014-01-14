@@ -20,6 +20,7 @@
 #define LUCRETIA_COMMON
 #ifdef __CUDACC__
 #include "curand_kernel.h"
+#include "gpu/mxGPUArray.h"
 #endif
 /* some parameters related to whether a corrector is an XCOR, a YCOR, or an XYCOR */
 
@@ -186,10 +187,11 @@ struct Bunch {
 	int StillTracking ;         /* are we still tracking the bunch? */
 	double* x ;                 /* pointer to coords  */
 #ifdef __CUDACC__  
-	double* x_gpu ;             /* pointer to coords memory in GPU memory*/
+	mxGPUArray* x_gpu ;             /* Matlab mxGPUArray */
   double* y ;                 /* second coordinate pointer in GPU memory*/
-  double* Q_gpu ;                 /* pointer to charge vector */
-	double* stop_gpu ;              /* pointer to stopping element, if any */
+  mxGPUArray* Q_gpu ;                 /* Matlab mxGPUArray */
+	mxGPUArray* stop_gpu ;              /* Matlab mxGPUArray */
+  mxGPUArray* y_gpu ;              /* Matlab mxGPUArray */
   int* ngoodray_gpu ;
 #else
   double* y ;                 /* second coordinate pointer*/
@@ -478,8 +480,11 @@ void XYExchange( double**, double**, int ) ;
 #endif
 
 /* perform initial check of total and transverse momenta */
-
-int InitialMomentumCheck( struct TrackArgsStruc* ) ;
+#ifdef __CUDACC__
+__global__ void InitialMomentumCheck( int* stat, double* bstop, int *ngoodray_gpu, double* x, double* y, int RayLoop, int* stp ) ;
+#else
+void InitialMomentumCheck( int* stat, double* bstop, int *ngoodray, double* x, double* y, int RayLoop, int* stp ) ;
+#endif
 
 /* point local coords at desired entry in a data vector */
 #ifdef __CUDACC__
@@ -570,12 +575,6 @@ double GetCsrTrackFlags( int, int*, int*, int, struct Bunch*, double* ) ;
 /* GPU specific functions and tracking kernels         */
 /* =================================================== */
 
-#ifdef __CUDACC__
-/* Memory copy routines GPU <-> CPU */
-void XCPU2GPU( struct TrackArgsStruc* ) ;
-void XGPU2CPU( struct TrackArgsStruc* ) ;
-#endif
-
 /* CUDA-related kernels */
 #ifdef __CUDACC__
 __global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed) ;
@@ -585,18 +584,13 @@ __global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed) ;
 #ifdef __CUDACC__
 __global__ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 __global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double* Xfrms, double dZmod,
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double* pXfrms, double dZmod,
 					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
-
-__global__ void TrackBunchThruQSOS_kernel2(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod,
-					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
-
-__global__ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
-        double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale,
-					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
-__global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
+__global__ void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
+        int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double* pXfrms, double dZmod, double splitScale, int* stp,
+        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
+__global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double* pXfrms, double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
 					   double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState) ;
@@ -604,9 +598,9 @@ __global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, dou
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,
         double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod, int* stp) ;
-void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray, int elemno, double aper2,
-        double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength, double* MultAngleValue,
-        double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp) ;
+void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
+        int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp) ;
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,

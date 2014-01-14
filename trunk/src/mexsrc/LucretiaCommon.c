@@ -130,14 +130,11 @@
  */
 /* --- CUDA STUFF --- */
 #ifdef __CUDACC__
-  #include <curand_kernel.h>
-  #include <cuda.h>
-  #include <curand.h>
-  #include "gpu/mxGPUArray.h"
-  #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
-    printf("Error at %s:%d\n",__FILE__,__LINE__); \
-    return EXIT_FAILURE;}} while(0)
-  #define threadsPerBlock 256
+#include <curand_kernel.h>
+#include <cuda.h>
+#include <curand.h>
+#include "gpu/mxGPUArray.h"
+#define threadsPerBlock 256
 #endif
 /* --- */
 #include "LucretiaCommon.h"       /* data & prototypes for this file */
@@ -149,13 +146,13 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
-
-
-
-/* File-scoped variables: */
+          
+          
+          
+          /* File-scoped variables: */
 #ifdef __CUDACC__
-/* rng CUDA variables */
-unsigned long long *rSeed = NULL ; /* rng seed sourced from Matlab workspace */
+          /* rng CUDA variables */
+          unsigned long long *rSeed = NULL ; /* rng seed sourced from Matlab workspace */
 curandState *rngStates = NULL ; /* device generated random number state */
 int blocksPerGrid = threadsPerBlock ; /* number of blocks per CUDA grid */
 #endif
@@ -950,7 +947,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     
     
     /* if we got here with bad status due to bad dynamic allocation, free
-   anything which was successfully allocated and return a null pointer */
+     * anything which was successfully allocated and return a null pointer */
     
     if (BadAllocate != 0)
     {
@@ -973,8 +970,8 @@ void* RmatCalculate( struct RmatArgStruc* Args )
     
     
     /*	Now we just have to set the return value and
-   exit.  If we are doing an eachelem, return a pointer to Relem; otherwise,
-   return a pointer to Rtot. */
+     * exit.  If we are doing an eachelem, return a pointer to Relem; otherwise,
+     * return a pointer to Rtot. */
     
     if (ReturnEach == 1)            /* GetRmats operation */
     {
@@ -988,7 +985,7 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       Tall.nentry++ ;
       
       /* if the original request was for backwards-propagation, then
-     we need to adjust the nu parameters */
+       * we need to adjust the nu parameters */
       
       if (Args->Backwards == 1)
       {
@@ -1101,31 +1098,46 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   int iter, csrSmoothFactor=0, maxpart=0, ib ;
   double trackIter ;
   double lastS, thisS, *sp;
-
+  int dosr,iele ;
+  
 #ifdef __CUDACC__
-  /* Get random number seed from Matlab workspace */  
+  /* Get random number seed from Matlab workspace */
   rSeed = (unsigned long long*) calloc(1,sizeof(unsigned long long)) ;
-  getLucretiaRandSeed(rSeed) ; 
-
+  getLucretiaRandSeed(rSeed) ;
+  
   /* Get Max particles in any bunch of the beam */
   for (ib=0; ib<TrackArgs->TheBeam->nBunch; ib++) {
     if (TrackArgs->TheBeam->bunches[ib]->nray>maxpart)
       maxpart=TrackArgs->TheBeam->bunches[ib]->nray;
   }
-
+  
   /* Define blocks per grid for CUDA computations */
   blocksPerGrid = (maxpart + threadsPerBlock - 1) / threadsPerBlock;
-
+  
   /* Make a GPU copy of the TrackFlags integer array */
   int* TFlag_gpu ;
   cudaMalloc(&TFlag_gpu, sizeof(int)*(NUM_TRACK_FLAGS+1));
-
+  
   /* CUDA rng states*/
-  cudaMalloc((void **)&rngStates, blocksPerGrid * threadsPerBlock * 
-                  sizeof(curandState));
-  rngSetup_kernel<<<blocksPerGrid, threadsPerBlock>>>(rngStates, *rSeed); /* make rng states for each thread*/
+  cudaMalloc((void **)&rngStates, blocksPerGrid * threadsPerBlock *
+          sizeof(curandState));
+  /* If no sync radiation selected anywhere, then just initialise with zeroes */
+  dosr=0;
+  for (iele=0; iele<TrackArgs->LastElem; iele++)
+  {
+    TFlag = GetTrackingFlags( iele ) ;
+    if (TFlag[SynRad] > SR_None)
+    {
+      dosr=1;
+      break;
+    }
+  }
+  if (dosr==0)
+    cudaMemset(rngStates,0,blocksPerGrid*threadsPerBlock*sizeof(curandState));
+  else /* make rng states for each thread*/
+    rngSetup_kernel<<<blocksPerGrid, threadsPerBlock>>>(rngStates, *rSeed); 
 #endif
-
+  
   /* initialize the pointers to freq-domain wakefield data */
   TLRFreqData    = NULL ;
   TLRErrFreqData = NULL ;
@@ -1277,22 +1289,48 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   
   /* Check to see whether there are unstopped particles coming in with
    * bad momenta (total or transverse), raise a warning if so. */
-  
-  TrackStatus = InitialMomentumCheck( TrackArgs ) ;
-  if (TrackStatus == 0)
+  int *momStat, bloop, RayLoop, *momStat_gpu ;
+  struct Bunch* TheBunch ;
+  /* loop over bunches */
+  for (bloop = TrackArgs->FirstBunch-1 ; bloop < TrackArgs->LastBunch ; bloop++)
   {
-    BadInitMomentumMessage( )  ;
-    GlobalStatus = 2 ;
-    goto egress ;
-  }
-  
-  /* Copy bunch data over to GPU */
+    TheBunch = TrackArgs->TheBeam->bunches[bloop] ;
+    momStat = (int*) calloc(TheBunch->nray,sizeof(int)) ;
+    memset(momStat, 0, sizeof(int)*TheBunch->nray) ;
 #ifdef __CUDACC__
-  XCPU2GPU( TrackArgs ) ;
-#endif
+    cudaMalloc(&momStat_gpu, sizeof(int)*TheBunch->nray);
+    cudaMemset(momStat_gpu, 0, sizeof(int)*TheBunch->nray) ;
+    InitialMomentumCheck<<<blocksPerGrid,threadsPerBlock>>>(momStat_gpu,TheBunch->stop,TheBunch->ngoodray_gpu,TheBunch->x,TheBunch->y,
+            TheBunch->nray, StoppedParticles_gpu ) ;
+    cudaMemcpy(momStat,momStat_gpu,sizeof(int)*TheBunch->nray,cudaMemcpyDeviceToHost) ;
+#else    
+    for (RayLoop = 0 ; RayLoop < TheBunch->nray ; RayLoop++)
+      InitialMomentumCheck( momStat, TheBunch->stop, &TheBunch->ngoodray, TheBunch->x, TheBunch->y, RayLoop, StoppedParticles ) ;
+#endif    
+    for (RayLoop = 0 ; RayLoop < TheBunch->nray ; RayLoop++)
+    {
+      if (momStat[RayLoop] != 0)
+      {
+        if (*momStat<0)
+          BadParticlePperpMessage( 0, bloop+1, abs(*momStat)+1 ) ;
+        else
+          BadParticleMomentumMessage( 0, bloop+1, *momStat+1 ) ;
+        BadInitMomentumMessage( )  ;
+        GlobalStatus = 2 ;
+        free(momStat) ;
+#ifdef __CUDACC__
+        cudaFree(momStat_gpu) ;
+#endif        
+        goto egress ;
+      }
+    }
+  }
+  free(momStat) ;
+#ifdef __CUDACC__
+  cudaFree(momStat) ;
+#endif  
   
   /* without further ado, begin the two loops */
-  
   OuterLoop = OuterStart ;
   do
   {
@@ -1346,10 +1384,10 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           BadTrackFlagMessage( (*ElemLoop)+1 ) ;
           goto egress ;
         }
-	/* Copy TFlag over to GPU */
+        /* Copy TFlag over to GPU */
 #ifdef __CUDACC__
-	cudaMemcpy(TFlag_gpu, TFlag, sizeof(int)*NUM_TRACK_FLAGS, cudaMemcpyHostToDevice) ;
-#endif        
+        cudaMemcpy(TFlag_gpu, TFlag, sizeof(int)*NUM_TRACK_FLAGS, cudaMemcpyHostToDevice) ;
+#endif
         
         /* get the element class string */
         
@@ -1374,7 +1412,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
 #ifdef __CUDACC__
-	    TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
 #else
             TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
 #endif
@@ -1382,13 +1420,9 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
+            
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1399,21 +1433,16 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
 #ifdef __CUDACC__
-	  TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, 0, 0, TFlag[Aper] ) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, 0, 0, TFlag[Aper] ) ;
 #else
           TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, 0, 0, TFlag[Aper] ) ;
 #endif
-	  if (TrackStatus == 0) {
+          if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if (strcmp(ElemClass,"SEXT")==0)
@@ -1421,20 +1450,21 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
         lastS = *sp ;
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if (TrackStatus == 0) {
-          GlobalStatus = TrackStatus ;
-          goto egress ;
-        }
+        
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
 #ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
 #else
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
+#endif
+            if (TrackStatus == 0) {
+              GlobalStatus = TrackStatus ;
+              goto egress ;
+            }
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
+            
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1444,14 +1474,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0, TFlag[Aper] ) ;
 #ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 3, 0, 0, TFlag[Aper] ) ;
 #else
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0, TFlag[Aper] ) ;
+#endif
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if (strcmp(ElemClass,"OCTU")==0)
@@ -1461,18 +1494,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
+#ifdef __CUDACC__
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
+#else
             TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
+#endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1482,14 +1514,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0, TFlag[Aper] ) ;
 #ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 4, 0, 0, TFlag[Aper] ) ;
 #else
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0, TFlag[Aper] ) ;
+#endif
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if (strcmp(ElemClass,"SOLENOID")==0)
@@ -1499,18 +1534,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
+#ifdef __CUDACC__
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
+#else
             TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
+#endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1520,14 +1554,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0, TFlag[Aper] ) ;
 #ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 0, 0, TFlag[Aper] ) ;
 #else
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0, TFlag[Aper] ) ;
+#endif
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if (strcmp(ElemClass,"MULT")==0)
@@ -1537,18 +1574,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
+#ifdef __CUDACC__
+            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS, lastS ) ;
+#else
             TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS ) ;
+#endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1558,14 +1594,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
 #ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 0 ) ;
 #else
+          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
+#endif
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
         
       }
@@ -1581,16 +1620,17 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         
         /* Track first split element with just upstream edge effects allowed */
         if ( TFlag[Split]>0 || trackIter > 0 ) {
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                  TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0  ) ;
-          
 #ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 1, 0, 1./( TFlag[Split] ), 0  ) ;
 #else
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0  ) ;
+#endif
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
           /* Apply CSR if requested */
           if ( trackIter > 0 )
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
@@ -1599,39 +1639,41 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         /* Now track rest, if any, of the splits with neither edge effects allowed */
         if ( TFlag[Split] > 0 ) {
           for (iter = 0; iter < TFlag[Split]-2; iter++) {
-            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                    TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
-            
 #ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
 #else
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
 #endif
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
+            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
+                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
             /* Apply CSR if requested */
             if ( trackIter > 0 )
               GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
           }
         } /* If no splits or CSR requested, just track once as normal */
         else if ( TFlag[Split]==0 && trackIter==0 )
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                  TrackArgs, TFlag, 1, 1, 1, 0  ) ;
+#ifdef __CUDACC__          
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 1, 1, 1, 0  ) ;
+#else
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1, 1, 1, 0  ) ;
+#endif          
         /* If tracking split then track last split with downstream edge allowed only now */
         if ( TFlag[Split] > 0 || trackIter > 0 )
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop,
-                  TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
-#ifdef __CUDACC__
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+#ifdef __CUDACC__               
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
 #else
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
+#endif
+        if (TrackStatus == 0) {
+          GlobalStatus = TrackStatus ;
+          goto egress ;
+        }
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                 TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         
         /* Apply CSR if requested */
         if ( trackIter > 0 )
@@ -1655,25 +1697,15 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         /* Split status not supported for LCAV now- too damned complicated to figure out how to split up
          * and correctly deal with wakefield and BPM details */
         TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDACC__
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                 TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
       }
       else if (strcmp(ElemClass,"TCAV")==0)
       {
         /* No split status treatment for TCAV's - see above */
         TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1 ) ;
-#ifdef __CUDACC__
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                 TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
       }
       else if ( (strcmp(ElemClass,"HMON")==0) ||
               (strcmp(ElemClass,"VMON")==0) ||
@@ -1689,13 +1721,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1707,13 +1734,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if ( (strcmp(ElemClass,"PROF")==0) ||
@@ -1733,13 +1755,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1751,13 +1768,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       
@@ -1773,13 +1785,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1790,13 +1797,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XCOR, 0, 0 ) ;
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       
@@ -1812,13 +1814,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1829,13 +1826,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, YCOR, 0, 0 ) ;
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if ( strcmp(ElemClass,"XYCOR")==0 )
@@ -1850,16 +1842,11 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
-            if (trackIter>0) 
+            if (trackIter>0)
               trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
             else
               trackIter = 0;
@@ -1867,13 +1854,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XYCOR, 0, 0 ) ;
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if ( strcmp(ElemClass,"COLL")==0 )
@@ -1888,13 +1870,8 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1905,26 +1882,16 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
       }
       else if ( strcmp(ElemClass,"COORD")==0 )
       {
         TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop,
                 TrackArgs, TFlag ) ;
-#ifdef __CUDACC__
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
         XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                 TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
       }
       
       else if ( strcmp(ElemClass,"MARK")==0 )
@@ -1940,7 +1907,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
 #ifdef __CUDACC__
-	    TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS ) ;
+            TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS ) ;
 #else
             TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
 #endif
@@ -1948,15 +1915,9 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-#ifdef __CUDACC__
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
             XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                     TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            /*printf("ele: %d driftL: %f s: %f s_last %f\n",*ElemLoop,trackIter,thisS,lastS);*/
             lastS = thisS ;
             if (trackIter>0)
               trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
@@ -1968,19 +1929,14 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 #ifdef __CUDACC__
           TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0 ) ;
 #else
-	  TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
+          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
 #endif
-	  if (TrackStatus == 0) {
+          if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-#ifdef __CUDACC__
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x_gpu, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#else
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-#endif
         }
         
       }
@@ -2011,9 +1967,9 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   egress:
     
     /* Copy GPU data over to CPU */
-#ifdef __CUDACC__
-    XGPU2CPU( TrackArgs ) ;
-#endif
+// #ifdef __CUDACC__
+//     XGPU2CPU( TrackArgs ) ;
+// #endif
     
     /* put the latched status back into TrackArgs */
     
@@ -2096,7 +2052,6 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   double* Pmod ;
   
   /* get the length of the drift space */
-  
   L = GetElemNumericPar( elemno, "L", NULL ) ;
   
   if ( splitScale == 0 )
@@ -2110,22 +2065,16 @@ int TrackBunchThruDrift( int elemno, int bunchno,
     Lfull = *L * splitScale ;
   
   /* get the design Lorentz delay */
-  
   Pmod = GetElemNumericPar( elemno, "P", NULL ) ;
   dZmod = GetDesignLorentzDelay( Pmod ) ;
   
   /* get the address of the bunch in question */
-  
   ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
   /* since about half of the coordinate data in the "output" bunch
    * is the same as the "input" bunch (px, py, p0), start by simply
    * exchanging the pointers of the input and output bunches */
-#ifdef __CUDACC__
-  XYExchange( &ThisBunch->x_gpu, &ThisBunch->y, ThisBunch->nray ) ;
-#else
   XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
-#endif
   
   /* execute ray tracking kernel (loop over rays) */
 #ifdef __CUDACC__
@@ -2134,7 +2083,7 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   cudaMalloc(&Lfull_gpu, sizeof(double)) ; cudaMalloc(&dZmod_gpu, sizeof(double)) ;
   cudaMemcpy(Lfull_gpu, &Lfull, sizeof(double), cudaMemcpyHostToDevice) ;
   cudaMemcpy(dZmod_gpu, &dZmod, sizeof(double), cudaMemcpyHostToDevice) ;
-  TrackBunchThruDrift_kernel<<<blocksPerGrid, threadsPerBlock>>>(Lfull_gpu, dZmod_gpu, ThisBunch->y, ThisBunch->stop_gpu, TrackFlag, ThisBunch->nray);
+  TrackBunchThruDrift_kernel<<<blocksPerGrid, threadsPerBlock>>>(Lfull_gpu, dZmod_gpu, ThisBunch->y, ThisBunch->stop, TrackFlag, ThisBunch->nray);
   cudaFree(Lfull_gpu); cudaFree(dZmod_gpu);
 #else
   for ( rayloop=0 ; rayloop<ThisBunch->nray ; rayloop++ )
@@ -2158,7 +2107,7 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
 #else
   i = N;
 #endif
-
+  
   /* if the bunch was previously stopped on an aperture, loop */
   if (stop[i] != 0.) return ;
   
@@ -2191,7 +2140,7 @@ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double
 
 int TrackBunchThruQSOS( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc,
-			int* TrackFlag, int nPoleFlag, double splitScale, double splitS, int TFlagAper )
+        int* TrackFlag, int nPoleFlag, double splitScale, double splitS, int TFlagAper )
 {
   
   double L,B,Tilt ;              /* some basic parameters */
@@ -2288,7 +2237,7 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
             (1. +  GetDBValue(PSPar+PSdAmpl) ) ;
     
   } /* end of PS interlude
-     *
+   *
    * /* now we get the complete input- and output- transformations for the
    * element courtesy of the relevant function */
   
@@ -2352,9 +2301,9 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
   cudaMalloc((void **)&Xfrms_gpu, sizeof(double)*12) ;
   Xfrms_flat = &(Xfrms[0][0]) ;
   cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(double)*12, cudaMemcpyHostToDevice) ;
-  TrackBunchThruQSOS_kernel<<<blocksPerGrid, threadsPerBlock>>>(ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->y, ThisBunch->x_gpu, TrackFlag,
+  TrackBunchThruQSOS_kernel<<<blocksPerGrid, threadsPerBlock>>>(ThisBunch->nray, ThisBunch->stop, ThisBunch->y, ThisBunch->x, TrackFlag,
           ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms_gpu, dZmod, StoppedParticles_gpu,
-								PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates ) ;
+          PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates ) ;
   cudaFree(Xfrms_gpu);
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
@@ -2372,13 +2321,13 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
 /* Quad, Sext, Octu, Solenoid Tracking kernel*/
 #ifdef __CUDACC__
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-			       int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
-			       int skew, double* pXfrms, double dZmod, int* stp, double* PascalMatrix, double* Bang,
-			       double* MaxMultInd, unsigned long long rSeed, curandState *rState)
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
+        int skew, double* pXfrms, double dZmod, int* stp, double* PascalMatrix, double* Bang,
+        double* MaxMultInd, unsigned long long rSeed, curandState *rState)
 #else
-void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
-			       int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
-			       int skew, double Xfrms[6][2], double dZmod, int* stp)
+        void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
+        int skew, double Xfrms[6][2], double dZmod, int* stp)
 #endif
 {
   int ray,coord,raystart,doStop,icount ;
@@ -2635,13 +2584,13 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
   doStop = CheckPperpStopPart( stop, ngoodray , elemno, ray,
           px, py, stp ) ;
   
- egress:
-  /* Copy rng state back to global memory */
+  egress:
+    /* Copy rng state back to global memory */
 #ifdef __CUDA_ARCH__
-  rState[ray] = rState_local ;
+    rState[ray] = rState_local ;
 #endif
-  return ;
-
+    return ;
+    
 }
 
 /*=====================================================================*/
@@ -2654,7 +2603,10 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
  * /* ABORT:  never.
  * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
  * and self-consistent structure for bunch # bunchno or if
- * BEAMLINE{elemno} is not some sort of magnet.  */
+ * BEAMLINE{elemno} is not some sort of magnet. 
+ * ===========================================
+ * GRW: 1/8/14 : Remove checking of aper>0 and Lrad>0, changed local
+ * function to not do aper checking / syn rad if 0 instead*/
 
 int TrackBunchThruMult( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc, int* TrackFlag, double splitScale, double splitS  )
@@ -2678,6 +2630,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
   double Lrad ;
 #ifdef __CUDACC__
   double *PascalMatrix, *Bang, *MaxMultInd ;
+  double *Xfrms_flat = NULL ;
 #endif
   
   /* get the element parameters from BEAMLINE; exit with bad status if
@@ -2739,26 +2692,6 @@ int TrackBunchThruMult( int elemno, int bunchno,
   
   Lrad *= splitScale ;
   
-  /* if aperture is zero but aperture track flag is on,
-   * it's an error.  Set error status and exit. */
-  
-  if ( (aper2 == 0.) && (TrackFlag[Aper] == 1) )
-  {
-    BadApertureMessage( elemno+1 ) ;
-    stat = 0 ;
-    goto egress ;
-  }
-  
-  /* if SR is turned on, make sure there's a nonzero Lrad to be used! */
-  
-  if ( (TrackFlag[SynRad]!=SR_None) &&
-          (Lrad<=0.)                       )
-  {
-    BadSROptionsMessage( elemno+1 ) ;
-    stat = 0 ;
-    goto egress ;
-  }
-  
   /* now the error parameters */
   
   dB = 1. + GetDBValue(MultPar+MultdB) ;
@@ -2766,6 +2699,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
   /* now get the power supply parameters, if any */
   
   PS = (int)(GetDBValue(MultPar+MultPS)) ;
+  
   if (PS > 0)
   {
     
@@ -2783,7 +2717,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
             (1. +  GetDBValue(PSPar+PSdAmpl) ) ;
     
   } /* end of PS interlude
-     *
+   *
    * /* now we get the complete input- and output- transformations for the
    * element courtesy of the relevant function */
   
@@ -2821,16 +2755,33 @@ int TrackBunchThruMult( int elemno, int bunchno,
   PascalMatrix = GetPascalMatrix_gpu( ) ;
   Bang = GetFactorial_gpu( ) ;
   MaxMultInd = GetMaxMultipoleIndex_gpu( ) ;
-  TrackBunchThruMult_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->stop_gpu, ThisBunch->x_gpu, ThisBunch->y, TrackFlag,
-          ThisBunch->ngoodray_gpu, elemno, aper2, L, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr,
-          MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
-          MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale,
-								 StoppedParticles_gpu, PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates) ;
+  double *Xfrms_gpu ;
+  double *MultAngleValue, *MultBValue, *MultTiltValue, *MultPoleIndexValue ;
+  cudaMalloc((void **)&Xfrms_gpu, sizeof(double)*12) ;
+  Xfrms_flat = &(Xfrms[0][0]) ;
+  cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(double)*12, cudaMemcpyHostToDevice) ;
+  cudaMalloc((void **)&MultAngleValue, sizeof(double)*MultPar[MultAngle].Length) ;
+  cudaMalloc((void **)&MultBValue, sizeof(double)*MultPar[MultB].Length) ;
+  cudaMalloc((void **)&MultTiltValue, sizeof(double)*MultPar[MultTilt].Length) ;
+  cudaMalloc((void **)&MultPoleIndexValue, sizeof(double)*MultPar[MultPoleIndex].Length) ;
+  cudaMemcpy(MultAngleValue, MultPar[MultAngle].ValuePtr, sizeof(double)*MultPar[MultAngle].Length, cudaMemcpyHostToDevice) ;
+  cudaMemcpy(MultBValue, MultPar[MultB].ValuePtr, sizeof(double)*MultPar[MultB].Length, cudaMemcpyHostToDevice) ;
+  cudaMemcpy(MultTiltValue, MultPar[MultTilt].ValuePtr, sizeof(double)*MultPar[MultTilt].Length, cudaMemcpyHostToDevice) ;
+  cudaMemcpy(MultPoleIndexValue, MultPar[MultPoleIndex].ValuePtr, sizeof(double)*MultPar[MultPoleIndex].Length, cudaMemcpyHostToDevice) ;
+  TrackBunchThruMult_kernel<<<blocksPerGrid, threadsPerBlock>>>( MultAngleValue, MultBValue, MultTiltValue, MultPoleIndexValue,
+          MultPar[MultPoleIndex].Length, ThisBunch->nray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag,
+          ThisBunch->ngoodray_gpu, elemno, aper2, L, dB, Tilt, Lrad, Xfrms_gpu, dZmod, splitScale, StoppedParticles_gpu,
+          PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates) ;
+  cudaFree(Xfrms_gpu);
+  cudaFree(MultAngleValue);
+  cudaFree(MultBValue);
+  cudaFree(MultTiltValue);
+  cudaFree(MultPoleIndexValue);
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
-    TrackBunchThruMult_kernel( ray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, L,
-            MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr, MultPar[MultPoleIndex].Length,
-            MultPar[MultAngle].ValuePtr, dB, Tilt, Lrad, Xfrms, dZmod, splitScale, StoppedParticles) ;
+    TrackBunchThruMult_kernel( MultPar[MultAngle].ValuePtr, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr,
+          MultPar[MultPoleIndex].Length, ray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, L,
+          dB, Tilt, Lrad, Xfrms, dZmod, splitScale, StoppedParticles) ;
 #endif
   
   egress:
@@ -2839,14 +2790,14 @@ int TrackBunchThruMult( int elemno, int bunchno,
     
 }
 #ifdef __CUDACC__
-void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
-        double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp,
-			       double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState)
+void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
+        int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double* pXfrms, double dZmod, double splitScale, int* stp,
+        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState)
 #else
-        void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, double L, double* MultBValue, double* MultTiltValue, double* MultPoleIndex, int MultPoleIndexLength,
-        double* MultAngleValue, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp)
+void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
+        int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
+        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp)
 #endif
         
 {
@@ -2859,6 +2810,14 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
 #else
   ray = nray;
 #endif
+#ifdef __CUDACC__
+  double Xfrms[6][2] ;
+  int irw, icol ;
+  for (irw=0;irw<6;irw++)
+    for (icol=0;icol<2;icol++)
+      Xfrms[irw][icol]=pXfrms[(2*irw)+icol] ;
+#endif
+  
   raystart = 6*ray ;
   
   /* if the ray was previously stopped copy it over */
@@ -2882,7 +2841,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   
   /* entrance-face aperture test, if requested */
   
-  if (TrackFlag[Aper] == 1)
+  if (TrackFlag[Aper] == 1 && aper2>0)
   {
     doStop = CheckAperStopPart( xb,yb,stop,ngoodray,elemno,&aper2,ray,UPSTREAM,
             NULL, 0, stp ) ;
@@ -2896,10 +2855,13 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   
   /*		ThisBunch->y[raystart+4] = ThisBunch->x[raystart+4] ; */
 #ifdef __CUDA_ARCH__
+//   yb[raystart] = 999 ;
+//   yb[raystart+1] = MultPoleIndex ;
+//   return ;
   PropagateRayThruMult_gpu( L,
           MultBValue,
           MultTiltValue,
-          MultPoleIndex,
+          MultPoleIndexValue,
           MultPoleIndexLength,
           MultAngleValue,
           dB, Tilt,
@@ -2912,7 +2874,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   PropagateRayThruMult( L,
           MultBValue,
           MultTiltValue,
-          MultPoleIndex,
+          MultPoleIndexValue,
           MultPoleIndexLength,
           MultAngleValue,
           dB, Tilt,
@@ -2946,13 +2908,13 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
   /* check amplitude of outgoing angular momentum */
   
   doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py, stp ) ;
-
- egress:
-  /* copy rng state back to global memory */
+  
+  egress:
+    /* copy rng state back to global memory */
 #ifdef __CUDA_ARCH__
-  rState[ray] = rState_local ;
+    rState[ray] = rState_local ;
 #endif
-  return ;
+    return ;
 }
 
 
@@ -2973,7 +2935,7 @@ void TrackBunchThruMult_kernel(int nray, double* stop, double* xb, double* yb, i
 
 int TrackBunchThruSBend( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc,
-			 int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit )
+        int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit )
 {
   
   double L,Tilt ;                /* some basic parameters */
@@ -2994,6 +2956,9 @@ int TrackBunchThruSBend( int elemno, int bunchno,
   int ray ;              /* shortcut for 6*ray */
 #endif
   struct Bunch* ThisBunch ;    /* a shortcut */
+#ifdef __CUDACC__
+  double *Xfrms_flat = NULL ;
+#endif
   
   int stat = 1 ;
   double OffsetFromTiltError ;
@@ -3158,9 +3123,14 @@ int TrackBunchThruSBend( int elemno, int bunchno,
   
   /* execute ray tracking kernel (loop over rays) */
 #ifdef __CUDACC__
-  TrackBunchThruSBend_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->x_gpu, ThisBunch->y, ThisBunch->stop_gpu,
-          TrackFlag, Xfrms, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
-								  elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed, rngStates) ;
+  double *Xfrms_gpu ;
+  cudaMalloc((void **)&Xfrms_gpu, sizeof(double)*12) ;
+  Xfrms_flat = &(Xfrms[0][0]) ;
+  cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(double)*12, cudaMemcpyHostToDevice) ;
+  TrackBunchThruSBend_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->x, ThisBunch->y, ThisBunch->stop,
+          TrackFlag, Xfrms_gpu, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
+          elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed, rngStates) ;
+  cudaFree(Xfrms_gpu);
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruSBend_kernel(ray, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, Xfrms, cTT, sTT, Tx, Ty,
@@ -3174,10 +3144,10 @@ int TrackBunchThruSBend( int elemno, int bunchno,
     
 }
 #ifdef __CUDACC__
-void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
+void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double* pXfrms, double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-				double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState)
+        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState)
 #else
         void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
@@ -3195,7 +3165,13 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   Rmat Rface1, Rface2, Rbody ; /* linear maps */
   double T5xx1[10], T5xx2[10], T5xxbody[10] ; /* 2nd order maps */
   double* temp;
-  
+#ifdef __CUDACC__
+  double Xfrms[6][2] ;
+  int irw, icol ;
+  for (irw=0;irw<6;irw++)
+    for (icol=0;icol<2;icol++)
+      Xfrms[irw][icol]=pXfrms[(2*irw)+icol] ;
+#endif
 #ifdef __CUDA_ARCH__
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
   if ( ray >= nray ) return;
@@ -3205,6 +3181,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
 #endif
   
   raystart = 6*ray ;
+  
   
   /* if the ray was previously stopped copy it over */
   
@@ -3221,7 +3198,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   GetLocalCoordPtrs(xb, raystart,&x,&px,&y,&py,&z,&p0) ;
   
   ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
-  
+    
   /* rotate particles into the coordinate frame of the magnet.  Note that the
    * offsets are performed first, indicating that both rotation and translation
    * of each magnet is in the global coordinate system (ie, the translation is
@@ -3409,13 +3386,13 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   /* finally, if the transverse momentum has gotten too high, stop the particle */
   
   doStop = CheckPperpStopPart( stop, ngoodray, elemno, ray, px, py, stp ) ;
-
- egress:
-#ifdef __CUDA_ARCH__  
-  /* Copy rng state back to global memory */
-  rState[ray] = rState_local ;
-#endif  
-  return ;
+  
+  egress:
+#ifdef __CUDA_ARCH__
+    /* Copy rng state back to global memory */
+    rState[ray] = rState_local ;
+#endif
+    return ;
 }
 
 /*=====================================================================*/
@@ -3962,7 +3939,7 @@ int TrackBunchThruRF( int elemno, int bunchno,
               1 ) ;
     
     /* if this is the last bunch, and we are tracking element-wise, forget
-   about which bunch was first/last in this structure */
+     * about which bunch was first/last in this structure */
     
     if ( (bunchno+1 == ArgStruc->LastBunch) &&
             (ArgStruc->BunchwiseTracking == 0)    )
@@ -6799,7 +6776,6 @@ void XYExchange( double** xb, double** yb, int nray )
 {
   double* temp ;
   
-  /* If using GPU, swap x_gpu and y */
 #ifdef __CUDACC__
   cudaMalloc((void**)&temp, 6*nray*sizeof(double)) ;
   cudaMemcpy(temp, *xb, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
@@ -6819,142 +6795,50 @@ void XYExchange( double** xb, double** yb, int nray )
 
 /*=====================================================================*/
 
-/* Copy required data from CPU memory to GPU memory*/
-
-/* RET:    None.
- * /* ABORT:  never.
- * /* FAIL:   never. */
-#ifdef __CUDACC__
-void XCPU2GPU( struct TrackArgsStruc* ArgStruc )
-{
-  int i ;
-  cudaError_t cerr;
-  for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
-  {
-    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x_gpu, ArgStruc->TheBeam->bunches[i]->x,
-            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
-    if (cerr != cudaSuccess)
-    {
-      printf("CUDA Falied to copy bunch info to device!\n");
-    }
-    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q_gpu, ArgStruc->TheBeam->bunches[i]->Q,
-            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
-    if (cerr != cudaSuccess)
-    {
-      printf("CUDA Falied to copy bunch info to device!\n");
-    }
-    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop_gpu, ArgStruc->TheBeam->bunches[i]->stop,
-            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyHostToDevice) ;
-    if (cerr != cudaSuccess)
-    {
-      printf("CUDA Falied to copy bunch info to device!\n");
-    }
-  }
-  return ;
-  
-}
-#endif
-
-/*=====================================================================*/
-
-/* Copy required data from GPU memory to CPU memory*/
-
-/* RET:    None.
- * /* ABORT:  never.
- * /* FAIL:   never. */
-
-#ifdef __CUDACC__
-void XGPU2CPU( struct TrackArgsStruc* ArgStruc )
-{
-  int i;
-  cudaError_t cerr;
-  for (i = ArgStruc->FirstBunch-1 ; i < ArgStruc->LastBunch ; i++)
-  {
-    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->x, ArgStruc->TheBeam->bunches[i]->x_gpu,
-            6*ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
-    if (cerr == cudaSuccess)
-    {
-      /*printf("CUDA OK!\n");*/
-    }
-    else printf("CUDA FAIL! (%d)\n",cerr);
-    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->Q, ArgStruc->TheBeam->bunches[i]->Q_gpu,
-            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
-    if (cerr == cudaSuccess)
-    {
-      /*printf("CUDA OK!\n");*/
-    }
-    else printf("CUDA FAIL!\n");
-    cerr=cudaMemcpy(ArgStruc->TheBeam->bunches[i]->stop, ArgStruc->TheBeam->bunches[i]->stop_gpu,
-            ArgStruc->TheBeam->bunches[i]->nray*sizeof(double), cudaMemcpyDeviceToHost) ;
-    if (cerr == cudaSuccess)
-    {
-      /*printf("CUDA OK!\n");*/
-    }
-    else printf("CUDA FAIL!\n");
-  }
-  return ;
-  
-}
-#endif
-
-/*=====================================================================*/
-
 /* Perform initial check of all momenta in a tracked bunch.  If some are
  * bad (P0 <= 0 or Pperp >= 1) raise a warning and issue a message. */
 
-/* RET:    Status, 1 = all incoming particles OK (good p0 and Pperp, or
- * bad p0 and/or Pperp but stopped), 0 = some particles which
- * came in bad but not stopped.
+/* RET:    Status (stat), 0 = all incoming particles OK (good p0 and Pperp, or
+ * bad p0 and/or Pperp but stopped), >0 = bad p <0 = bad pt
  * /* ABORT:  never.
  * /* FAIL:   never. */
-
-int InitialMomentumCheck( struct TrackArgsStruc *TrackArgs )
+#ifdef __CUDACC__
+__global__ void InitialMomentumCheck( int* stat, double* bstop, int *ngoodray, double* x, double* y, int RayLoop, int* stp )
+#else
+void InitialMomentumCheck( int* stat, double* bstop, int *ngoodray, double* x, double* y, int RayLoop, int* stp )
+#endif
 {
-  int BunchLoop, RayLoop, stop ;
-  struct Bunch* TheBunch ;
+  int stop, i ;
   double *px, *py ;
-  int stat = 1 ;
-  int dmy = 0 ;
   
-  /* loop over bunches */
+#ifdef __CUDA_ARCH__
+  i = blockDim.x * blockIdx.x + threadIdx.x ;
+  if ( i >= RayLoop ) return;
+#else
+  i = RayLoop;
+#endif
   
-  for (BunchLoop = TrackArgs->FirstBunch-1 ;
-  BunchLoop < TrackArgs->LastBunch ;
-  BunchLoop++)
+  stat[i] = 0 ;
+  if (bstop[i] == 0)
   {
-    TheBunch = TrackArgs->TheBeam->bunches[BunchLoop] ;
-    
-    /* loop over rays */
-    
-    for (RayLoop = 0 ;
-    RayLoop < TheBunch->nray ;
-    RayLoop++)
+    stop = CheckP0StopPart( bstop, ngoodray, x, y, 0, i, x[6*i+5], UPSTREAM, stp ) ;
+    if (stop != 0)
     {
-      if (RayLoop > 395)
-        dmy++ ;
-      if (TheBunch->stop[RayLoop] == 0)
+      stat[i] = 1 ;
+      return ;
+    }
+    else
+    {
+      px = &(x[6*i+1]) ;
+      py = &(x[6*i+3]) ;
+      stop = CheckPperpStopPart( bstop, ngoodray, 0, i, px, py, stp ) ;
+      if (stop != 0)
       {
-        stop = 0 ;
-        stop = CheckP0StopPart( TheBunch->stop,&TheBunch->ngoodray,TheBunch->x,TheBunch->y, 0, RayLoop,
-                TheBunch->x[6*RayLoop+5], UPSTREAM, StoppedParticles ) ;
-        if (stop != 0)
-          BadParticleMomentumMessage( 0, BunchLoop+1, RayLoop+1 ) ;
-        else
-        {
-          px = &(TheBunch->x[6*RayLoop+1]) ;
-          py = &(TheBunch->x[6*RayLoop+3]) ;
-          stop = CheckPperpStopPart( TheBunch->stop, &TheBunch->ngoodray, 0, RayLoop, px, py, StoppedParticles ) ;
-          if (stop != 0)
-            BadParticlePperpMessage( 0, BunchLoop+1, RayLoop+1 ) ;
-        }
-        if (stop !=0)
-          stat = 0 ;
+        stat[i] = -1 ;
+        return ;
       }
     }
   }
-  
-  return stat ;
-  
 }
 
 /*=====================================================================*/
@@ -8986,7 +8870,6 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   
   /* Record Bend downstrem face location and Angle */
   usL = *S + *L ;
-  /*printf("S1: %f L1: %f usL1: %f\n",*S,*L,usL);*/
   ANG = GetElemNumericPar(elemNo, "Angle", NULL) ;
   R=*L / ( 2 * sin(fabs(*ANG)/2) );
   angle += *ANG ;
@@ -9007,13 +8890,6 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   else
     dsL[0] = 0 ;
   lPointer = 0 ;
-  /*printf("ldecay: %f S: %f L: %f usL: %f calc: %f\n",lDecay,*S,*L,usL,24*rmsDim*pow(fabs(R),2));
-  printf("dL:");
-  for (iL=0; iL<1000; iL++) {
-    if (dsL[iL]==0) break;
-    printf(" %f",dsL[iL]);
-  }
-  printf("\n");*/
   
   thisS = NULL ;
   
@@ -9024,9 +8900,9 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
 #ifdef __CUDACC__
 __global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed)
 {
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-    /* Each thread gets same seed, a different sequence 
-       number, no offset */
-    curand_init(rSeed, id, 0, &state[id]);
+  int id = threadIdx.x + blockIdx.x * blockDim.x;
+  /* Each thread gets same seed, a different sequence
+   * number, no offset */
+  curand_init(rSeed, id, 0, &state[id]);
 }
 #endif
