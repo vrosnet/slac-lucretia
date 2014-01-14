@@ -1547,15 +1547,18 @@ void ClearMaxMultipoleStuff( )
     MaxMult = -1 ;
   }
 #ifdef __CUDACC__ /* clear device associated variable memory */
-  cudaFreeHost(dTheMatrix) ;
+  /*cudaFreeHost(dTheMatrix) ;
   cudaFreeHost(dTheFact) ;
-  cudaFreeHost(dMaxMult) ;
+  cudaFreeHost(dMaxMult) ; */
+  cudaFree(dTheMatrix);
+  cudaFree(dTheFact);
+  cudaFree(dMaxMult);
 #endif  
 }
 
 void ComputeNewMultipoleStuff(double MultSize)
 {
-  double* MMptr = NULL ;
+  /* double* MMptr = NULL ; */
   mxArray* prhs_lin[3]  ;   /* arguments for "linspace" call */
   mxArray* prhs_pas[2]  ;   /* arguments for "pascal" call */
   
@@ -1604,14 +1607,20 @@ void ComputeNewMultipoleStuff(double MultSize)
   mxDestroyArray( plhs_lin[0]  ) ;
   /*	mxDestroyArray( plhs_fact[0] ) ; */
   
-#ifdef __CUDACC__ /* Create associated persistent variables on the device */
-  cudaHostAlloc( (void**) &TheMatrix, MaxMult*sizeof(double), cudaHostAllocMapped );
-  cudaHostGetDevicePointer ( &dTheMatrix, TheMatrix, 0 ) ;
-  cudaHostAlloc( (void**) &TheFact, 3*sizeof(double), cudaHostAllocMapped );
-  cudaHostGetDevicePointer ( &dTheFact, TheFact, 0 ) ;
-  MMptr = &MaxMult ;
+#ifdef __CUDACC__ /* Create associated variables on the CUDA device */
+  /*cudaHostAlloc( (void**) &TheMatrix, MaxMult*MaxMult*sizeof(double), cudaHostAllocMapped );
+  cudaHostGetDevicePointer ( &dTheMatrix, TheMatrix, 0 ) ;*/
+  cudaMalloc((void **)&dTheMatrix, sizeof(double)*MaxMult*MaxMult) ;
+  cudaMemcpy(dTheMatrix, TheMatrix, sizeof(double)*MaxMult*MaxMult, cudaMemcpyHostToDevice) ;
+  /*cudaHostAlloc( (void**) &TheFact, 3*sizeof(double), cudaHostAllocMapped );
+  cudaHostGetDevicePointer ( &dTheFact, TheFact, 0 ) ;*/
+  cudaMalloc((void **)&dTheFact, sizeof(double)*(MaxMult+1)) ;
+  cudaMemcpy(dTheFact, TheFact, sizeof(double)*(MaxMult+1), cudaMemcpyHostToDevice) ;
+  /*MMptr = &MaxMult ;
   cudaHostAlloc( (void**) &MMptr, sizeof(double), cudaHostAllocMapped );
-  cudaHostGetDevicePointer ( &dMaxMult, &MaxMult, 0 ) ;
+  cudaHostGetDevicePointer ( &dMaxMult, &MaxMult, 0 ) ;*/
+  cudaMalloc((void **)&dMaxMult, sizeof(double)) ;
+  cudaMemcpy(dMaxMult, &MaxMult, sizeof(double), cudaMemcpyHostToDevice) ;
 #endif
   
   return ;
