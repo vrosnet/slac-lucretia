@@ -69,6 +69,7 @@ classdef Track < handle
     doPlasmaTrack=0; % Include tracking through plasma region (0=no)
     beamStoreInd=[]; % Store the full beam at additional points along the lattice
     centerZInd=[]; % Indices to re-center longitudinal distribution
+    zOffset=0; % Phase offset in bunch (m), used if centerZInd present
   end
   properties(SetAccess=protected)
     isDistrib=false; % Is this Track object opererating in distributed mode?
@@ -342,7 +343,7 @@ classdef Track < handle
                     bstore(bi)=beamout;
                   end
                   if ismember(interele(iele),czind)
-                    B.Bunch.x(5,:)=B.Bunch.x(5,:)-median(B.Bunch.x(5,:));
+                    B.Bunch.x(5,:)=B.Bunch.x(5,:)-median(B.Bunch.x(5,:))+obj.zOffset;
                   end
                 end
               end
@@ -391,7 +392,7 @@ classdef Track < handle
               obj.beamStore(bi)=beamout;
             end
             if ismember(interele(iele),czind)
-              B.Bunch.x(5,:)=B.Bunch.x(5,:)-median(B.Bunch.x(5,:));
+              B.Bunch.x(5,:)=B.Bunch.x(5,:)-median(B.Bunch.x(5,:))+obj.zOffset;
             end
           end
         end
@@ -629,8 +630,10 @@ classdef Track < handle
       data.ydisp=Ty.eta;
       data.xdp=Tx.etap;
       data.ydp=Ty.etap;
-      data.betax=data.xrms^2/data.emit_x;
-      data.betay=data.yrms^2/data.emit_y;
+      data.betax=Tx.beta;
+      data.betay=Ty.beta;
+      data.alphax=Tx.alpha;
+      data.alphay=Tx.alpha;
       data.sig13=data.sigma(1,3);
       data.sig23=data.sigma(2,3);
       data.sig14=data.sigma(1,4);
