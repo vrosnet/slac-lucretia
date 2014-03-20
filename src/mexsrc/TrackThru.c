@@ -152,7 +152,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
   egress:
     
     TrackThruSetReturn( TrackArgs, nlhs, plhs, DidTracking ) ;
-//     cudaDeviceReset() ; // For profiling
+    /*     cudaDeviceReset() ; // For profing */
     
 }
 
@@ -180,7 +180,9 @@ int* nWakes ;
 /* Unpack the calling arguments for the TrackThru command, and verify that
  * they are well-formed.  Do some preparation on the output args as well,
  * and some preparation of local vars related to the global data
- * structures. */
+ * structures.
+ * Also here, allocate GPU-resident array memory and point them to arrays
+ * in Matlab space */
 
 /* RET:    a pointer to a TrackArgsStruc with the necessary information
  * for the tracking engine.

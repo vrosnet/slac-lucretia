@@ -134,7 +134,7 @@
 #include <cuda.h>
 #include <curand.h>
 #include "gpu/mxGPUArray.h"
-#define threadsPerBlock 256
+#define threadsPerBlock 512
 #endif
 /* --- */
 #include "LucretiaCommon.h"       /* data & prototypes for this file */
@@ -1716,7 +1716,11 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
+#ifdef __CUDACC__ 
+            TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS ) ;
+#else
             TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
+#endif              
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
@@ -1730,10 +1734,18 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
             else
               trackIter = 0;
           }
+#ifdef __CUDACC__                     
+          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, -1 ) ;
+#else
           TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, -1 ) ;
+#endif          
         }
         else {
+#ifdef __CUDACC__           
+          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0 ) ;
+#else
           TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
+#endif          
           XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
                   TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
         }
@@ -1965,11 +1977,6 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   
   
   egress:
-    
-    /* Copy GPU data over to CPU */
-// #ifdef __CUDACC__
-//     XGPU2CPU( TrackArgs ) ;
-// #endif
     
     /* put the latched status back into TrackArgs */
     
@@ -3149,7 +3156,7 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
         double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState)
 #else
-        void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
+void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
         double H2, double hgapx, double fintx, double hgapx2, int* stp)
@@ -3966,23 +3973,42 @@ int TrackBunchThruRF( int elemno, int bunchno,
 
 int TrackBunchThruBPM( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc,
-        int* TrackFlags, double splitL )
+        int* TFlag, double splitL )
 {
   
   static int BPMCounter ;           /* Which BPM is it? */
   int nBunchNeeded ;                /* how many bunches' dataspace? */
   double* retcatch ;
   int BunchSlot ;
-  int i,j,k, raystart ;
+  int i,j,k ;
   double Xfrms[6][2] ;
   double sintilt,costilt ;
   struct Bunch* ThisBunch ;
-  double dx,dpx,dy,dpy,dz,P,Q ;
   double dxvec[6] ;
   double* gaussran ;
   double QBS ;
   int stat=1 ;
-  
+#ifdef __CUDACC__
+  float xread_cnt, yread_cnt, Q_cnt, P_cnt, pxq_cnt, pyq_cnt, z_cnt ; /* bpmdata counters for kernel*/
+  float sigma_cnt[36] ;
+#else
+  double xread_cnt, yread_cnt, Q_cnt, P_cnt, pxq_cnt, pyq_cnt, z_cnt ; /* bpmdata counters for kernel*/
+  double sigma_cnt[36] ;
+#endif
+
+
+   /* for CUDA and CPU, TrackFlags is local memory, for CUDA TFlag is device memory*/
+#ifdef __CUDACC__
+  int* TrackFlags=0;
+ 
+  TrackFlags=(int*) malloc(sizeof(int)*NUM_TRACK_FLAGS) ;
+  memset(TrackFlags,0,sizeof(int)*NUM_TRACK_FLAGS);
+  cudaMemcpy(TrackFlags, TFlag, sizeof(int)*NUM_TRACK_FLAGS, cudaMemcpyDeviceToHost) ;
+  float *Xfrms_flat = NULL ;
+#else
+  int* TrackFlags = TFlag ;
+#endif          
+
   /* Get the BPM parameters */
   
   stat = GetDatabaseParameters( elemno, nBPMPar, BPMPar,
@@ -3993,28 +4019,27 @@ int TrackBunchThruBPM( int elemno, int bunchno,
     goto egress ;
   }
   
-  /* start by doing the tracking */
+   /* start by doing the tracking */
   if ( splitL >= 0 )
-    stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlags, splitL ) ;
-  
-  /* if we do not need to save BPM information here, we can return */
+    stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TFlag, splitL ) ;
+
+   /* if we do not need to save BPM information here, we can return */
   
   if ( ( (ArgStruc->GetInstData == 0) ||
-          ( (TrackFlags[GetBPMData] == 0)&&(TrackFlags[GetBPMBeamPars]==0) ) ) ||
-          ( splitL > 0 )  )
+          ( (TrackFlags[GetBPMData] == 0)&&(TrackFlags[GetBPMBeamPars]==0) ) ) )
     goto egress ;
   
-  /* if we're still here, we must want to accumulate some information, so
+   /* if we're still here, we must want to accumulate some information, so
    * start that process */
   
   ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
   
-  /* do initialization */
+   /* do initialization */
   
   BPMInstIndexingSetup( elemno, &FirstBPMElemno,
           &BPMElemnoLastCall, &BPMCounter ) ;
   
-  /* figure out how many bunch-data slots we need for this BPM, based on
+   /* figure out how many bunch-data slots we need for this BPM, based on
    * the number of bunches to be tracked and the multi/single switch.
    * While we're at it, figure out which data slot this bunch's data goes
    * into */
@@ -4022,7 +4047,7 @@ int TrackBunchThruBPM( int elemno, int bunchno,
   BunchSlotSetup( TrackFlags, ArgStruc, bunchno,
           &nBunchNeeded, &BunchSlot     ) ;
   
-  /* If this is the first bunch, then we've never tracked in this BPM
+   /* If this is the first bunch, then we've never tracked in this BPM
    * before and we should check the allocation of its data in the data
    * backbone */
   
@@ -4147,67 +4172,60 @@ int TrackBunchThruBPM( int elemno, int bunchno,
    * positions after tracking thru the BPM but in the survey coordinate
    * system, so we have to make appropriate transformations to the BPM
    * coordinate system */
-  
-  for (i=0 ; i<ThisBunch->nray ; i++)
+  xread_cnt=0; yread_cnt=0; Q_cnt=0; P_cnt=0; pxq_cnt=0; pyq_cnt=0; z_cnt=0;
+  memset(sigma_cnt, 0, 36*sizeof(double) );
+#ifdef __CUDACC__
+  float *Xfrms_gpu ;
+  float *xread_gpu, *yread_gpu, *Q_gpu, *P_gpu, *pxq_gpu, *pyq_gpu, *z_gpu, *sigma_gpu ; /* bpmdata counters for kernel*/
+  cudaMalloc((void **)&Xfrms_gpu, sizeof(float)*12) ;
+  Xfrms_flat = (float*)&(Xfrms[0][0]) ;
+  cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(float)*12, cudaMemcpyHostToDevice) ;
+  cudaMalloc((void **)&xread_gpu, sizeof(float)); cudaMalloc((void **)&yread_gpu, sizeof(float));
+  cudaMalloc((void **)&Q_gpu, sizeof(float)); cudaMalloc((void **)&P_gpu, sizeof(float));
+  cudaMalloc((void **)&pxq_gpu, sizeof(float)); cudaMalloc((void **)&pyq_gpu, sizeof(float));
+  cudaMalloc((void **)&z_gpu, sizeof(float)); cudaMalloc((void **)&sigma_gpu, 36*sizeof(float));
+  cudaMemset(xread_gpu, 0, sizeof(float)); cudaMemset(yread_gpu, 0, sizeof(float));
+  cudaMemset(Q_gpu, 0, sizeof(float)); cudaMemset(P_gpu, 0, sizeof(float));
+  cudaMemset(pxq_gpu, 0, sizeof(float)); cudaMemset(pyq_gpu, 0, sizeof(float));
+  cudaMemset(z_gpu, 0, sizeof(float)); cudaMemset(sigma_gpu, 0, sizeof(float)*36);
+  TrackBunchThruBPM_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, Xfrms_gpu, TFlag, ThisBunch->Q, ThisBunch->y, ThisBunch->stop,
+								(float)sintilt, (float)costilt, xread_gpu, yread_gpu, Q_gpu, P_gpu, pxq_gpu, pyq_gpu, z_gpu, sigma_gpu) ;
+  cudaMemcpy(&xread_cnt, xread_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(&yread_cnt, yread_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(&Q_cnt, Q_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(&P_cnt, P_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(&pxq_cnt, pxq_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(&pyq_cnt, pyq_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(&z_cnt, z_gpu, sizeof(float), cudaMemcpyDeviceToHost) ;
+  cudaMemcpy(sigma_cnt, sigma_gpu, sizeof(float)*36, cudaMemcpyDeviceToHost) ;
+  cudaFree(Xfrms_gpu);
+  cudaFree(xread_gpu); cudaFree(yread_gpu); cudaFree(Q_gpu); cudaFree(P_gpu); cudaFree(P_gpu);
+  cudaFree(pxq_gpu); cudaFree(pyq_gpu); cudaFree(z_gpu); cudaFree(sigma_gpu);
+#else
+  for (i=0 ;i<ThisBunch->nray ; i++)
+    TrackBunchThruBPM_kernel(i, Xfrms, TFlag, ThisBunch->Q, ThisBunch->y, ThisBunch->stop, sintilt, costilt,
+           &xread_cnt, &yread_cnt, &Q_cnt, &P_cnt, &pxq_cnt, &pyq_cnt, &z_cnt, sigma_cnt ) ;
+#endif
+
+  /* put accumulated data into necessary data structure slots */
+  bpmdata[BPMCounter]->xread[BunchSlot] += xread_cnt ;
+  bpmdata[BPMCounter]->yread[BunchSlot] += yread_cnt ;
+  bpmdata[BPMCounter]->Q[BunchSlot] += Q_cnt ;
+
+  if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
   {
-    raystart = 6*i ;
-    if (ThisBunch->stop[i] !=0.)
-      continue ;
-    
-    /* get the contribution from this ray, including its weight and the
-     * transformation from the element offset. */
-    
-    dx  = ThisBunch->y[raystart] - Xfrms[0][1]
-            + Xfrms[4][1] * ThisBunch->y[raystart+1] ;
-    dpx = ThisBunch->y[raystart+1] - Xfrms[1][1] ;
-    dy  = ThisBunch->y[raystart+2] - Xfrms[2][1]
-            + Xfrms[4][1] * ThisBunch->y[raystart+3] ;
-    dpy = ThisBunch->y[raystart+3] - Xfrms[3][1] ;
-    dz  = ThisBunch->y[raystart+4] -	Xfrms[4][1]
-            + 0.5 * Xfrms[4][1] *
-            (  ThisBunch->y[raystart+1] * ThisBunch->y[raystart+1] +
-            ThisBunch->y[raystart+3] * ThisBunch->y[raystart+3]   ) ;
-    P   = ThisBunch->y[raystart+5] ;
-    Q   = ThisBunch->Q[i] ;
-    
-    /* put into a vector, including rotations (if the BPM is rotated,
-     * by convention clockwise, then a +x offset -> -y contribution and a
-     * +y offset -> +x contribution) */
-    
-    dxvec[0] = dx * costilt + dy * sintilt ;
-    dxvec[1] = dpx * costilt + dpy * sintilt ;
-    dxvec[2] = -dx * sintilt + dy * costilt ;
-    dxvec[3] = -dpx * sintilt + dpy * costilt ;
-    dxvec[4] = dz ;
-    dxvec[5] = P ;
-    
-    /* accumulate this ray, weighted by charge, into the necessary slots
-     * in the data structure */
-    
-    bpmdata[BPMCounter]->xread[BunchSlot] += dxvec[0] * Q ;
-    bpmdata[BPMCounter]->yread[BunchSlot] += dxvec[2] * Q ;
-    bpmdata[BPMCounter]->Q[BunchSlot] += Q ;
-    
-    if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
+    bpmdata[BPMCounter]->P[BunchSlot]      += P_cnt ;
+    bpmdata[BPMCounter]->sumpxq[BunchSlot] += pxq_cnt ;
+    bpmdata[BPMCounter]->sumpyq[BunchSlot] += pyq_cnt ;
+    bpmdata[BPMCounter]->z[BunchSlot]      += z_cnt;
+
+    for (j=0; j<6; j++)
     {
-      bpmdata[BPMCounter]->P[BunchSlot]      += dxvec[5] * Q ;
-      bpmdata[BPMCounter]->sumpxq[BunchSlot] += dxvec[1] * Q ;
-      bpmdata[BPMCounter]->sumpyq[BunchSlot] += dxvec[3] * Q ;
-      bpmdata[BPMCounter]->z[BunchSlot]      += dxvec[4] * Q ;
-      
-      for (j=0; j<6; j++)
+      for (k=j ; k<6 ; k++)
       {
-        for (k=j ; k<6 ; k++)
-        {
-          bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] +=
-                  Q * dxvec[k]*dxvec[j] ;
-        }
+        bpmdata[BPMCounter]->sigma[36*BunchSlot+6*j+k] += sigma_cnt[6*j+k] ;
       }
-      
-    }
-    
-    /* that's all the accumulation we need to do, so end the loop over rays */
-    
+    } 
   }
   
   /* Do we need to complete the calculation of first and second moments?
@@ -4303,6 +4321,143 @@ int TrackBunchThruBPM( int elemno, int bunchno,
     return stat ;
     
 }
+
+#ifdef __CUDACC__
+__global__ void TrackBunchThruBPM_kernel(int nray, float* pXfrms, int* TrackFlags, double* qb, double* yb, double* stop, float sintilt, float costilt,
+        float* xread_ret, float* yread_ret, float* Q_ret, float* P_ret, float* sumpxq_ret,
+        float* sumpyq_ret, float* z_ret, float* sigma_ret )
+#else
+void TrackBunchThruBPM_kernel(int nray, double Xfrms[6][2], int* TrackFlags, double* qb, double* yb, double* stop, double sintilt, double costilt,
+        double* xread_cnt, double* yread_cnt, double* Q_cnt, double* P_cnt, double* sumpxq_cnt, double* sumpyq_cnt,
+        double* z_cnt, double sigma_cnt[36] )
+#endif  
+{    
+  
+  /* Use temp shared variables for variables that need to be accumulated so atomic adds can be efficiently utilized for CUDA code */
+int ray, raystart, k, j;
+#ifdef __CUDACC__
+  ray = blockDim.x * blockIdx.x + threadIdx.x ;
+  if ( ray >= nray ) return;
+  __shared__ float xread_cnt, yread_cnt, Q_cnt ;
+  xread_cnt=0; yread_cnt=0; Q_cnt=0;
+  __shared__ float P_cnt, sumpxq_cnt, sumpyq_cnt, z_cnt;
+  __shared__ float sigma_cnt[36] ;
+  P_cnt=0; sumpxq_cnt=0; sumpyq_cnt=0; z_cnt=0;
+  memset( sigma_cnt, 0, sizeof(float)*36 ) ;
+  __syncthreads();
+  float Xfrms[6][2] ;
+  int irw, icol ;
+  float dx,dpx,dy,dpy,dz,P,Q ;
+  float dxvec[6] ;
+  for (irw=0;irw<6;irw++)
+    for (icol=0;icol<2;icol++)
+      Xfrms[irw][icol]=pXfrms[(2*irw)+icol] ;
+#else
+  double dx,dpx,dy,dpy,dz,P,Q ;
+  double dxvec[6] ;
+  ray = nray;
+#endif
+  raystart = 6*ray ;
+  if (stop[ray] !=0.)
+    return ;
+
+  /* get the contribution from this ray, including its weight and the
+   * transformation from the element offset. */
+#ifdef __CUDACC__
+  dx  = (float)yb[raystart] - Xfrms[0][1]
+    + Xfrms[4][1] * (float)yb[raystart+1] ;
+  dpx = (float)yb[raystart+1] - Xfrms[1][1] ;
+  dy  = (float)yb[raystart+2] - Xfrms[2][1]
+    + Xfrms[4][1] * (float)yb[raystart+3] ;
+  dpy = (float)yb[raystart+3] - Xfrms[3][1] ;
+  dz  = (float)yb[raystart+4] -	Xfrms[4][1]
+          + 0.5 * Xfrms[4][1] *
+    (  (float)yb[raystart+1] * (float)yb[raystart+1] +
+       (float)yb[raystart+3] * (float)yb[raystart+3]   ) ;
+  P   = (float)yb[raystart+5] ;
+  Q   = (float)qb[ray] ;
+#else
+  dx  = yb[raystart] - Xfrms[0][1]
+    + Xfrms[4][1] * yb[raystart+1] ;
+  dpx = yb[raystart+1] - Xfrms[1][1] ;
+  dy  = yb[raystart+2] - Xfrms[2][1]
+    + Xfrms[4][1] * yb[raystart+3] ;
+  dpy = yb[raystart+3] - Xfrms[3][1] ;
+  dz  = yb[raystart+4] -	Xfrms[4][1]
+          + 0.5 * Xfrms[4][1] *
+    (  yb[raystart+1] * yb[raystart+1] +
+       yb[raystart+3] * yb[raystart+3]   ) ;
+  P   = yb[raystart+5] ;
+  Q   = qb[ray] ;
+#endif
+
+  /* put into a vector, including rotations (if the BPM is rotated,
+   * by convention clockwise, then a +x offset -> -y contribution and a
+   * +y offset -> +x contribution) */
+
+  dxvec[0] = dx * costilt + dy * sintilt ;
+  dxvec[1] = dpx * costilt + dpy * sintilt ;
+  dxvec[2] = -dx * sintilt + dy * costilt ;
+  dxvec[3] = -dpx * sintilt + dpy * costilt ;
+  dxvec[4] = dz ;
+  dxvec[5] = P ;
+
+  /* accumulate this ray, weighted by charge, to go into the necessary slots
+   * in the data structure */
+#ifdef __CUDACC__
+  atomicAdd( &xread_cnt, dxvec[0] * Q ) ;
+  atomicAdd( &yread_cnt, dxvec[2] * Q ) ;
+  atomicAdd( &Q_cnt, Q ) ;
+#else  
+  *xread_cnt += dxvec[0] * Q ;
+  *yread_cnt += dxvec[2] * Q ;
+  *Q_cnt += Q ;
+#endif
+  if (TrackFlags[GetBPMBeamPars]==1) /* P, z, and sigma returned */
+  {
+#ifdef __CUDACC__
+    atomicAdd( &P_cnt, dxvec[5] * Q ) ;
+    atomicAdd( &sumpxq_cnt, dxvec[1] * Q ) ;
+    atomicAdd( &sumpyq_cnt, dxvec[3] * Q ) ;
+    atomicAdd( &z_cnt, dxvec[4] * Q ) ;
+#else    
+    *P_cnt      += dxvec[5] * Q ;
+    *sumpxq_cnt += dxvec[1] * Q ;
+    *sumpyq_cnt += dxvec[3] * Q ;
+    *z_cnt      += dxvec[4] * Q ;
+#endif
+    for (j=0; j<6; j++)
+      for (k=j ; k<6 ; k++)
+#ifdef __CUDACC__
+        atomicAdd( &sigma_cnt[6*j+k], Q * dxvec[k]*dxvec[j] ) ;
+#else        
+        sigma_cnt[6*j+k] += Q * dxvec[k]*dxvec[j] ;
+#endif 
+  }
+#ifdef __CUDACC__ 
+  /* Add the sub-pieces of the accumulated variables that exist in shared memory back into global GPU memory */
+  __syncthreads();
+  if (threadIdx.x>0)
+    return;
+  atomicAdd( xread_ret, xread_cnt ) ;
+  atomicAdd( yread_ret, yread_cnt ) ;
+  atomicAdd( Q_ret, Q_cnt ) ;
+  if (TrackFlags[GetBPMBeamPars]==1)
+  {
+    atomicAdd( P_ret, P_cnt ) ;
+    atomicAdd( sumpxq_ret, sumpxq_cnt ) ;
+    atomicAdd( sumpyq_ret, sumpyq_cnt ) ;
+    atomicAdd( z_ret, z_cnt ) ;
+    for (j=0; j<6; j++)
+    {
+      for (k=0; k<6; k++)
+      {
+        atomicAdd( &sigma_ret[6*j+k], sigma_cnt[6*j+k] ) ;
+      }
+    }
+  }
+#endif    
+} 
 
 /*=====================================================================*/
 
@@ -4576,6 +4731,7 @@ int TrackBunchThruInst( int elemno, int bunchno,
     return stat;
     
 }
+
 
 /*=====================================================================*/
 
