@@ -14,7 +14,7 @@ function beamtemp = MakeBeam6DSparse( Initial, nsigmas, nzgrid, npgrid )
 %    the emittances and Twiss parameters in the Inital data strcture's
 %    Twiss and emittance fields.
 %
-% SEE ALSO:  MakeBeam6DGauss, MakeBeamPZGrid, MakeBeamPZGauss, 
+% SEE ALSO:  MakeBeam6DGauss, MakeBeamPZGrid, MakeBeamPZGauss, MakeBeam6DWeighted
 %            CreateBlankBeam, InitCondStruc.
 %
 % Version date:  24-May-2007.
