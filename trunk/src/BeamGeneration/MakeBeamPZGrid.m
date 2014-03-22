@@ -20,7 +20,7 @@ function beamout = MakeBeamPZGrid( Initial, nsigmas, nzgrid, npgrid, varargin )
 %    have charges which are equal to one another (but potentially different
 %    from rays at other grid points).
 %
-%    SEE ALSO:  MakeBeam6DSparse, MakeBeam6DGauss, MakeBeamPZGauss, 
+%    SEE ALSO:  MakeBeam6DSparse, MakeBeam6DGauss, MakeBeamPZGauss, MakeBeam6DWeighted
 %               CreateBlankBeam, InitCondStruc.
 %
 % Version date:  24-May-2007.

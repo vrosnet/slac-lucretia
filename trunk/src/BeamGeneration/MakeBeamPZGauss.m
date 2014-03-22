@@ -15,7 +15,7 @@ function beamout = MakeBeamPZGauss( Initial, nsigmas, nray )
 %    All of the rays in a given bunch have equal charge, and the sum of 
 %    the charges is given by the values in Initial.
 %
-%    SEE ALSO:  MakeBeamPZGrid, MakeBeam6DSparse, MakeBeam6DGauss,
+%    SEE ALSO:  MakeBeamPZGrid, MakeBeam6DSparse, MakeBeam6DGauss, MakeBeam6DWeighted
 %               CreateBlankBeam, InitCondStruc.
 %
 % Version date:  24-May-2007.

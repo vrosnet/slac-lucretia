@@ -6,7 +6,7 @@ function beamout = CreateBlankBeam( nbunch, nray, P0, bspace )
 % a beam with nbunch bunches, nray rays (nray = scalar), 
 % bunch spacing bspace, and all momenta set to P0.
 %
-% See also:  MakeBeamPZGrid, MakeBeamPZGauss, MakeBeam6DSparse,
+% See also:  MakeBeamPZGrid, MakeBeamPZGauss, MakeBeam6DSparse, MakeBeam6DWeighted
 %            MakeBeam6DGauss.
 %
 % Version date:  24-May-2007.

@@ -15,7 +15,7 @@ function beamout = MakeBeam6DGauss( Initial, nrays, nsigma, allsame )
 %    will have nrays(1) rays regardless of the value of nrays(2:end).
 %
 % See also:  MakeBeam6DSparse, MakeBeamPZGrid, MakeBeamPZGauss,
-%            CreateBlankBeam, InitCondStruc.
+%            MakeBeam6DWeighted, CreateBlankBeam, InitCondStruc.
 %
 % Version date:  27-Jan-2011.
 
