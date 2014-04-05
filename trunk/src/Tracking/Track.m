@@ -70,6 +70,7 @@ classdef Track < handle
     beamStoreInd=[]; % Store the full beam at additional points along the lattice
     centerZInd=[]; % Indices to re-center longitudinal distribution
     zOffset=0; % Phase offset in bunch (m), used if centerZInd present
+    isgpu=false; % Wishing to track with GPU-optimized mex function?
   end
   properties(SetAccess=protected)
     isDistrib=false; % Is this Track object opererating in distributed mode?
@@ -273,6 +274,13 @@ classdef Track < handle
         end
       end
     end
+    function [stat, beamout, instdata] = dotrack(obj,startInd,finishInd,BeamIn,b1,b2,lf)
+      if obj.isgpu
+        [stat, beamout, instdata] = TrackThru_gpu(startInd,finishInd,BeamIn,b1,b2,lf) ;
+      else
+        [stat, beamout, instdata] = TrackThru(startInd,finishInd,BeamIn,b1,b2,lf) ;
+      end
+    end
     function trackThru(obj,cmd)
       % Asking for intermediate track locations?
       interele=obj.beamStoreInd;
@@ -280,7 +288,9 @@ classdef Track < handle
       if ~isempty(obj.centerZInd)
         interele=unique([interele obj.centerZInd]);
       end
-      interele=interele(interele<=obj.finishInd & interele>=obj.startInd);
+      if ~isempty(interele)
+        interele=interele(interele<=obj.finishInd & interele>=obj.startInd);
+      end
       % Asking for single-ray tracking?
       if exist('cmd','var') && isequal(cmd,'singleRay')
         doSingleRay=true;
@@ -320,7 +330,7 @@ classdef Track < handle
             if ismember(labindex,useWorkers)
               bstore=[];
               if isempty(interele)
-                [stat, beamout, instdata]=TrackThru(startInd,finishInd,BeamIn,b1,b2,lf);
+                [stat, beamout, instdata]=obj.dotrack(startInd,finishInd,BeamIn,b1,b2,lf);
               else
                 if interele(end)~=finishInd; interele=[interele finishInd]; end;
                 t1=startInd;
@@ -329,7 +339,7 @@ classdef Track < handle
                 bi=1;
                 instdata={};
                 for iele=1:length(interele)
-                  [stat, beamout, idat]=TrackThru(t1,t2,B,b1,b2,lf);
+                  [stat, beamout, idat]=obj.dotrack(t1,t2,B,b1,b2,lf);
                   for id=1:length(idat)
                     if length(instdata)<id; instdata{id}=[]; end;
                     instdata{id}=[instdata{id} idat{id}];
@@ -369,7 +379,7 @@ classdef Track < handle
         end
       else % local tracking
         if isempty(interele)
-          [stat, beamout, instdata]=TrackThru(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
+          [stat, beamout, instdata]=obj.dotrack(obj.startInd,obj.finishInd,BeamIn,obj.firstBunch,obj.lastBunch,obj.loopFlag);
         else
           if interele(end)~=obj.finishInd; interele=[interele obj.finishInd]; end;
           t1=obj.startInd;
@@ -378,7 +388,7 @@ classdef Track < handle
           B=BeamIn;
           bi=1;
           for iele=1:length(interele)
-            [stat, beamout, idat]=TrackThru(t1,t2,B,obj.firstBunch,obj.lastBunch,obj.loopFlag);
+            [stat, beamout, idat]=obj.dotrack(t1,t2,B,obj.firstBunch,obj.lastBunch,obj.loopFlag);
             for id=1:length(idat)
               if length(instdata)<id; instdata{id}=[]; end;
               instdata{id}=[instdata{id} idat{id}];
@@ -567,7 +577,7 @@ classdef Track < handle
   
   %% Static methods (includes those needing to be called in worker environment for distributed jobs)
   methods(Static)
-    function [stat beamout instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf,doSingleParticle)
+    function [stat, beamout, instdata]=asynTrack(dataFile,iworker,i1,i2,b1,b2,lf,doSingleParticle)
       [BEAMLINE, PS, GIRDER, KLYSTRON, WF]=distributedLucretia.asynLoadLattice(dataFile,iworker); %#ok<NASGU,ASGLU>
       load(dataFile,'trackBeamIn')
       if length(trackBeamIn)>1
@@ -582,12 +592,15 @@ classdef Track < handle
         beamInSingle.x=mean(beam.Bunch.x,2);
         beam=beamInSingle;
       end
-      [stat, beamout, instdata]=TrackThru(i1,i2,beam,b1,b2,lf);
+      [stat, beamout, instdata]=obj.dotrack(i1,i2,beam,b1,b2,lf);
     end
     function data=procBeamData(beam,dims)
-%       data.qloss=sum(beam.Bunch.Q(:,beam.Bunch.stop>0));
-%       beam.Bunch.x=beam.Bunch.x(:,~beam.Bunch.stop);
-%       beam.Bunch.Q=beam.Bunch.Q(:,~beam.Bunch.stop);
+      data.qloss=sum(beam.Bunch.Q(:,beam.Bunch.stop>0));
+      beam.Bunch.x=beam.Bunch.x(:,~beam.Bunch.stop);
+      beam.Bunch.Q=beam.Bunch.Q(:,~beam.Bunch.stop);
+      if isempty(beam.Bunch.x)
+        error('All particles in provided beam stopped!')
+      end
       gamma=mean(beam.Bunch.x(6,:))/0.511e-3;
       if any(ismember(dims,'x'))
         [fitTerm,fitCoef,bsize_corrected,bsize] = beamTerms(1,beam);
@@ -649,7 +662,7 @@ classdef Track < handle
       [~, q] = gauss_fit(bc,fx) ;
       data.zfit=abs(q(4));
     end
-    function [bunchProfile sx sy]=plasmaTrack(beamIn,decimate,doplot)
+    function [bunchProfile, sx, sy]=plasmaTrack(beamIn,decimate,doplot)
       persistent n_in s_in
       if isempty(n_in)
         ld=load('data/plasProf');
@@ -744,7 +757,7 @@ classdef Track < handle
     end
   end
   methods(Access=private)
-    function [bininds z Z ZSP]=doBinning(beamZ,nbin)
+    function [bininds, z, Z, ZSP]=doBinning(beamZ,nbin)
       zmin=min(-beamZ);
       zmax=max(-beamZ);
       if zmin==zmax

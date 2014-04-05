@@ -33,8 +33,8 @@ if any(size(x) ~= size(y))
     error ('The size of the two first input vectors should be same!');
 end
 
-[xn, xbin] = histc(x,xedges);
-[yn, ybin] = histc(y,yedges);
+[~, xbin] = histc(x,xedges);
+[~, ybin] = histc(y,yedges);
 
 %xbin, ybin zero for out of range values 
 % (see the help of histc) force this event to the 

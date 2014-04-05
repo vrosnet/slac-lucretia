@@ -26,6 +26,12 @@ function [fitTerm,fitCoef,bsize_corrected,bsize,p,bsize_accum] = beamTerms(dim,b
 warnstate=warning('query','MATLAB:nearlySingularMatrix');
 warning('off','MATLAB:nearlySingularMatrix');
 
+% remove stopped particles
+beam.Bunch.x(beam.Bunch.stop>0)=[];
+if isempty(beam.Bunch.x)
+  error('All particles in provided beam stopped!')
+end
+
 % remove constant offsets
 for idim=1:6
   beam.Bunch.x(idim,:)=beam.Bunch.x(idim,:)-mean(beam.Bunch.x(idim,:));

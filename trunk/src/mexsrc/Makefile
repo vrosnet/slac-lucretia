@@ -1,6 +1,6 @@
 # 
 # Makefile for construction of Lucretia mex files
-#  Written for use on a Linux OS (EL5 & SL5 32 and 64-bit supported)
+#  Written for use on a Linux OS (EL5+ & SL5+ 32 and 64-bit supported)
 #  - edit MATPATH variable to link to the location of your
 #    Matlab  installation
 #  - edit MATEXT variable to provide the mex file extension for your
@@ -13,29 +13,37 @@
 #    installation directories
 #  - type "make gpu" to build mex files which support GPU operation
 #    requires >R2013a, compiled mex files have _gpu suffix
+#  - type "make g4track" to build (cpu) version of TrackThru which
+#    also allows interfacing to GEANT4. This requires GEANT4 (v.10+)
+#    installed fully (with "geant4-config" shell on the system search
+#    path)
 #
-# Auth: GW: Aug 4 2011
-# Mod: GW: July 17 2013
+# Auth: GRW: Aug 4 2011
+# Mod:  GRW: Apr 2 2014
+#         - Added compilation steps for g4track
+#       GRW: July 17 2013
 #         - Added GPU compile steps
 #
 #===================================================================
 
 # Link to matlab installation directory
- MATPATH = /var/MATLAB/R2013a
+MATPATH = /var/MATLAB/R2013b
 # Name of mex file extension for this architecture (mexglx or mexa64 or mexmaci64)
- MEXEXT = mexa64
+MEXEXT = mexa64
+MCOMP:= $(MATPATH)/bin/mex
+CCOMP := $(MATPATH)/bin/mex -c
+# include -DLUCRETIA_DPREC to compile for double precision, else single
+MFLAGS = -DLUCETIA_DPREC
+G4LIBS := $(shell geant4-config --libs)
+G4TRACKPATH := $(shell pwd)/g4track
+NVCC = nvcc # Cuda compiler
 
- MCOMP = $(MATPATH)/bin/mex
- CCOMP = $(MATPATH)/bin/mex -c
- CFLAGS = -DLUCRETIA_DPREC # include -DLUCRETIA_DPREC to compile for double precision, else single
- MFLAGS = -DLUCRETIA_DPREC
- NVCC = nvcc # Cuda compiler
-
- LMAIN  = libLucretiaMain.a
- LMATL  = libLucretiaMatlab.a
+LMAIN  = libLucretiaMain.a
+LMATL  = libLucretiaMatlab.a
+LG4LIB = libg4track.a
 
 cpu : cpu_init GetRmats.$(MEXEXT) GetTwiss.$(MEXEXT) RmatAtoB.$(MEXEXT) TrackThru.$(MEXEXT)  VerifyLattice.$(MEXEXT)
-
+g4track : g4_init g4track/libg4track.a TrackThru_g4.$(MEXEXT)
 gpu : gpu_init TrackThru_gpu.$(MEXEXT)
 
 install::
@@ -45,27 +53,34 @@ install::
 	-mv TrackThru.$(MEXEXT) ../Tracking
 	-mv VerifyLattice.$(MEXEXT) ../LatticeVerification
 	-mv TrackThru_gpu.$(MEXEXT) ../Tracking
+	-mv TrackThru_g4.$(MEXEXT) ../Tracking/TrackThru.$(MEXEXT)
 
 cpu_init::
 	-cp mexopts_gcc.sh mexopts.sh
+
+g4_init: cpu_init
+	-cp TrackThru.c TrackThru_g4.c
+	-cp mexopts-g4.sh mexopts.sh
 
 gpu_init::
 	-cp mexopts-gpu.sh mexopts.sh
 
 # Mex files:
- GetRmats.$(MEXEXT) : $(LMAIN) $(LMATL) GetRmats.c
+GetRmats.$(MEXEXT) : $(LMAIN) $(LMATL) GetRmats.c
 	$(MCOMP) $(MFLAGS) GetRmats.c -L. -lLucretiaMatlab -lLucretiaMain
- GetTwiss.$(MEXEXT) : $(LMAIN) $(LMATL) GetTwiss.c
+GetTwiss.$(MEXEXT) : $(LMAIN) $(LMATL) GetTwiss.c
 	$(MCOMP) $(MFLAGS) GetTwiss.c -L. -lLucretiaMatlab -lLucretiaMain
- RmatAtoB.$(MEXEXT) : $(LMAIN) $(LMATL) RmatAtoB.c
+RmatAtoB.$(MEXEXT) : $(LMAIN) $(LMATL) RmatAtoB.c
 	$(MCOMP) $(MFLAGS) RmatAtoB.c -L. -lLucretiaMatlab -lLucretiaMain
- TrackThru.$(MEXEXT) : $(LMAIN) $(LMATL) TrackThru.c
-	$(MCOMP) $(MFLAGS) -v TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
- VerifyLattice.$(MEXEXT) : $(LMAIN) $(LMATL) VerifyLattice.c
+TrackThru.$(MEXEXT) : $(LMAIN) $(LMATL) TrackThru.c
+	$(MCOMP) $(MFLAGS) TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
+VerifyLattice.$(MEXEXT) : $(LMAIN) $(LMATL) VerifyLattice.c
 	$(MCOMP) $(MFLAGS) VerifyLattice.c -L. -lLucretiaMatlab -lLucretiaMain
- TrackThru_gpu.$(MEXEXT) : GPULINK TrackThru_gpu.o
+TrackThru_gpu.$(MEXEXT) : GPULINK TrackThru_gpu.o
 	g++ -O -pthread -shared -Wl,--version-script,$(MATPATH)/extern/lib/glnxa64/mexFunction.map -Wl,--no-undefined -o  "TrackThru_gpu.$(MEXEXT)"  TrackThru_gpu.o  "LucretiaMatlab_gpu.o"  "LucretiaMatlabErrMsg_gpu.o"  "LucretiaPhysics_gpu.o"  "LucretiaCommon_gpu.o" "gpulink.o"  -Wl,-rpath-link,$(MATPATH)/bin/glnxa64 -L$(MATPATH)/bin/glnxa64 -lmx -lmex -lmat -lm -lmwgpu $(MATPATH)/bin/glnxa64/libcudart.so.5.0
-
+TrackThru_g4.$(MEXEXT) :  $(LMAIN) $(LMATL) g4track/$(LG4LIB) TrackThru_g4.c
+	$(MCOMP) $(MFLAGS) -v TrackThru_g4.c -L. -lLucretiaMatlab -lLucretiaMain -L$(G4TRACKPATH) -lg4track $(G4LIBS)
+	rm TrackThru_g4.c
 
 # LucretiaMain library:
 

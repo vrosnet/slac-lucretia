@@ -46,9 +46,12 @@
  * GetMatrixNormalizer
  * IsEmpty
  * GetCsrEloss
+ * GetExtProcessData
  *
  * /* AUTH: PT, 03-aug-2004 */
 /* MOD:
+ * 31-March-2014, GWL
+ * Add functionality for GEANT4 interface
  * 08-Oct-2010, GW:
  * LucretiaMatlabSetup tries to read in Lucretia BEAMLINE etc
  * as defined in caller scope in preference to global. This
@@ -85,7 +88,6 @@
 #include "LucretiaMatlab.h"       /* gets LucretiaCommon.h for free */
 #include "LucretiaGlobalAccess.h" /* manipulate Lucretia globals */
 #include "LucretiaVersionProto.h" /* prototypes for version functions */
-
 
 /* File-scoped variables */
 
@@ -252,12 +254,9 @@ double* GetElemNumericPar( int elemno, char* parname, int* len )
   if (len != NULL)
     *len = 0 ;
   
-  /* get a pointer to the quad's cell */
-  
+  /* get a pointer to the cell */
   ElemCell = mxGetCell( Beamline, elemno ) ;
-  
   /* get field pointer */
-  
   Param = mxGetField( ElemCell, 0, parname ) ;
   if (Param == NULL)
     parval = NULL ;
@@ -267,7 +266,6 @@ double* GetElemNumericPar( int elemno, char* parname, int* len )
     if (len != NULL)
       *len = mxGetM(Param)*mxGetN(Param) ;
   }
-  
   
   return parval;
 }
@@ -1930,4 +1928,36 @@ void GetCsrEloss(struct Bunch* ThisBunch, int nbin, int smoothVal, int elementNo
   for (iarr=0;iarr<7;iarr++)
     mxDestroyArray(rhs[iarr]) ;
   mxDestroyArray(lhs) ;
+}
+
+
+/* Get Energy loss profile due to Coherent Synchrotron Radiation */
+
+/* RET: requested EXT Process object property.
+ * /* ABORT:  never.
+ * /* FAIL:   never */
+
+mxArray* GetExtProcessData(int* elemno, const char *propname)
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  mxArray* extProcess ; /* pointer to the extProcess object */
+  mxArray* retprop ;
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, *elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return NULL ;
+  if (!mxIsStruct(ElemCell))
+    return NULL ;
+  
+  /* now get a pointer to the extProcess object if there */
+  extProcess = mxGetField( ElemCell, 0, "ExtProcess" ) ;
+  if (extProcess == NULL)
+    return NULL ;
+  if (!mxIsClass(extProcess, "ExtG4Process"))
+    return NULL ;
+  
+  /* now return the requested property */
+  retprop = mxGetProperty(extProcess, 0, propname) ;
+  return retprop ;
 }

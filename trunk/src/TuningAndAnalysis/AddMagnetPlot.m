@@ -18,7 +18,9 @@ function [h0,h1] = AddMagnetPlot( istart, iend, han, opt )
 %
 % Version date:  11-Apr-2006.
 %
-% Modified 10/24/2008, G. White, added ability to replace current axis
+% Modifications:
+% 3/24/2014, GRW, link x-axis of magnet plot and original
+% 10/24/2008, GRW, added ability to replace current axis
 %
 %==========================================================================
 
@@ -235,6 +237,9 @@ end
 
 hold(h1,'off');
 
+% Link x-axis for original and magnet bar plots
+linkprop([h0 h1],'XLim');
+
 % stick the title over everything
 
 if (found)
@@ -246,4 +251,5 @@ end
 if isprop(han,'NextPlot')
   set(han,'NextPlot','replace')
 end % if NextPlot property (is a figure window)
+
 

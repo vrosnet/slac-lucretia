@@ -116,9 +116,9 @@ enum DriftOrdinal {
 	DriftS, DriftP, DriftL } ;
 
 struct LucretiaParameter DrifPar[nDrifPar] = {
-	{"S",      {Required,Ignored, Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,    },
-	{"P",      {Required,Optional,Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,    },
-	{"L",      {Required,Required,Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,    }
+  {"S",      {Required,Ignored, Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,    },
+  {"P",      {Required,Optional,Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,    },
+  {"L",      {Required,Required,Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,    }
 } ;
 
 int DrifTrackFlag[NUM_TRACK_FLAGS] = {
