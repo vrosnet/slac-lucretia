@@ -79,9 +79,12 @@
  * ClearOldLRWFFreqKicks
  * XGPU2CPU
  * XCPU2GPU
+ * ExtProcess
  *
  * /* AUTH:  PT, 03-aug-2004 */
 /* MOD:
+ * 01-apr-2014, GRW:
+ * code for implementation of GEANT tracking (ExtProcess)
  * 02-aug-2007, PT:
  * bugfix in CheckAperStopPart, code clean-up in
  * TrackBunchThruSBend, and minor correction to the handling of
@@ -138,6 +141,7 @@
 #endif
 /* --- */
 #include "LucretiaCommon.h"       /* data & prototypes for this file */
+#include "LucretiaMatlab.h"
 #include "LucretiaDictionary.h"   /* dictionary data */
 #include "LucretiaPhysics.h"      /* data & prototypes for physics module */
 #include "LucretiaGlobalAccess.h" /* data & prototypes for global var access */
@@ -146,13 +150,14 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include "mex.h"          
           
           
-          
-          /* File-scoped variables: */
+/* File-scoped variables: */
+
 #ifdef __CUDACC__
-          /* rng CUDA variables */
-          unsigned long long *rSeed = NULL ; /* rng seed sourced from Matlab workspace */
+/* rng CUDA variables */
+unsigned long long *rSeed = NULL ; /* rng seed sourced from Matlab workspace */
 curandState *rngStates = NULL ; /* device generated random number state */
 int blocksPerGrid = threadsPerBlock ; /* number of blocks per CUDA grid */
 #endif
@@ -1420,8 +1425,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
@@ -1432,17 +1436,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, 0, 0, TFlag[Aper] ) ;
-#else
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, 0, 0, TFlag[Aper] ) ;
-#endif
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, 0, 0, TFlag[Aper] ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if (strcmp(ElemClass,"SEXT")==0)
@@ -1453,17 +1452,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
-#else
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
-#endif
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
@@ -1474,17 +1468,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 3, 0, 0, TFlag[Aper] ) ;
-#else
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 3, 0, 0, TFlag[Aper] ) ;
-#endif
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, 0, 0, TFlag[Aper] ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if (strcmp(ElemClass,"OCTU")==0)
@@ -1494,17 +1483,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
-#else
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
-#endif
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1514,17 +1498,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 4, 0, 0, TFlag[Aper] ) ;
-#else
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 4, 0, 0, TFlag[Aper] ) ;
-#endif
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 4, 0, 0, TFlag[Aper] ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if (strcmp(ElemClass,"SOLENOID")==0)
@@ -1534,17 +1513,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
-#else
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
-#endif
+            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1554,17 +1528,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 0, 0, TFlag[Aper] ) ;
-#else
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 0, TFlag[Aper] ) ;
-#endif
+          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0, 0, TFlag[Aper] ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if (strcmp(ElemClass,"MULT")==0)
@@ -1574,17 +1543,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS, lastS ) ;
-#else
-            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS ) ;
-#endif
+            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS, lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1594,17 +1558,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 0 ) ;
-#else
-          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
-#endif
+          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0 ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
         
       }
@@ -1620,17 +1579,13 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         
         /* Track first split element with just upstream edge effects allowed */
         if ( TFlag[Split]>0 || trackIter > 0 ) {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 1, 0, 1./( TFlag[Split] ), 0  ) ;
-#else
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1, 0, 1./( TFlag[Split] ), 0  ) ;
-#endif
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1, 0, 1./( TFlag[Split] ), 0  ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, *GetElemNumericPar( *ElemLoop, "L", NULL )/TFlag[Split],
+                        thisS, TFLAG) ;
           /* Apply CSR if requested */
           if ( trackIter > 0 )
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
@@ -1639,42 +1594,36 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         /* Now track rest, if any, of the splits with neither edge effects allowed */
         if ( TFlag[Split] > 0 ) {
           for (iter = 0; iter < TFlag[Split]-2; iter++) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
-#else
-            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
-#endif
+            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, *GetElemNumericPar( *ElemLoop, "L", NULL )/TFlag[Split],
+                          thisS, TFLAG) ;
             /* Apply CSR if requested */
             if ( trackIter > 0 )
               GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
           }
         } /* If no splits or CSR requested, just track once as normal */
-        else if ( TFlag[Split]==0 && trackIter==0 )
-#ifdef __CUDACC__          
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 1, 1, 1, 0  ) ;
-#else
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1, 1, 1, 0  ) ;
-#endif          
-        /* If tracking split then track last split with downstream edge allowed only now */
-        if ( TFlag[Split] > 0 || trackIter > 0 )
-#ifdef __CUDACC__               
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
-#else
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
-#endif
-        if (TrackStatus == 0) {
-          GlobalStatus = TrackStatus ;
-          goto egress ;
+        else if ( TFlag[Split]==0 && trackIter==0 ) {
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1, 1, 1, 0  ) ;
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, thisS, TFLAG) ;
         }
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
-        
+        /* If tracking split then track last split with downstream edge allowed only now */
+        if ( TFlag[Split] > 0 || trackIter > 0 ) {
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
+          if (TrackStatus == 0) {
+            GlobalStatus = TrackStatus ;
+            goto egress ;
+          }
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, *GetElemNumericPar( *ElemLoop, "L", NULL )/TFlag[Split],
+                        thisS, TFLAG) ;
+        }
         /* Apply CSR if requested */
         if ( trackIter > 0 )
           GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
@@ -1697,15 +1646,13 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         /* Split status not supported for LCAV now- too damned complicated to figure out how to split up
          * and correctly deal with wakefield and BPM details */
         TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFlag, 0 ) ;
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+        postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFLAG );
       }
       else if (strcmp(ElemClass,"TCAV")==0)
       {
         /* No split status treatment for TCAV's - see above */
         TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1 ) ;
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+        postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFLAG) ;
       }
       else if ( (strcmp(ElemClass,"HMON")==0) ||
               (strcmp(ElemClass,"VMON")==0) ||
@@ -1716,17 +1663,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-#ifdef __CUDACC__ 
-            TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS ) ;
-#else
-            TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
-#endif              
+            TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1734,20 +1676,11 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
             else
               trackIter = 0;
           }
-#ifdef __CUDACC__                     
-          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, -1 ) ;
-#else
-          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, -1 ) ;
-#endif          
+          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, -1 ) ;
         }
         else {
-#ifdef __CUDACC__           
-          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0 ) ;
-#else
-          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#endif          
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if ( (strcmp(ElemClass,"PROF")==0) ||
@@ -1767,8 +1700,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1780,8 +1712,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       
@@ -1797,8 +1728,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1809,8 +1739,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XCOR, 0, 0 ) ;
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       
@@ -1826,8 +1755,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1838,8 +1766,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, YCOR, 0, 0 ) ;
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if ( strcmp(ElemClass,"XYCOR")==0 )
@@ -1854,8 +1781,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1866,8 +1792,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XYCOR, 0, 0 ) ;
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if ( strcmp(ElemClass,"COLL")==0 )
@@ -1882,8 +1807,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG ) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1894,16 +1818,14 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         }
         else {
           TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
       }
       else if ( strcmp(ElemClass,"COORD")==0 )
       {
         TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop,
                 TrackArgs, TFlag ) ;
-        XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+        postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFLAG) ;
       }
       
       else if ( strcmp(ElemClass,"MARK")==0 )
@@ -1918,17 +1840,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
         if ( trackIter > 0 ) {
           while ( trackIter != 0 ) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, thisS-lastS ) ;
-#else
-            TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
-#endif
+            TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
             if (TrackStatus == 0) {
               GlobalStatus = TrackStatus ;
               goto egress ;
             }
-            XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                    TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+            postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, thisS-lastS, lastS, TFLAG) ;
             GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
             lastS = thisS ;
             if (trackIter>0)
@@ -1938,17 +1855,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
           }
         }
         else {
-#ifdef __CUDACC__
-          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 0 ) ;
-#else
-          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-#endif
+          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
           if (TrackStatus == 0) {
             GlobalStatus = TrackStatus ;
             goto egress ;
           }
-          XYExchange( &TrackArgs->TheBeam->bunches[*BunchLoop]->x, &TrackArgs->TheBeam->bunches[*BunchLoop]->y,
-                  TrackArgs->TheBeam->bunches[*BunchLoop]->nray) ;
+          postEleTrack( TrackArgs->TheBeam->bunches[*BunchLoop], ElemLoop, 0, lastS, TFLAG) ;
         }
         
       }
@@ -1963,7 +1875,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
         GlobalStatus = TrackStatus ;
         goto egress ;
       }
-      
+    
       /* increment the inner loop counter and close the do loop */
       
       InnerLoop += InnerStep ;
@@ -2081,7 +1993,7 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   /* since about half of the coordinate data in the "output" bunch
    * is the same as the "input" bunch (px, py, p0), start by simply
    * exchanging the pointers of the input and output bunches */
-  XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
+  XYExchange( ThisBunch ) ;
   
   /* execute ray tracking kernel (loop over rays) */
 #ifdef __CUDACC__
@@ -3908,7 +3820,7 @@ int TrackBunchThruRF( int elemno, int bunchno,
     
     if (slicecount < nslice-1)
     {
-      XYExchange( &ThisBunch->x, &ThisBunch->y, ThisBunch->nray ) ;
+      XYExchange( ThisBunch ) ;
     }
     
     /* if this slice was an SBPM slice, update the inner SBPM counter */
@@ -4019,11 +3931,10 @@ int TrackBunchThruBPM( int elemno, int bunchno,
     goto egress ;
   }
   
-   /* start by doing the tracking */
-  if ( splitL >= 0 )
-    stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TFlag, splitL ) ;
+  /* start by doing the tracking */
+  stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TFlag, splitL ) ;
 
-   /* if we do not need to save BPM information here, we can return */
+  /* if we do not need to save BPM information here, we can return */
   
   if ( ( (ArgStruc->GetInstData == 0) ||
           ( (TrackFlags[GetBPMData] == 0)&&(TrackFlags[GetBPMBeamPars]==0) ) ) )
@@ -4498,13 +4409,12 @@ int TrackBunchThruInst( int elemno, int bunchno,
   }
   
   /* start by doing the tracking */
-  if ( splitL >= 0 )
-    stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlags, splitL ) ;
+  stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlags, splitL ) ;
   
   /* if we do not need to save inst information here, we can return */
   
   if ( (ArgStruc->GetInstData == 0)    ||
-          (TrackFlags[GetInstData] == 0 ) || (splitL > 0)   )
+          (TrackFlags[GetInstData] == 0 )  )
     goto egress ;
   
   /* if we're still here, we must want to accumulate some information, so
@@ -4893,10 +4803,10 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
   /* now we get the complete input- and output- transformations for the
    * element courtesy of the relevant function */
   if ( splitS == 0 ) {
-    if ( CollPar[CollS].ValuePtr == NULL )
+    if ( CPar[CorS].ValuePtr == NULL )
       splitS = 0 ;
     else
-      splitS = *CollPar[CollS].ValuePtr ;
+      splitS = *CPar[CorS].ValuePtr ;
   }
   
   stat = GetTotalOffsetXfrms( CPar[CorGirder].ValuePtr,
@@ -5023,7 +4933,6 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
   
   /* get the element parameters from BEAMLINE; exit with bad status if
    * any parameters are missing or corrupted. */
-  
   stat = GetDatabaseParameters( elemno, nCollPar, CollPar,
           TrackPars, ElementTable ) ;
   if (stat == 0)
@@ -5101,13 +5010,11 @@ int TrackBunchThruCollimator( int elemno, int bunchno,
       GetLocalCoordPtrs(ThisBunch->x, raystart,&x,&px,&y,&py,&z,&p0) ;
       
       ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
-      
       Stop = CheckAperStopPart( ThisBunch->x,ThisBunch->y,ThisBunch->stop,&ThisBunch->ngoodray, elemno, aper2, ray,
               UPSTREAM, &shape, Tilt, StoppedParticles ) ;
     }
   
   /* now track thru the intervening drift */
-  
   stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlag, *L ) ;
   if (stat==0)
   {
@@ -5435,16 +5342,12 @@ int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray,
   {
     x_rotated = posvec[6*ray+0] * cos(tilt) - posvec[6*ray+2] * sin(tilt) ;
     y_rotated = posvec[6*ray+0] * sin(tilt) + posvec[6*ray+2] * cos(tilt) ;
-    if (*shape == COLL_ELLIPSE)
-      if ( x_rotated*x_rotated / aper2[0]  +
-            y_rotated*y_rotated / aper2[1]  >= 1 )
+    
+    if ( (*shape == COLL_ELLIPSE && ( x_rotated*x_rotated / aper2[0]  + y_rotated*y_rotated / aper2[1]  >= 1 ))
+         ||
+         (*shape == COLL_RECTANGLE &&  ( (x_rotated*x_rotated >= aper2[0]) || (y_rotated*y_rotated >= aper2[1]) ) ) )
         retval = 1 ;
-      else if (*shape == COLL_RECTANGLE)
-        if ( (x_rotated*x_rotated >= aper2[0]) ||
-            (y_rotated*y_rotated >= aper2[1])    )
-          retval = 1 ;
   }
-  
   if (retval == 1)
   {
     
@@ -6924,14 +6827,20 @@ double GetDesignLorentzDelay( double* pmod )
 /*=====================================================================*/
 
 /* Exchange the x and y coordinate vectors of a bunch */
-
+/* Mod :
+02-apr-2014 GRW
+- Simplify calling with just Bunch structure
+call */
 /* RET:    None.
  * /* ABORT:  never.
  * /* FAIL:   never. */
-void XYExchange( double** xb, double** yb, int nray )
+void XYExchange( struct Bunch* ThisBunch )
 {
   double* temp ;
-  
+  double** xb = &ThisBunch->x ;
+  double** yb = &ThisBunch->y ;
+  int nray = ThisBunch->nray ;
+
 #ifdef __CUDACC__
   cudaMalloc((void**)&temp, 6*nray*sizeof(double)) ;
   cudaMemcpy(temp, *xb, 6*nray*sizeof(double), cudaMemcpyDeviceToDevice) ;
@@ -6947,7 +6856,6 @@ void XYExchange( double** xb, double** yb, int nray )
   return ;
   
 }
-
 
 /*=====================================================================*/
 
@@ -9060,5 +8968,85 @@ __global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed)
   /* Each thread gets same seed, a different sequence
    * number, no offset */
   curand_init(rSeed, id, 0, &state[id]);
+}
+#endif
+
+/* Actions to perform post tracking through an element */
+/* RET:    None.
+ * /* ABORT:  never.
+ * /* FAIL:   never. */
+void postEleTrack( struct Bunch* ThisBunch, int* elemno, double L, double S, int* TrackFlag )
+{
+ /* Exchange post-track rays (y) with pre-tracked rays (x) for next track operation */
+ XYExchange( ThisBunch ) ;
+ #ifndef __CUDACC__
+ /* Perform any external processes (e.g. GEANT4 tracking) */
+ #ifdef LUCRETIA_G4TRACK
+ ExtProcess( elemno, ThisBunch, L, &S, TrackFlag) ;
+ #endif
+ #endif
+ return ;
+}
+
+/* Interface function to external (GEANT4) process routines */
+#ifdef LUCRETIA_G4TRACK
+void ExtProcess(int* elemno, struct Bunch* ThisBunch, double L, double* S, int* TrackFlag)
+{
+  /* If there are stopped particles in this bunch that correspond to this beamline element
+     and there is an associated extProcess object attached, then pass bunch over to
+     GEANT4 tracking to go through the requested material */
+  int stoppedParticles=0 ;
+  int ray, stat ;
+  int len ;
+  double Xfrms[6][2] ;
+  double* ElemOffset ;
+  double GirdNo ;
+  mxArray* pMaterial;
+  double *x, *px, *y, *py, *z, *p0 ;
+    
+  pMaterial = GetExtProcessData(elemno, "Material") ;
+  if (pMaterial == NULL)
+    return ;
+  for (ray=0; ray<ThisBunch->nray; ray++) {
+    if (ThisBunch->stop[ray] == *elemno+1) {
+      stoppedParticles=1;
+      break ;
+    }
+  }
+  if (stoppedParticles==0)
+    return ;
+  if (L == 0) /* If L passed as 0, need to look up from BEAMLINE in case of split tracking */
+    L = *GetElemNumericPar( *elemno, "L", NULL ) ;
+  if (L == 0) /* If L is still 0 then no point passing to GEANT */
+      return ;
+  /* make ray coordinates into local ones */
+  GirdNo = (double) GetElemGirder( *elemno )  ;
+  ElemOffset = GetElemNumericPar( *elemno, "Offset", &len ) ;
+  if (len != 6)
+    ElemOffset = NULL ;
+  stat = GetTotalOffsetXfrms( &GirdNo , &L, S, ElemOffset, Xfrms ) ;
+  if (stat == 1) {
+    for (ray=0 ;ray<ThisBunch->nray ; ray++)
+    {
+      /* if the ray was previously stopped, ignore it  */
+      if (ThisBunch->stop[ray] != *elemno+1)
+        continue ;
+      GetLocalCoordPtrs(ThisBunch->x, ray*6, &x,&px,&y,&py,&z,&p0) ;
+      ApplyTotalXfrm( Xfrms, UPSTREAM, TrackFlag, 0 ,x,px,y,py,z,p0) ;
+    }
+  }
+  /* Perform required GEANT4 tracking */
+  g4track(elemno, ThisBunch, &L) ;
+  /* Transform back to accelerator coordinates */
+  if (stat == 1) {
+    for (ray=0 ;ray<ThisBunch->nray ; ray++)
+    {
+      /* if the ray was previously stopped, ignore it  */
+      if (ThisBunch->stop[ray] != *elemno+1)
+        continue ;
+      GetLocalCoordPtrs(ThisBunch->x, ray*6, &x,&px,&y,&py,&z,&p0) ;
+      ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
+    }
+  }
 }
 #endif

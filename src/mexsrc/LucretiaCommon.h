@@ -19,9 +19,19 @@
 
 #define LUCRETIA_COMMON
 #ifdef __CUDACC__
-#include "curand_kernel.h"
-#include "gpu/mxGPUArray.h"
+  #include "curand_kernel.h"
+  #include "gpu/mxGPUArray.h"
+  #define CUDAHOSTFUN __host__
+  #define CUDAGLOBALFUN __global__
+  #define CUDAHOSTDEVICEFUN __host__ __device__
+  #define TFLAG TFlag_gpu
+#else
+  #define CUDAHOSTFUN
+  #define CUDAGLOBALFUN
+  #define CUDAHOSTDEVICEFUN
+  #define TFLAG TFlag
 #endif
+
 /* some parameters related to whether a corrector is an XCOR, a YCOR, or an XYCOR */
 
 #define XCOR  0
@@ -188,13 +198,13 @@ struct Bunch {
 	double* x ;                 /* pointer to coords  */
 #ifdef __CUDACC__  
 	mxGPUArray* x_gpu ;             /* Matlab mxGPUArray */
-  double* y ;                 /* second coordinate pointer in GPU memory*/
-  mxGPUArray* Q_gpu ;                 /* Matlab mxGPUArray */
+        double* y ;                 /* second coordinate pointer in GPU memory*/
+        mxGPUArray* Q_gpu ;                 /* Matlab mxGPUArray */
 	mxGPUArray* stop_gpu ;              /* Matlab mxGPUArray */
-  mxGPUArray* y_gpu ;              /* Matlab mxGPUArray */
-  int* ngoodray_gpu ;
+        mxGPUArray* y_gpu ;              /* Matlab mxGPUArray */
+        int* ngoodray_gpu ;
 #else
-  double* y ;                 /* second coordinate pointer*/
+        double* y ;                 /* second coordinate pointer*/
 #endif
 	double* Q ;                 /* pointer to charge vector */
 	double* stop ;              /* pointer to stopping element, if any */
@@ -356,34 +366,17 @@ int GetTotalOffsetXfrms( double*, double*,
 								 double[6][2] ) ;
 
 /* apply complete offsets (upstream and downstream) for an element */
-#ifdef __CUDACC__
-__host__ __device__ void ApplyTotalXfrm( double[6][2], int, int*, double, double *x, double *px, double *y, double *py, double *z, double *p0 ) ;
-#else
-void ApplyTotalXfrm( double[6][2], int, int*, double, double *x, double *px, double *y, double *py, double *z, double *p0 ) ;
-#endif
+CUDAHOSTDEVICEFUN void ApplyTotalXfrm( double[6][2], int, int*, double, double *x, double *px, double *y, double *py, double *z, double *p0 ) ;
 
 /* check whether a particle needs to stop on aperture */
-#ifdef __CUDACC__
-__host__ __device__ int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray, int, double*, int, int,
+CUDAHOSTDEVICEFUN int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray, int, double*, int, int,
 					   int*, double, int* ) ;
-#else
-int CheckAperStopPart( double *x, double *y, double *stop, int *ngoodray, int, double*, int, int,
-					   int*, double, int* ) ;
-#endif
 
 /* check whether a particle needs to stop for P0 <= 0 */
-#ifdef __CUDACC__
-__host__ __device__ int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int, int, double, int, int* ) ;
-#else
-int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int, int, double, int, int* ) ;
-#endif
+CUDAHOSTDEVICEFUN int CheckP0StopPart( double *stop, int *ngoodray, double *x, double *y, int, int, double, int, int* ) ;
 
 /* check whether a particle needs to stop for |Pperp| >= 1 */
-#ifdef __CUDACC__
-__host__ __device__ int CheckPperpStopPart( double*, int*, int, int, double*, double*, int* ) ;
-#else
-int CheckPperpStopPart( double*, int*, int, int, double*, double*, int* ) ;
-#endif
+CUDAHOSTDEVICEFUN int CheckPperpStopPart( double*, int*, int, int, double*, double*, int* ) ;
 
 /* initialization for BPM/INST operations */
 
@@ -473,25 +466,14 @@ double GetSpecialSBendPar(struct LucretiaParameter*, int) ;
 double GetDesignLorentzDelay( double* ) ;
 
 /* exchange x and y coord vectors in a bunch */
-#ifdef __CUDACC__
-__host__ void XYExchange( double**, double**, int ) ;
-#else
-void XYExchange( double**, double**, int ) ;
-#endif
+CUDAHOSTFUN void XYExchange( struct Bunch* ) ;
+CUDAHOSTFUN void postEleTrack( struct Bunch*, int*, double, double, int* ) ;
 
 /* perform initial check of total and transverse momenta */
-#ifdef __CUDACC__
-__global__ void InitialMomentumCheck( int* stat, double* bstop, int *ngoodray_gpu, double* x, double* y, int RayLoop, int* stp ) ;
-#else
-void InitialMomentumCheck( int* stat, double* bstop, int *ngoodray, double* x, double* y, int RayLoop, int* stp ) ;
-#endif
+CUDAGLOBALFUN void InitialMomentumCheck( int*, double*, int*, double*, double*, int, int* ) ;
 
 /* point local coords at desired entry in a data vector */
-#ifdef __CUDACC__
-__host__ __device__ void GetLocalCoordPtrs( double[], int, double**, double**, double**, double**, double**, double** ) ;
-#else
-void GetLocalCoordPtrs( double[], int, double**, double**, double**, double**, double**, double** ) ;
-#endif
+CUDAHOSTDEVICEFUN void GetLocalCoordPtrs( double[], int, double**, double**, double**, double**, double**, double** ) ;
 
 /* do additional consistency checking of girder mover parameters */
 
@@ -570,6 +552,15 @@ void ClearOldLRWFFreqKicks( int ) ;
 /* Deal with CSR and split track flags */
 double GetCsrTrackFlags( int, int*, int*, int, struct Bunch*, double* ) ;
 
+/* External process function calls (GEANT4) */
+#ifdef LUCRETIA_G4TRACK
+void ExtProcess(int*, struct Bunch*, double, double*, int*) ;
+#endif
+
+/* GEANT4 stuff */
+#ifdef LUCRETIA_G4TRACK
+#include "g4track/g4track.h"
+#endif
 
 /* =================================================== */
 /* GPU specific functions and tracking kernels         */

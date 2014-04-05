@@ -3,6 +3,8 @@
 
 /* AUTH: PT, 02-aug-2004 */
 /* MOD:
+                   01-Apr-2014, GRW:
+		           add geant4 handling stuff
 		   06-Mar-2008, PT:
 			   add IsEmpty proto.
 		   08-mar-2006, PT:
@@ -34,6 +36,9 @@ void   ReverseTwissDirection( struct RmatArgStruc* ) ;
 void   GetTwissSetReturn( int, mxArray*[], struct twiss* ) ;
 void   GetTwissCoupledSetReturn( int, int, mxArray*[], 
 										  struct Ctwiss * ) ;
+
+/* For GEANT4 tracking handling */
+mxArray* GetExtProcessData(int*, const char*) ;
 
 /* for TrackThru:  check arguments and set returns */
 
