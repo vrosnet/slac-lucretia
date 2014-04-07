@@ -17,7 +17,7 @@ class G4Event;
 class primaryGeneratorAction : public G4VUserPrimaryGeneratorAction
 {
   public:
-  primaryGeneratorAction(G4double zpos, lucretiaManager* lman);    
+  primaryGeneratorAction(lucretiaManager* lman);    
     virtual ~primaryGeneratorAction();
 
     virtual void GeneratePrimaries(G4Event* );
@@ -29,7 +29,6 @@ class primaryGeneratorAction : public G4VUserPrimaryGeneratorAction
 
   private:
     G4ParticleGun*          fParticleGun; // G4 particle gun
-    G4double fZPOS; // left edge of world to start tracking particles from
   lucretiaManager* fLman ;
 };
 

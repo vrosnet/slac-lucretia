@@ -25,11 +25,15 @@
   #define CUDAGLOBALFUN __global__
   #define CUDAHOSTDEVICEFUN __host__ __device__
   #define TFLAG TFlag_gpu
+  #define STOPPED_PARTICLES StoppedParticles_gpu
+  #define NGOODRAY ngoodray_gpu
 #else
   #define CUDAHOSTFUN
   #define CUDAGLOBALFUN
   #define CUDAHOSTDEVICEFUN
   #define TFLAG TFlag
+  #define STOPPED_PARTICLES StoppedParticles
+  #define NGOODRAY ngoodray
 #endif
 
 /* some parameters related to whether a corrector is an XCOR, a YCOR, or an XYCOR */
@@ -467,7 +471,7 @@ double GetDesignLorentzDelay( double* ) ;
 
 /* exchange x and y coord vectors in a bunch */
 CUDAHOSTFUN void XYExchange( struct Bunch* ) ;
-CUDAHOSTFUN void postEleTrack( struct Bunch*, int*, double, double, int* ) ;
+CUDAHOSTFUN void postEleTrack( struct Beam*, int*, int*, double, double, int* ) ;
 
 /* perform initial check of total and transverse momenta */
 CUDAGLOBALFUN void InitialMomentumCheck( int*, double*, int*, double*, double*, int, int* ) ;
@@ -554,7 +558,7 @@ double GetCsrTrackFlags( int, int*, int*, int, struct Bunch*, double* ) ;
 
 /* External process function calls (GEANT4) */
 #ifdef LUCRETIA_G4TRACK
-void ExtProcess(int*, struct Bunch*, double, double*, int*) ;
+void ExtProcess(int*, struct Beam*, int*, double, double*, int*) ;
 #endif
 
 /* GEANT4 stuff */

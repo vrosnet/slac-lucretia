@@ -2,11 +2,13 @@ classdef ExtGeometry < handle
   %EXTGEOMETRY - Class to descibe geometry required for operation of
   %external processes (e.g. for GEANT4)
   
-  properties(Constant)
+  properties(Constant, Hidden)
     allowedGeometryTypes={'Rectangle','Ellipse'};
   end
-  properties(SetAccess=protected)
+  properties(Access=protected)
     allowedMaterials={'Vacuum'};
+  end
+  properties(SetAccess=protected)
     GeometryType='Ellipse'; % type of shape (e.g. 'Rectangule')
     AperX=1; % Inside half-aperture of shape (m) - Horizontal dimension
     AperY=1; % Inside half-aperture of shape (m) - Vertical dimension

@@ -2,9 +2,10 @@ classdef ExtProcess < handle
   % EXTPROCESS - Class for handling interfaces to external code linked with Lucretia
   % Currently supported is GEANT4
   
-  properties(Constant)
+  properties(Constant, Hidden)
     supportedProcessTypes = {'GEANT4'} ;
     supportedProcessPhysics = {'All'} ;
+    supportedParticleTypes = {'All'} ;
   end
   properties(Abstract)
     Verbose ;
@@ -15,13 +16,40 @@ classdef ExtProcess < handle
     type ;
     processPhysicsEnabled = 'All' ;
   end
+  properties(SetAccess=protected)
+    SecondaryBeam ; % Lucretia Beam structure for store secondaries
+    SecondaryParticleTypes = 'All' ; % Which particle types to store
+    PrimaryOrder % Order in which primary particles are serviced
+  end
   properties
+    MaxSecondaryParticles = 0 ; % set >0 to store up to N secondary particles produced
     MaxPrimaryParticles = 1e4 ;
     MaxSecondaryParticlesPerPrimary = 10 ;
+    NumSecondariesStored = 0 ; % Number of secondary particles actually stored
   end
   
   methods
     function obj = ExtProcess()
+    end
+    function InitializeSecondaries(obj, primaryBeam)
+      global BEAMLINE
+      if obj.MaxSecondaryParticles<1; return; end;
+      if ~isfield(primaryBeam,'Bunch') || ~isfield(primaryBeam.Bunch,'Q') || length(primaryBeam.Bunch.Q)<1
+        error('Badly formatted Lucretia Beam ''primaryBeam''')
+      end
+      obj.SecondaryBeam = CreateBlankBeam(length(primaryBeam.Bunch),min([obj.MaxPrimaryParticles,obj.MaxSecondaryParticles]), ...
+        BEAMLINE{obj.elemno}.P,primaryBeam.BunchInterval) ;
+      obj.SecondaryBeam.Bunch.type = cell(1,length(obj.SecondaryBeam.Bunch.Q)) ;
+    end
+    function SetPrimaryOrdering(obj,primaryBeam)
+      % Set order in which primary rays are serviced, order by highest
+      % charge weight first, with equal charge weights randomized
+      if ~isfield(primaryBeam,'Bunch') || ~isfield(primaryBeam.Bunch,'Q') || length(primaryBeam.Bunch.Q)<1
+        error('Badly formatted Lucretia Beam ''primaryBeam''')
+      end
+      randind=randperm(length(primaryBeam.Bunch.Q));
+      [~, sortind]=sort(primaryBeam.Bunch.Q(randind));
+      obj.PrimaryOrder=randind(sortind);
     end
   end
   methods(Static)

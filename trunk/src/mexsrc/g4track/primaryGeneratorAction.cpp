@@ -14,9 +14,8 @@
 #endif
 #include <iostream>
 
-primaryGeneratorAction::primaryGeneratorAction(G4double zpos, lucretiaManager* lman)
+primaryGeneratorAction::primaryGeneratorAction(lucretiaManager* lman)
   : G4VUserPrimaryGeneratorAction(),
-    fZPOS(zpos),  // starting Z postion (left edge of world)
     fLman(lman)
 {
   // Input particles type of electron
@@ -43,7 +42,7 @@ void primaryGeneratorAction::GeneratePrimaries(G4Event* Event)
   xPtr = fLman->GetNextX() ;
   while ( xPtr>=0 ) { // Loop through all stopped Lucretia macro-particles
     // X/Y co-ordinates from Lucretia Bunch, place Z at start of geometry
-    fParticleGun->SetParticlePosition(G4ThreeVector(fLman->fBunch->x[xPtr*6]*m, fLman->fBunch->x[xPtr*6+2]*m, -fZPOS*m));
+    fParticleGun->SetParticlePosition(G4ThreeVector(fLman->fBunch->x[xPtr*6]*m, fLman->fBunch->x[xPtr*6+2]*m, -fLman->Lcut*m));
     P=fLman->fBunch->x[xPtr*6+5];
     Px=P*sin(fLman->fBunch->x[xPtr*6+1]);
     Py=P*sin(fLman->fBunch->x[xPtr*6+3]);
@@ -53,9 +52,9 @@ void primaryGeneratorAction::GeneratePrimaries(G4Event* Event)
     fParticleGun->SetParticleEnergy(P*GeV);
     // Create a GEANT4 primary vertex from this macro-particle
     fParticleGun->GeneratePrimaryVertex(Event);
+    //cout << "X/Y/Z : " << fLman->fBunch->x[xPtr*6]*m << " / " << fLman->fBunch->x[xPtr*6+2]*m << " / " << -fLman->Lcut << " Px/Py/Pz : " << Px << " / " << Py << " / " << Pz << " P : " << P << "\n" ;
     // Next stopped Lucretia macro-particle
     xPtr = fLman->GetNextX() ;
-    //cout << "X/Y/Z : " << fLman->fBunch->x[xPtr*6]*m << " / " << fLman->fBunch->x[xPtr*6+2]*m << " / " << -fZPOS*m << " Px/Py/Pz : " << Px << " / " << Py << " / " << Pz << " P : " << P << "\n" ;
   }
 }
 

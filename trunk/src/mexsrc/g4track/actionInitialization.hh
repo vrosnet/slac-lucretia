@@ -14,14 +14,11 @@
 class actionInitialization : public G4VUserActionInitialization
 {
 public:
-  actionInitialization(G4double zpos, G4double ecut, G4double zcut, lucretiaManager* lman );
+  actionInitialization(lucretiaManager* lman );
   ~actionInitialization();
   virtual void BuildForMaster() const;
   virtual void Build() const;
 private:
-  G4double fZPOS;
-  G4double fECUT;
-  G4double fZCUT;
   lucretiaManager* fLman ;
 };
 
