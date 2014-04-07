@@ -28,7 +28,7 @@ g4track_test : geomConstruction.o actionInitialization.o eventAction.o primaryGe
 	g++ $(CFLAGS) $(CLIBS) -o g4track_test g4track_test.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o
 
 # g4track Library
-libg4track : g4track.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o lucretiaManager.o
+libg4track : g4track.o lucretiaManager.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o
 #libg4track : g4track.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o lucretiaManager.o
 #	g++ $(LFLAGS) -o libg4track.so g4track.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o lucretiaManager.o
 

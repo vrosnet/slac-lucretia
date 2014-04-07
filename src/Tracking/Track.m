@@ -282,6 +282,17 @@ classdef Track < handle
       end
     end
     function trackThru(obj,cmd)
+      global BEAMLINE
+      % Any Ext Processes to pre-condition?
+      ext=findcells(BEAMLINE,'ExtProcess');
+      if ~isempty(ext)
+        for iele=ext
+          for iproc=1:length(BEAMLINE{iele}.ExtProcess)
+            BEAMLINE{iele}.ExtProcess(iproc).SetPrimaryOrdering(obj.beamIn);
+            BEAMLINE{iele}.ExtProcess(iproc).InitializeSecondaries(obj.beamIn);
+          end
+        end
+      end
       % Asking for intermediate track locations?
       interele=obj.beamStoreInd;
       bsind=obj.beamStoreInd; czind=obj.centerZInd;

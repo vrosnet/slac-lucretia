@@ -23,7 +23,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle & ExtSecondaryParticle
       while 1
         tline=fgetl(fid);
         if ~ischar(tline); break; end;
-        t=regexp(tline,'G4_(\S+)','tokens','once');
+        t=regexp(tline,'(G4_\S+)','tokens','once');
         if ~isempty(t)
           obj.allowedMaterials{end+1}=t{1};
         end
@@ -50,7 +50,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle & ExtSecondaryParticle
   methods
     function SetMaterial(obj,material)
       SetMaterial@ExtGeometry(obj,material);
-      obj.Material=sprintf('G4_%s',obj.Material);
+      obj.Material=obj.Material;
     end
     function SetGeometryType(obj,type)
       global BEAMLINE
@@ -58,7 +58,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle & ExtSecondaryParticle
          if ~isempty(obj.elemno) && isfield(BEAMLINE{obj.elemno},'Geometry')
            type=BEAMLINE{obj.elemno}.Geometry;
          else
-           type='Vacuum';
+           type='Ellipse';
          end
        end
        SetGeometryType@ExtGeometry(obj,type);
@@ -73,7 +73,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle & ExtSecondaryParticle
       end
       if ~exist('val2','var') || isempty(val2) && ~isempty(obj.elemno) && isfield(BEAMLINE{elemno},'aper') && ...
         length(BEAMLINE{elemno}.aper)>1
-        val2=BEAMLINE{obj.elemno}.aper(2);
+        val2=BEAMLINE{obj.elemno}.aper(1);
       end
       SetAper@ExtGeometry(obj,val1,val2);
       if isempty(obj.elemno) || ~obj.apercheck; return; end;

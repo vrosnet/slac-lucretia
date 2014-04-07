@@ -7,11 +7,8 @@
   #include "lucretiaManager.hh"
 #endif
 
-actionInitialization::actionInitialization(G4double zpos, G4double ecut, G4double zcut, lucretiaManager* lman)
+actionInitialization::actionInitialization(lucretiaManager* lman)
   : G4VUserActionInitialization(),
-    fZPOS(zpos),
-    fECUT(ecut),
-    fZCUT(zcut),
     fLman(lman)
 {
 }
@@ -27,10 +24,10 @@ void actionInitialization::BuildForMaster() const
 
 void actionInitialization::Build() const
 {
-  primaryGeneratorAction* prim = new primaryGeneratorAction(fZPOS,fLman) ;
+  primaryGeneratorAction* prim = new primaryGeneratorAction(fLman) ;
   SetUserAction(prim);
   SetUserAction(new runAction);
   SetUserAction(new eventAction);
-  SetUserAction(new trackingAction(fECUT,fZCUT,fLman));
+  SetUserAction(new trackingAction(fLman));
 }  
 
