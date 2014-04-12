@@ -288,8 +288,7 @@ classdef Track < handle
       if ~isempty(ext)
         for iele=ext
           for iproc=1:length(BEAMLINE{iele}.ExtProcess)
-            BEAMLINE{iele}.ExtProcess(iproc).SetPrimaryOrdering(obj.beamIn);
-            BEAMLINE{iele}.ExtProcess(iproc).InitializeSecondaries(obj.beamIn);
+            BEAMLINE{iele}.ExtProcess(iproc).InitializeTrackingData(obj.beamIn,obj.firstBunch,obj.lastBunch);
           end
         end
       end
@@ -431,6 +430,15 @@ classdef Track < handle
           obj.plasmaData.bunchProfile=bunchProfile;
           obj.plasmaData.sx=plas_sx;
           obj.plasmaData.sy=plas_sy;
+        end
+      end
+      % Any Ext Processes to finalize data with
+      ext=findcells(BEAMLINE,'ExtProcess');
+      if ~isempty(ext)
+        for iele=ext
+          for iproc=1:length(BEAMLINE{iele}.ExtProcess)
+            BEAMLINE{iele}.ExtProcess(iproc).FinalizeTrackingData() ;
+          end
         end
       end
     end

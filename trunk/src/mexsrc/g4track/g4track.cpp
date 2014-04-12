@@ -96,6 +96,8 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   runno++;
 
   // return
+  // - return variables to Matlab workspace
+  lman->SetLucretiaData() ;
   return lman->fNumRaysResumed ;
 }
 

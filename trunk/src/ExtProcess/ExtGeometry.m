@@ -9,7 +9,7 @@ classdef ExtGeometry < handle
     allowedMaterials={'Vacuum'};
   end
   properties(SetAccess=protected)
-    GeometryType='Ellipse'; % type of shape (e.g. 'Rectangule')
+    GeometryType='Ellipse'; % type of shape (e.g. 'Rectangle')
     AperX=1; % Inside half-aperture of shape (m) - Horizontal dimension
     AperY=1; % Inside half-aperture of shape (m) - Vertical dimension
     Thickness=1; % Geometry thickness (m)

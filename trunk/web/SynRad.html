@@ -134,12 +134,12 @@ CSR fields, it can be set independently- in which case the tracking engine
 treats the element as N sequential identical elements with lengths and strengths 
 scaled appropriately. More splitting more closely represents reality but will 
 slow down the tracking. Again, experimentation is recommended.<br><br><strong>
-TrackFlags.DriftSplit = 10<br></strong>If set to 0, then no CSR treatment is 
+TrackFlags.CSR_DriftSplit = 10<br></strong>If set to 0, then no CSR treatment is 
 applied beyond the downstream face of the SBEN. If integer &gt;0, then CSR is 
 applied to the tracked beam downstream of the bend to a point downstream 
 determined internally where the CSR field ceases to have a significant effect. 
 The following elements are usually drifts (hence the flag name, but can include 
-any element class other than LCAV or TCAV). The value of the DriftSplit flag 
+any element class other than LCAV or TCAV). The value of the CSR_DriftSplit flag 
 determines the number of slices between the downstream SBEN face and the cutoff 
 point to use. Depending on the number of downstream elements between bend and 
 cutoff point, the elements are split so that the total number of tracking slices 

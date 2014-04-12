@@ -1,9 +1,9 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-  <meta http-equiv="content-type"
- content="text/html; charset=ISO-8859-1">
-  <title>Lucretia: Downloads</title>
+<html><head>
+
+
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"><title>Lucretia: Downloads</title>
+  
   <meta name="author" content="Peter Tenenbaum">
   <style type="text/css">
 .auto-style1 {
@@ -12,15 +12,8 @@
 .auto-style2 {
 	text-align: center;
 }
-</style>
-</head>
-<body>
-<div style="text-align: center;"><a
- href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span
- style="font-size: 24pt;"><img
- style="border: 0px solid ; width: 80px; height: 90px;"
- alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif"
- align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
+</style></head><body>
+<div style="text-align: center;"><a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span style="font-size: 24pt;"><img style="border: 0px solid ; width: 80px; height: 90px;" alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif" align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
 </span>
 <div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
@@ -30,14 +23,16 @@ Project</span><br>
 <small>Downloads / Source code description<br>
 <br>
 </small></span></div>
-The Lucretia code is open-source:&nbsp; anyone can freely download any or all of the 
-source, examples, binaries, etc.&nbsp; Links to facilitate downloading are below.&nbsp; 
-The philosophy of the Lucretia maintainers is to keep binaries (mex files) for 
-the CURRENT version of Matlab only in the download package and file repository. 
-All development and bugfixes/maintainance etc is done using the current Matlab 
-release. Although most m-files and to a lesser extent the mexfiles will probably 
-work for several versions back from the current, we cannot guarantee this, 
-supported functions and the Matlab build environment change over time.<br><br>
+The Lucretia code is open-source:&nbsp; anyone can freely download any
+or all of the source, examples, binaries, etc.&nbsp; Links to
+facilitate downloading are below.&nbsp; The philosophy of the Lucretia
+maintainers is to keep binaries (mex files) for the CURRENT version of
+Matlab only in the download package and file repository. All
+development and bugfixes/maintainance etc is done using the current
+Matlab release. Although most m-files and to a lesser extent the
+mexfiles will probably work for several versions back from the current,
+we cannot guarantee this as supported functions and the Matlab build
+environment change over time.<br><br>
 <div style="text-align: center;"><span class="auto-style1">Supported 
 	Environments</span><br>
 </div>
@@ -84,24 +79,32 @@ Downloads</span><br>
 	subversion: <br>
 	<blockquote>
 		svn co https://slac-lucretia.googlecode.com/svn/trunk Lucretia</blockquote>
-	<br>will download all to a directory &quot;Lucretia&quot; for example (linux 
+	<br>will download all to a directory "Lucretia" for example (linux 
 	command-line example), other subversion client programs for all major 
 	operating systems are available.<br>
 </div>
 </div>
 <div class="auto-style2">
 	<strong>mexfile Source</strong></div>
-<br>The source code for Lucretia exists as several c or fortran files all 
+<br>The source code for Lucretia exists as several c, c++, or fortran files all 
 contained in the Lucretia/src/mexsrc directory and subdirectories therein. The 
-&quot;core&quot; Lucretia binaries are built in the mexsrc directory itself from c source 
+"core" Lucretia binaries are built in the mexsrc directory itself from c source 
 files. See <a href="mexfiles.html">here</a> for a description of these mexfiles. 
 There is a Makefile included in the mexsrc directory for building. The Makefile 
 has some built-in documentation with descriptions of which environment variables 
-to alter to build the mexfiles for your environment.<br>There are also separate 
-directories containing the source code for the XSIF parser (mexsrc/xsif) and for 
-the Ground Motion code (mexsrc/matgm). These source files are fortran77 and 
-fortran90 based. Once again there are self-describing Makefiles in each of these 
-build directories.<br>The only known fortran compiler which works with current 
+to alter to build the mexfiles for your environment.<br>There
+are also separate directories containing the source code for the XSIF
+parser (mexsrc/xsif) and for the Ground Motion code (mexsrc/matgm).
+These source files are fortran77 and fortran90 based. Once again there
+are self-describing Makefiles in each of these build directories. There
+is also a seperate directory for the sorce for the GEANT4 interface
+module, contained in the src/mexsrc/g4track directory. To build against
+this to enable the GEANT4 process function to work from within
+Lucretia: first build the g4track library object using the Makefile in
+that directory (assumes GEANT4 v.10+ is installed on your system). Then
+build Lucretia using the "make g4track" command. The distributed
+TrackThru mex files (for linux 64-bit) are built including the GEANT4
+libraries.<br>The only known fortran compiler which works with current 
 versions of Matlab and these source files is the Intel fortran compiler.<br>
 Run-time libraries for the Intel compiler and other required shared object 
 libraries are kept in the Lucretia/src/Libs directory (each environment has a 
@@ -110,12 +113,8 @@ search path (LD_LIBRARY_PATH environment variable for Linux-based operating
 systems, PATH for windows or DYLD_LIBRARY_PATH for Mac) before starting Matlab 
 to successfully run all mexfiles.<br>
 <br>
-<a
- href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
+<a href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
 20-Sept-2011<br>
-<a href="http://www.slac.stanford.edu/detailed.html"><img
- src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
- alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
- align="right"></a><br>
-</body>
-</html>
+<a href="http://www.slac.stanford.edu/detailed.html"><img src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page" alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;" align="right"></a><br>
+
+</body></html>

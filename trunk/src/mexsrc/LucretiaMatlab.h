@@ -39,6 +39,9 @@ void   GetTwissCoupledSetReturn( int, int, mxArray*[],
 
 /* For GEANT4 tracking handling */
 mxArray* GetExtProcessData(int*, const char*) ;
+mxArray* GetExtProcessPtr(int* elemno) ;
+mxArray* GetExtProcessPrimariesData(int* elemno) ;
+mxArray* GetExtProcessSecondariesData(int* elemno) ;
 
 /* for TrackThru:  check arguments and set returns */
 

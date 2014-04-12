@@ -17,39 +17,75 @@ classdef ExtProcess < handle
     processPhysicsEnabled = 'All' ;
   end
   properties(SetAccess=protected)
-    SecondaryBeam ; % Lucretia Beam structure for store secondaries
     SecondaryParticleTypes = 'All' ; % Which particle types to store
-    PrimaryOrder % Order in which primary particles are serviced
+    PrimarySampleOrder
+    PrimaryParticlesData
+    SecondaryParticlesData
   end
-  properties
-    MaxSecondaryParticles = 0 ; % set >0 to store up to N secondary particles produced
-    MaxPrimaryParticles = 1e4 ;
-    MaxSecondaryParticlesPerPrimary = 10 ;
-    NumSecondariesStored = 0 ; % Number of secondary particles actually stored
+  properties(Dependent)
+    MaxSecondaryParticlesPerPrimary
+    MaxSecondaryParticles % set >0 to store up to N secondary particles produced
+    MaxPrimaryParticles
+  end
+  properties(Access=protected)
+    fPrimarySampleOrder ;
+    fMaxSecondaryParticlesPerPrimary = uint32(10) ;
+    fMaxSecondaryParticles= uint32(0) ;
+    fMaxPrimaryParticles = uint32(1e4) ;
+    fNumSecondariesStored = uint32(0) ; % Number of secondary particles actually stored
   end
   
   methods
     function obj = ExtProcess()
     end
-    function InitializeSecondaries(obj, primaryBeam)
-      global BEAMLINE
-      if obj.MaxSecondaryParticles<1; return; end;
-      if ~isfield(primaryBeam,'Bunch') || ~isfield(primaryBeam.Bunch,'Q') || length(primaryBeam.Bunch.Q)<1
-        error('Badly formatted Lucretia Beam ''primaryBeam''')
-      end
-      obj.SecondaryBeam = CreateBlankBeam(length(primaryBeam.Bunch),min([obj.MaxPrimaryParticles,obj.MaxSecondaryParticles]), ...
-        BEAMLINE{obj.elemno}.P,primaryBeam.BunchInterval) ;
-      obj.SecondaryBeam.Bunch.type = cell(1,length(obj.SecondaryBeam.Bunch.Q)) ;
+    function val=get.MaxPrimaryParticles(obj)
+      val=obj.fMaxPrimaryParticles;
     end
-    function SetPrimaryOrdering(obj,primaryBeam)
+    function set.MaxPrimaryParticles(obj,val)
+      obj.fMaxPrimaryParticles=uint32(val);
+    end
+    function val=get.MaxSecondaryParticlesPerPrimary(obj)
+      val=obj.fMaxSecondaryParticlesPerPrimary;
+    end
+    function val=get.MaxSecondaryParticles(obj)
+      val=obj.fMaxSecondaryParticles;
+    end
+    function set.MaxSecondaryParticlesPerPrimary(obj,val)
+      obj.fMaxSecondaryParticlesPerPrimary=uint32(val);
+    end
+    function set.MaxSecondaryParticles(obj,val)
+      obj.fMaxSecondaryParticles=uint32(val);
+    end
+    function FinalizeTrackingData(obj)
+      % To be called by Track after tracking
+      global BEAMLINE
+      if isfield(BEAMLINE{obj.elemno},'ExtProcess_primariesData')
+        BEAMLINE{obj.elemno}.ExtProcess(obj.processID).PrimaryParticlesData=BEAMLINE{obj.elemno}.ExtProcess_primariesData;
+        BEAMLINE{obj.elemno}=rmfield(BEAMLINE{obj.elemno},'ExtProcess_primariesData') ;
+      end
+      if isfield(BEAMLINE{obj.elemno},'ExtProcess_secondariesData')
+        BEAMLINE{obj.elemno}.ExtProcess(obj.processID).SecondaryParticlesData=BEAMLINE{obj.elemno}.ExtProcess_secondariesData;
+        BEAMLINE{obj.elemno}=rmfield(BEAMLINE{obj.elemno},'ExtProcess_secondariesData') ;
+      end
+    end
+    function InitializeTrackingData(obj,primaryBeam,b1,b2)
       % Set order in which primary rays are serviced, order by highest
       % charge weight first, with equal charge weights randomized
+      global BEAMLINE
       if ~isfield(primaryBeam,'Bunch') || ~isfield(primaryBeam.Bunch,'Q') || length(primaryBeam.Bunch.Q)<1
         error('Badly formatted Lucretia Beam ''primaryBeam''')
       end
-      randind=randperm(length(primaryBeam.Bunch.Q));
-      [~, sortind]=sort(primaryBeam.Bunch.Q(randind));
-      obj.PrimaryOrder=randind(sortind);
+      for ibunch=b1:b2
+        randind=randperm(length(primaryBeam.Bunch(ibunch).Q));
+        [~, sortind]=sort(primaryBeam.Bunch(ibunch).Q(randind));
+        obj.PrimarySampleOrder{ibunch}=uint32(randind(sortind));
+      end
+      % Set up data structures for returning info about primary and
+      % secondary particles not codified in Lucretia Beam
+      for ibunch=b1:b2
+        BEAMLINE{obj.elemno}.ExtProcess_primariesData(ibunch)=ExtPrimaryParticles();
+        BEAMLINE{obj.elemno}.ExtProcess_secondariesData(ibunch)=ExtSecondaryParticles();
+      end
     end
   end
   methods(Static)
