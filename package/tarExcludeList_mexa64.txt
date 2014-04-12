@@ -5,4 +5,6 @@ src/Libs/darwin-x86/*
 src/Libs/darwin-x86
 src/Libs/linux-x86/*
 src/Libs/linux-x86
+package/*
+package
 
