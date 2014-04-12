@@ -1,0 +1,8 @@
+*.mexglx
+*.mexmaci64
+*.mexw32
+src/Libs/darwin-x86/*
+src/Libs/darwin-x86
+src/Libs/linux-x86/*
+src/Libs/linux-x86
+
