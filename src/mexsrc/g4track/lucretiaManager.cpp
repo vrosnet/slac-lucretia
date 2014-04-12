@@ -1,12 +1,18 @@
-#include "mex.h"
 #include "lucretiaManager.hh"
 #include <iostream>
+#include <string.h>
 
 using namespace std;
 
 lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBunch, double L)
 {
   fPrimIndex=NULL;
+  fSecondaryPrimaryID = NULL ;
+  fSecondariesPerThisPrimary = NULL ;
+  Material = NULL ;
+  GeomType = NULL ;
+  fSecondaryBunch_x = NULL ;
+  fPrimaryRegenID = NULL ;
   Initialize(blele, bunchno, ThisBunch, L) ;
 }
 
@@ -20,6 +26,7 @@ void lucretiaManager::freeMem()
 
 void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBunch, double L)
 {
+  uint32_T i ;
   fBunch=ThisBunch;
   fBunchNo=bunchno;
   Status=0;
@@ -29,6 +36,15 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   fRayGetPtr=0;
   fNumRaysResumed=0;
   fBunchNo=bunchno;
+  // Clear any previously assigned memory that isn't required by Matlab session
+  if ( fSecondariesPerThisPrimary != NULL )
+    free(fSecondariesPerThisPrimary) ;
+  if (fPrimIndex!=NULL)
+    free(fPrimIndex) ;
+  if (Material!=NULL)
+    free(Material) ;
+  if (GeomType!=NULL)
+    free(GeomType) ;
   // Get required extProcess properties
   // - Geometry type (Ellipse or Rectangle)
   mxArray* pGeomType = GetExtProcessData(blele,"GeometryType") ;
@@ -37,8 +53,6 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     return;
   }
   int buflen = mxGetN(pGeomType)*sizeof(mxChar)+1;
-  if (GeomType!=NULL)
-    free(GeomType) ;
   GeomType = (char*) malloc(buflen);
   mxGetString(pGeomType, GeomType, buflen) ;
   // - Material
@@ -48,8 +62,6 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     return;
   }
   buflen = mxGetN(pMaterial)*sizeof(mxChar)+1;
-  if (Material!=NULL)
-    free(Material) ;
   Material = (char*) malloc(buflen);
   mxGetString(pMaterial, Material, buflen) ;
   // - X and Y Apertures
@@ -78,9 +90,7 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     Status = 1;
     return;
   }
-  fMaxPrimaryParticles = *mxGetPr( pMax ) ;
-  if (fPrimIndex!=NULL)
-    free(fPrimIndex) ;
+  fMaxPrimaryParticles = *(uint32_T*)mxGetData( pMax ) ;
   fPrimIndex = (int*) malloc(fMaxPrimaryParticles*sizeof(int)) ;
   // - Material thickness
   mxArray* pThickness = GetExtProcessData(blele,"Thickness") ;
@@ -96,55 +106,57 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     Verbose = (int) *mxGetPr( pVerbose ) ;
   }
   // - Primaries ordering
-  mxArray* pOrder = GetExtProcessData(blele,"PrimaryOrder") ;
+  mxArray* pOrder = mxGetCell(GetExtProcessData(blele,"PrimarySampleOrder"), *bunchno) ;
   if (pOrder == NULL)
     fPrimOrder = NULL ;
   else if ( mxGetM(pOrder)*mxGetN(pOrder) < fMaxPrimaryParticles )
     fPrimOrder = NULL ;
-  else
-    fPrimOrder = mxGetPr(pOrder) ;
+  else {
+    fPrimOrder = (uint32_T*) mxGetData(pOrder) ;
+  }
+  // - vector of re-generated (unstopped) primary particles
+  if (fPrimaryRegenID!=NULL)
+    free(fPrimaryRegenID) ;
+  fPrimaryRegenID = (uint32_T*) malloc(fMaxPrimaryParticles*sizeof(uint32_T)) ;
+  for (i=0; i< fMaxPrimaryParticles; i++)
+    fPrimaryRegenID[i]=0 ;
   // - Secondaries info
   fSecondariesCounter=0 ;
+  //
   mxArray* pMaxSecondaries = GetExtProcessData(blele,"MaxSecondaryParticles") ;
   if ( pMaxSecondaries == NULL)
     fMaxSecondaryParticles = 0 ;
   else
-    fMaxSecondaryParticles = *mxGetPr( pMaxSecondaries ) ;
+    fMaxSecondaryParticles = *(uint32_T*)mxGetData( pMaxSecondaries ) ;
+  //
   mxArray* pMaxSecondariesPerPrimary = GetExtProcessData(blele,"MaxSecondaryParticlesPerPrimary") ;
   if ( pMaxSecondariesPerPrimary == NULL)
     fMaxSecondaryParticlesPerPrimary = 0 ;
   else
-    fMaxSecondaryParticlesPerPrimary = *mxGetPr( pMaxSecondariesPerPrimary ) ;
+    fMaxSecondaryParticlesPerPrimary = *(uint32_T*)mxGetData( pMaxSecondariesPerPrimary ) ;
+  //
   fSecondariesPerThisPrimary = (int*) malloc(fMaxPrimaryParticles*sizeof(int)) ;
-  mxArray* pSecondaryBeam = GetExtProcessData(blele,"SecondaryBeam") ;
-  mxArray* pSecondaryBunch ;
-  if ( pSecondaryBeam !=NULL ) {
-    pSecondaryBunch = mxGetField( pSecondaryBeam, *bunchno, "Bunch" ) ;
-  }
-  else
-    pSecondaryBunch = NULL ;
-  if ( pSecondaryBunch !=NULL ) {
-    fSecondaryBunch_x = mxGetPr(mxGetField( pSecondaryBunch, *bunchno, "x" )) ;
-    fSecondaryBunch_q = mxGetPr(mxGetField( pSecondaryBunch, *bunchno, "Q" )) ;
-    fSecondaryBunch_type = mxGetField( pSecondaryBunch, *bunchno, "type" ) ;
-  }
-  else {
-    fSecondaryBunch_x = NULL ;
-    fSecondaryBunch_q = NULL ;
-    fSecondaryBunch_type = NULL ;
-  }
-  fNumSecondariesStored = mxGetPr( GetExtProcessData(blele,"NumSecondariesStored") );
+  // - Create secondary return bunch structure
+  if (fMaxSecondaryParticles>0) {
+    if (fSecondaryBunch_x!=NULL) {
+      free(fSecondaryPrimaryID);
+      free(fSecondaryBunch_x);
+    }
+    fSecondaryBunch_x = (double*) malloc(sizeof(double)*fMaxSecondaryParticles*6) ;
+    fSecondaryPrimaryID = (uint32_T*) malloc(sizeof(uint32_T)*fMaxSecondaryParticles) ;
+  }  
+  fTypeCellPtr = mxCreateCellMatrix(1,fMaxSecondaryParticles) ;
 }
 
 int lucretiaManager::GetNextX()
 {
   // Return pointer to next 6D ray co-ordinates that has a stopped flag at this element #
-  int iray, useray, i ;
+  uint32_T iray, useray, i ;
   if (fRayGetPtr >= (fBunch->nray-1) || fRayCount >= fMaxPrimaryParticles )
     return -1 ;
   for (i=fRayGetPtr; i<fBunch->nray; i++) {
     if (fPrimOrder!=NULL)
-      iray=(int) fPrimOrder[i] ;
+      iray=fPrimOrder[i] ;
     else
       iray=i ;
     //cout << "iray: " << iray << "\n" ;
@@ -170,20 +182,53 @@ int lucretiaManager::GetNextX()
   return -1 ;
 }
 
-void lucretiaManager::SetNextSecondary(double x[6], const char* type)
+void lucretiaManager::SetLucretiaData()
+{
+  // Send object data back into Lucretia data structures
+  if (fNumRaysResumed>0) {
+    mxArray* pPrimaryRegenID = mxCreateNumericMatrix(1, fNumRaysResumed, mxUINT32_CLASS, mxREAL) ;
+    uint32_T* dPrimaryRegenID = (uint32_T*) mxMalloc( sizeof(uint32_T)*fNumRaysResumed ) ;
+    memcpy(dPrimaryRegenID, fPrimaryRegenID, sizeof(uint32_T)*fNumRaysResumed );
+    mxSetData( pPrimaryRegenID, dPrimaryRegenID) ;
+    mxSetProperty( GetExtProcessPrimariesData(fEle), *fBunchNo, "regeneratedID", pPrimaryRegenID ) ;
+  }
+  //
+  if (fSecondariesCounter>0) {
+    mxArray* pSecondaryBunch_x = mxCreateNumericMatrix(6, fSecondariesCounter, mxDOUBLE_CLASS, mxREAL) ;
+    double* dSecondaryBunch_x = (double*) mxMalloc(fSecondariesCounter*sizeof(double)*6) ;
+    memcpy( dSecondaryBunch_x, fSecondaryBunch_x, fSecondariesCounter*sizeof(double)*6) ;
+    mxSetPr( pSecondaryBunch_x, dSecondaryBunch_x) ;
+    mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "Pos", pSecondaryBunch_x) ;
+    //
+    mxArray* pSecondaryPrimaryID = mxCreateNumericMatrix(1, fSecondariesCounter, mxUINT32_CLASS, mxREAL) ;
+    uint32_T* dSecondaryPrimaryID = (uint32_T*) mxMalloc(fSecondariesCounter*sizeof(uint32_T)) ;
+    memcpy( dSecondaryPrimaryID, fSecondaryPrimaryID, fSecondariesCounter*sizeof(uint32_T)) ;
+    mxSetData( pSecondaryPrimaryID, dSecondaryPrimaryID) ;
+    mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "PrimaryID", pSecondaryPrimaryID) ;
+    //
+    mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "ParticleType", fTypeCellPtr) ;
+    //
+    mxArray* pNumSec = mxCreateNumericMatrix(1, 1, mxUINT32_CLASS, mxREAL) ;
+    uint32_T* dNumSec = (uint32_T*) mxMalloc(sizeof(uint32_T)) ;
+    *dNumSec = fSecondariesCounter ;
+    mxSetData( pNumSec, dNumSec );
+    mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "NumStored", pNumSec) ;
+  }
+}
+
+void lucretiaManager::SetNextSecondary(double x[6], int id, const char* type)
 {
   int icoord ;
-  double tval ;
+  int iray=fPrimIndex[id] ;
+  if (fMaxSecondaryParticles==0)
+    return;
   if (fSecondaryBunch_x != NULL ) {
     for (icoord=0; icoord<6; icoord++)
-      fSecondaryBunch_x[6*fSecondariesCounter+icoord] = x[icoord] ;\
-    if ( fSecondaryBunch_q != NULL )
-      fSecondaryBunch_q[fSecondariesCounter] = fBunch->Q[fSecondariesCounter] ;
-    if ( fSecondaryBunch_type !=NULL )
-      mxSetCell(fSecondaryBunch_type, fSecondariesCounter, mxCreateString(type)) ;
+      fSecondaryBunch_x[fSecondariesCounter*6+icoord] = x[icoord] ;
+    mxSetCell(fTypeCellPtr,fSecondariesCounter,mxCreateString(type)) ;
+    fSecondaryPrimaryID[fSecondariesCounter] = iray+1 ;
   }
   fSecondariesCounter++ ;
-  *fNumSecondariesStored = (double) fSecondariesCounter ;
 }
 
 void lucretiaManager::SetNextX(double x[6], int id, int doresume)
@@ -196,6 +241,7 @@ void lucretiaManager::SetNextX(double x[6], int id, int doresume)
       fBunch->x[6*iray+icoord] = x[icoord] ;
   if (doresume == 1) {
     fBunch->stop[iray] = 0 ;
+    fPrimaryRegenID[fNumRaysResumed] = iray+1 ;
     fNumRaysResumed++;
   }
   /*cout << "SET_ID = " << id << " iray: " << iray << " X/Y/Z: " <<

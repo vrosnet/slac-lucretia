@@ -27,7 +27,7 @@
 #===================================================================
 
 # Link to matlab installation directory
-MATPATH = /var/MATLAB/R2013b
+MATPATH = /var/MATLAB/R2014a
 # Name of mex file extension for this architecture (mexglx or mexa64 or mexmaci64)
 MEXEXT = mexa64
 MCOMP:= $(MATPATH)/bin/mex

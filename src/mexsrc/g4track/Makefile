@@ -6,7 +6,7 @@
 #=============================================================================
 
 # Link to matlab installation directory
- MATPATH = /var/MATLAB/R2013b
+ MATPATH = /var/MATLAB/R2014a
  ARCHEXT = glnxa64
 
 # CFLAGS := $(shell geant4-config --cflags) -O2 -fexceptions -fPIC -fno-omit-frame-pointer -pthread -DG4MULTITHREADED

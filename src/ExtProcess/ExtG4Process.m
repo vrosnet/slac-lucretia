@@ -1,4 +1,4 @@
-classdef ExtG4Process < ExtProcess & ExtGeometry & handle & ExtSecondaryParticles
+classdef ExtG4Process < ExtProcess & ExtGeometry & handle
   %EXTG4PROCESS - class to handle interface of Lucretia beam using GEANT4 engine
   
   properties
@@ -13,7 +13,6 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle & ExtSecondaryParticle
       % Superclass initialization
       obj = obj@ExtProcess() ;
       obj = obj@ExtGeometry() ;
-      obj = obj@ExtSecondaryParticles() ;
       % Get list of materials from GEANT4 database
       dbfile=which('G4MaterialsDatabase.txt');
       if isempty(dbfile)

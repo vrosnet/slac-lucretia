@@ -1931,7 +1931,7 @@ void GetCsrEloss(struct Bunch* ThisBunch, int nbin, int smoothVal, int elementNo
 }
 
 
-/* Get Energy loss profile due to Coherent Synchrotron Radiation */
+/* Get ExtProcess class data from BEAMLINE array */
 
 /* RET: requested EXT Process object property.
  * /* ABORT:  never.
@@ -1961,3 +1961,57 @@ mxArray* GetExtProcessData(int* elemno, const char *propname)
   retprop = mxGetProperty(extProcess, 0, propname) ;
   return retprop ;
 }
+
+/* RET: void
+ * /* ABORT:  never.
+ * /* FAIL:   never */
+
+mxArray* GetExtProcessPtr(int* elemno )
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, *elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return NULL ;
+  if (!mxIsStruct(ElemCell))
+    return NULL ;
+  
+  /* now get a pointer to the extProcess object */
+  return mxGetField( ElemCell, 0, "ExtProcess" ) ;
+}
+
+mxArray* GetExtProcessPrimariesData(int* elemno)
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  mxArray* extProcess ; /* pointer to the extProcess object */
+  mxArray* retprop ;
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, *elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return NULL ;
+  if (!mxIsStruct(ElemCell))
+    return NULL ;
+  
+  /* now get a pointer to the extProcess object if there */
+  return mxGetField( ElemCell, 0, "ExtProcess_primariesData" ) ;
+}
+
+mxArray* GetExtProcessSecondariesData(int* elemno)
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  mxArray* extProcess ; /* pointer to the extProcess object */
+  mxArray* retprop ;
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, *elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return NULL ;
+  if (!mxIsStruct(ElemCell))
+    return NULL ;
+  
+  /* now get a pointer to the extProcess object if there */
+  return mxGetField( ElemCell, 0, "ExtProcess_secondariesData" ) ;
+}
+
