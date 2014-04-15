@@ -16,9 +16,11 @@ classdef ExtProcess < handle
     type ;
     processPhysicsEnabled = 'All' ;
   end
+  properties
+    PrimarySampleOrder
+  end
   properties(SetAccess=protected)
     SecondaryParticleTypes = 'All' ; % Which particle types to store
-    PrimarySampleOrder
     PrimaryParticlesData
     SecondaryParticlesData
   end
@@ -75,9 +77,9 @@ classdef ExtProcess < handle
       if ~isfield(primaryBeam,'Bunch') || ~isfield(primaryBeam.Bunch,'Q') || length(primaryBeam.Bunch.Q)<1
         error('Badly formatted Lucretia Beam ''primaryBeam''')
       end
+      randind=randperm(length(primaryBeam.Bunch(b1).Q));
+      [~, sortind]=sort(primaryBeam.Bunch(b1).Q(randind));
       for ibunch=b1:b2
-        randind=randperm(length(primaryBeam.Bunch(ibunch).Q));
-        [~, sortind]=sort(primaryBeam.Bunch(ibunch).Q(randind));
         obj.PrimarySampleOrder{ibunch}=uint32(randind(sortind));
       end
       % Set up data structures for returning info about primary and
