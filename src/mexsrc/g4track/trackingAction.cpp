@@ -26,9 +26,9 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
   G4double y = track->GetPosition().y()/CLHEP::m ;
   G4double z = track->GetPosition().z()/CLHEP::m ;
   G4double e = track->GetDynamicParticle()->GetKineticEnergy()/CLHEP::GeV ;
-  G4double momx = track->GetMomentum().x() ;
-  G4double momy = track->GetMomentum().y() ;
-  G4double momz = track->GetMomentum().z() ;
+  G4double momx = track->GetMomentum().x()/CLHEP::GeV ;
+  G4double momy = track->GetMomentum().y()/CLHEP::GeV ;
+  G4double momz = track->GetMomentum().z()/CLHEP::GeV ;
   G4int parentID = track->GetParentID() ;
   double xLucretia[6] ;
   int passCuts=0 ;
@@ -51,6 +51,7 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
   }
   if (parentID==0) { // Actions for primary particles
     hitsPerParentCounter=0;
+    //std::cout << "Z: " << z << " Z_cut: " << fLman->Lcut << " momz: " << momz << " E: " << e << " E_cut: " << fLman->Ecut << " CUTS: " << passCuts << "\n" ;
     fLman->SetNextX(xLucretia, track->GetTrackID()-1, passCuts) ; // Write new tracked particle back to Lucretia Matlab Bunch
     lastPrimaryID=track->GetTrackID()-1;
     /*std::cout << "-=-=-=-=-***USER_TRACKING****-=-=-=-= [PRIMARY PARTICLE]\n"

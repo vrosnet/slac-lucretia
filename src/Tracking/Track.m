@@ -285,10 +285,16 @@ classdef Track < handle
       global BEAMLINE
       % Any Ext Processes to pre-condition?
       ext=findcells(BEAMLINE,'ExtProcess');
+      pord=[];
       if ~isempty(ext)
         for iele=ext
           for iproc=1:length(BEAMLINE{iele}.ExtProcess)
             BEAMLINE{iele}.ExtProcess(iproc).InitializeTrackingData(obj.beamIn,obj.firstBunch,obj.lastBunch);
+            if ~isempty(pord)
+              BEAMLINE{iele}.ExtProcess(iproc).PrimarySampleOrder=pord;
+            else
+              pord=BEAMLINE{iele}.ExtProcess(iproc).PrimarySampleOrder;
+            end
           end
         end
       end

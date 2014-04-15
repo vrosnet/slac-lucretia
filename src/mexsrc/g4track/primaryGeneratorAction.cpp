@@ -38,7 +38,7 @@ void primaryGeneratorAction::GeneratePrimaries(G4Event* Event)
   // Generate primary particles from Lucretia input (stopped) beam structure
   int xPtr ;
   double Px, Py, Pz, P ;
-  //cout << "+-+-+-+-+-+-+- primaryGeneratorAction +-+-+-+-+-+-+-\n" ;
+  //cout << "+-+-+-+-+-+-+- primaryGeneratorAction +-+-+-+-+-+-+- (ele= " << *fLman->fEle << ")\n" ;
   xPtr = fLman->GetNextX() ;
   while ( xPtr>=0 ) { // Loop through all stopped Lucretia macro-particles
     // X/Y co-ordinates from Lucretia Bunch, place Z at start of geometry
@@ -52,7 +52,7 @@ void primaryGeneratorAction::GeneratePrimaries(G4Event* Event)
     fParticleGun->SetParticleEnergy(P*GeV);
     // Create a GEANT4 primary vertex from this macro-particle
     fParticleGun->GeneratePrimaryVertex(Event);
-    //cout << "X/Y/Z : " << fLman->fBunch->x[xPtr*6]*m << " / " << fLman->fBunch->x[xPtr*6+2]*m << " / " << -fLman->Lcut << " Px/Py/Pz : " << Px << " / " << Py << " / " << Pz << " P : " << P << "\n" ;
+    /*cout << "X/Y/Z : " << fLman->fBunch->x[xPtr*6]*m << " / " << fLman->fBunch->x[xPtr*6+2]*m << " / " << -fLman->Lcut << " Px/Py/Pz : " << Px << " / " << Py << " / " << Pz << " P : " << P << "\n" ;*/
     // Next stopped Lucretia macro-particle
     xPtr = fLman->GetNextX() ;
   }

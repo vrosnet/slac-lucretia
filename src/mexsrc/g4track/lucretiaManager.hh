@@ -34,6 +34,7 @@ class lucretiaManager
   uint32_T fMaxSecondaryParticlesPerPrimary ; // Max secondaries to store per primary launched
   uint32_T fSecondariesCounter ;
   int* fSecondariesPerThisPrimary ;
+  int* fEle ;
 
   private:
   mxArray* fTypeCellPtr ;
@@ -42,7 +43,6 @@ class lucretiaManager
   double* fSecondaryBunch_x ;
   int* fBunchNo ; // Bunch number
   uint32_T* fPrimOrder ; // Order in which to read in primary particles
-  int* fEle ;
   uint32_T fRayCount ;
   int fRayGetPtr ;
   int* fPrimIndex ;

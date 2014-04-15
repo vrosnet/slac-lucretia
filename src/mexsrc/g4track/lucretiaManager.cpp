@@ -152,6 +152,7 @@ int lucretiaManager::GetNextX()
 {
   // Return pointer to next 6D ray co-ordinates that has a stopped flag at this element #
   uint32_T iray, useray, i ;
+  //cout << "fRayCount: " << fRayCount << "\n" ;
   if (fRayGetPtr >= (fBunch->nray-1) || fRayCount >= fMaxPrimaryParticles )
     return -1 ;
   for (i=fRayGetPtr; i<fBunch->nray; i++) {
@@ -242,6 +243,7 @@ void lucretiaManager::SetNextX(double x[6], int id, int doresume)
   if (doresume == 1) {
     fBunch->stop[iray] = 0 ;
     fPrimaryRegenID[fNumRaysResumed] = iray+1 ;
+    //cout << "iray: " << iray+1 << " stop: " << fBunch->stop[iray] << "\n" ;
     fNumRaysResumed++;
   }
   /*cout << "SET_ID = " << id << " iray: " << iray << " X/Y/Z: " <<
