@@ -620,9 +620,10 @@ classdef Track < handle
       [stat, beamout, instdata]=obj.dotrack(i1,i2,beam,b1,b2,lf);
     end
     function data=procBeamData(beam,dims)
-      data.qloss=sum(beam.Bunch.Q(:,beam.Bunch.stop>0));
+      data.qloss=sum(beam.Bunch.Q(beam.Bunch.stop>0));
       beam.Bunch.x=beam.Bunch.x(:,~beam.Bunch.stop);
-      beam.Bunch.Q=beam.Bunch.Q(:,~beam.Bunch.stop);
+      beam.Bunch.Q=beam.Bunch.Q(~beam.Bunch.stop);
+      beam.Bunch.stop=beam.Bunch.stop(~beam.Bunch.stop);
       if isempty(beam.Bunch.x)
         error('All particles in provided beam stopped!')
       end
