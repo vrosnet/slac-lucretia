@@ -165,11 +165,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
 egress:  
 
 	if ( RmatArgs->PropagateTwiss == 1)
-	  GetTwissSetReturn( RmatArgs->Status, plhs, T ) ;
+	  GetTwissSetReturn( RmatArgs->Status, plhs, (twiss*)T ) ;
 	else
 	  GetTwissCoupledSetReturn( RmatArgs->Status, 
 	  RmatArgs->nWolskiDimensions, 
-	  plhs, T ) ;
+				    plhs, (Ctwiss*)T ) ;
 	return ;
 
 }
@@ -334,7 +334,7 @@ struct RmatArgStruc* GetTwissGetCheckArgs( int nlhs, int nrhs,
 /* make sure that we have a 6 x 6 x n double-precision matrix */
 
 		int nDim = mxGetNumberOfDimensions( prhs[2] ) ;
-		int* dims = mxGetDimensions( prhs[2] ) ;
+		const int* dims = mxGetDimensions( prhs[2] ) ;
 
 		if (mxIsDouble( prhs[2] ) != 1)
 			goto Egress ;
@@ -649,7 +649,7 @@ void GetTwissSetReturn( int Status, mxArray* plhs[], struct twiss* T )
 	mxArray *ReturnStruc ;         /* the thing we want to return */
 	mxArray *mxrealvec ;           /* vector of reals */
 	double *mxrealp ;              /* pointer into real vectors */
-	static char *fieldname[] = {   /* 12 field names */
+	static const char *fieldname[] = {   /* 12 field names */
 	"S","P","betax","alphax","etax","etapx","nux",
            "betay","alphay","etay","etapy","nuy"
 	} ;
@@ -881,7 +881,7 @@ void GetTwissCoupledSetReturn( int Status,
 	double *mxrealp ;              /* pointer into real vectors */
 	int i ;
 	int dims[4] ;
-	static char *fieldname[] = {   /* 3 field names */
+	static const char *fieldname[] = {   /* 3 field names */
 		"S","P","beta"} ;	
 
 	char** messages ; 
@@ -970,9 +970,9 @@ egress:
 
 	if (T != NULL)
 	{
-		FreeAndNull(&(T->S)) ;
-		FreeAndNull(&(T->E)) ;
-		FreeAndNull(&(T->Twiss)) ;
+	  FreeAndNull((void**)&(T->S)) ;
+	  FreeAndNull((void**)&(T->E)) ;
+	  FreeAndNull((void**)&(T->Twiss)) ;
 	}
 
 	if (WolskiInit != NULL)

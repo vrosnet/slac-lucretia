@@ -34,6 +34,8 @@ MCOMP:= $(MATPATH)/bin/mex
 CCOMP := $(MATPATH)/bin/mex -c
 # include -DLUCRETIA_DPREC to compile for double precision, else single
 MFLAGS = -DLUCETIA_DPREC
+# include -DLUCRETIA_MLRAND to utilize Matlab's random number generation (slow) else use C generator (faster)
+# CFLAGS := -DLUCRETIA_MLRAND
 G4LIBS := $(shell geant4-config --libs)
 G4TRACKPATH := $(shell pwd)/g4track
 NVCC = nvcc # Cuda compiler
@@ -73,12 +75,12 @@ GetTwiss.$(MEXEXT) : $(LMAIN) $(LMATL) GetTwiss.c
 RmatAtoB.$(MEXEXT) : $(LMAIN) $(LMATL) RmatAtoB.c
 	$(MCOMP) $(MFLAGS) RmatAtoB.c -L. -lLucretiaMatlab -lLucretiaMain
 TrackThru.$(MEXEXT) : $(LMAIN) $(LMATL) TrackThru.c
-	$(MCOMP) $(MFLAGS) TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
+	$(MCOMP) $(MFLAGS) -v TrackThru.c -L. -lLucretiaMatlab -lLucretiaMain
 VerifyLattice.$(MEXEXT) : $(LMAIN) $(LMATL) VerifyLattice.c
 	$(MCOMP) $(MFLAGS) VerifyLattice.c -L. -lLucretiaMatlab -lLucretiaMain
 TrackThru_gpu.$(MEXEXT) : GPULINK TrackThru_gpu.o
 	g++ -O -pthread -shared -Wl,--version-script,$(MATPATH)/extern/lib/glnxa64/mexFunction.map -Wl,--no-undefined -o  "TrackThru_gpu.$(MEXEXT)"  TrackThru_gpu.o  "LucretiaMatlab_gpu.o"  "LucretiaMatlabErrMsg_gpu.o"  "LucretiaPhysics_gpu.o"  "LucretiaCommon_gpu.o" "gpulink.o"  -Wl,-rpath-link,$(MATPATH)/bin/glnxa64 -L$(MATPATH)/bin/glnxa64 -lmx -lmex -lmat -lm -lmwgpu $(MATPATH)/bin/glnxa64/libcudart.so.5.0
-TrackThru_g4.$(MEXEXT) :  $(LMAIN) $(LMATL) g4track/$(LG4LIB) TrackThru_g4.c
+TrackThru_g4.$(MEXEXT) : $(LMAIN) $(LMATL) g4track/$(LG4LIB) TrackThru_g4.c
 	$(MCOMP) $(MFLAGS) -v TrackThru_g4.c -L. -lLucretiaMatlab -lLucretiaMain -L$(G4TRACKPATH) -lg4track $(G4LIBS)
 	rm TrackThru_g4.c
 

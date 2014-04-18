@@ -257,7 +257,7 @@ void GetRmatsSetReturn( int Status,
 
 
 	mxArray *ReturnStruc ;         /* the thing we want to return */
-	char *fieldname ;             /* name of field = "RMAT" */
+	const char *fieldname ;             /* name of field = "RMAT" */
 	char rmatname[5] = "RMAT" ;   
 	int count ;
 	mxArray *matrix6x6 ;           /* pointer to 6x6 numeric matrix */

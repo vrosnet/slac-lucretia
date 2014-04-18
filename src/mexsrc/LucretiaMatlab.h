@@ -17,6 +17,8 @@
 #ifndef LUCRETIA_COMMON
   #include "LucretiaCommon.h"
 #endif
+#include <stdlib.h>
+#include <math.h>
 
 /* for GetRmats:  check arguments and set returns */
 

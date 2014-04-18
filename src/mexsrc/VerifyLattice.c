@@ -153,10 +153,10 @@ Finish:
 
 /* allocate backbones to handle the 3 message types */
 
-	errors   = mxMalloc( nError * sizeof(char*) ) ;
-	warnings = mxMalloc( nWarn  * sizeof(char*) ) ;
-	misc     = mxMalloc( nmisc  * sizeof(char*) ) ;
-	info     = mxMalloc( nInfo  * sizeof(char*) ) ;
+	errors   = (char**) mxMalloc( nError * sizeof(char*) ) ;
+	warnings = (char**) mxMalloc( nWarn  * sizeof(char*) ) ;
+	misc     = (char**) mxMalloc( nmisc  * sizeof(char*) ) ;
+	info     = (char**) mxMalloc( nInfo  * sizeof(char*) ) ;
 
 /* move the messages to the 3 new backbones */
 
