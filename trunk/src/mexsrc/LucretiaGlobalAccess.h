@@ -29,6 +29,7 @@
 /* Return the random number seed from the Matlab caller workspace */
 
 void getLucretiaRandSeed( unsigned long long *rseed );
+unsigned int getLucretiaRandSeedC( );
 
 /* define an enumeration type for klystron status */
 
@@ -109,6 +110,7 @@ __device__ double RanGaussVecPtr_gpu( curandState_t *rState ) ;
 __host__ double* RanGaussVecPtr( int ) ;
 #endif
 double* RanGaussVecPtr( int ) ;
+double* RanGaussVecPtrC( int ) ;
 
 /* use Matlab rand function to get a vector of uniform-
    distributed random numbers if host, else use cudaRand library*/
@@ -118,6 +120,7 @@ __device__ double RanFlatVecPtr_gpu( curandState_t *state) ;
 __host__ double* RanFlatVecPtr( int ) ;
 #else
 double* RanFlatVecPtr( int ) ;
+double* RanFlatVecPtrC( int ) ;
 #endif
 
 /* Use Matlab sort function to get a sortkey for the rays in  

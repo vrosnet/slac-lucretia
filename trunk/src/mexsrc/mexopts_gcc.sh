@@ -56,9 +56,9 @@ echo "Error: Did not imbed 'options.sh' code"; exit 1 #imbed options.sh glnx86 1
             # CkeyVersion:
             # CkeyLinkerName: GNU ld
             # CkeyLinkerVersion:
-            CC='gcc'
+            CC='g++'
             CFLAGS='-ansi -D_GNU_SOURCE'
-            CFLAGS="$CFLAGS  -fexceptions"
+            CFLAGS="$CFLAGS  -fexceptions -w"
             CFLAGS="$CFLAGS -fPIC -fno-omit-frame-pointer -pthread"
             CLIBS="$RPATH $MLIBS -lm"
             COPTIMFLAGS='-O -DNDEBUG'
@@ -73,7 +73,7 @@ echo "Error: Did not imbed 'options.sh' code"; exit 1 #imbed options.sh glnx86 1
             # C++keyLinkerVersion:  
             CXX='g++'
             CXXFLAGS='-ansi -D_GNU_SOURCE'
-            CXXFLAGS="$CXXFLAGS -fPIC -fno-omit-frame-pointer -pthread"
+            CXXFLAGS="$CXXFLAGS -fPIC -fno-omit-frame-pointer -pthread -w"
             CXXLIBS="$RPATH $MLIBS -lm"
             CXXOPTIMFLAGS='-O -DNDEBUG'
             CXXDEBUGFLAGS='-g'
@@ -92,7 +92,7 @@ echo "Error: Did not imbed 'options.sh' code"; exit 1 #imbed options.sh glnx86 1
             FOPTIMFLAGS='-O'
             FDEBUGFLAGS='-g'
 #
-            LD="$COMPILER"
+            LD="g++"
             LDEXTENSION='.mexa64'
             LDFLAGS="-pthread -shared -Wl,--version-script,$TMW_ROOT/extern/lib/$Arch/$MAPFILE -Wl,--no-undefined"
             LDOPTIMFLAGS='-O'

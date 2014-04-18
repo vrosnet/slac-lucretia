@@ -150,8 +150,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
-#include "mex.h"          
-          
+#include "mex.h"           
           
 /* File-scoped variables: */
 
@@ -1101,6 +1100,12 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
   double trackIter ;
   double lastS, thisS, *sp;
   int dosr,iele ;
+
+
+#ifndef LUCRETIA_MLRAND
+  /* If not using MATLAB calls to get random number then intialize the C random number generator here from Matlab */
+  srand( getLucretiaRandSeedC() ) ;
+#endif
   
 #ifdef __CUDACC__
   /* Get random number seed from Matlab workspace */
@@ -1404,7 +1409,7 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
       
       LastLoopElem = *ElemLoop ; /* only get track flags and ElemClass if ElemLoop has
        * changed from last loop execution */
-      
+
       /* track this bunch through this element */
       if (strcmp(ElemClass,"QUAD")==0)
       {
@@ -4139,7 +4144,6 @@ int TrackBunchThruBPM( int elemno, int bunchno,
   /* Do we need to complete the calculation of first and second moments?
    * If we are doing multibunch tracking, the answer is yes; if we are not
    * but we are on the last bunch, the answer is also yes */
-  
   if ( (TrackFlags[MultiBunch] == 1)    ||
           (bunchno+1 == ArgStruc->LastBunch)    )
   {
@@ -4189,7 +4193,7 @@ int TrackBunchThruBPM( int elemno, int bunchno,
       }
       
     }
-    
+
     /* Apply the BPM scale factor */
     
     retcatch = BPMPar[BPMdScale].ValuePtr ;
@@ -4219,7 +4223,7 @@ int TrackBunchThruBPM( int elemno, int bunchno,
       bpmdata[BPMCounter]->yread[BunchSlot] +=
               retcatch[0]*gaussran[1] ;
     }
-    
+
   }
   
   /* now return */
