@@ -67,12 +67,14 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle
       % If this object attached to a BEAMLINE element then issue a warning
       % if the aperture does not match the BEAMLINE element or set to
       % BEAMLINE aper values if no values provided
-      if ~exist('val1','var') || isempty(val1) && ~isempty(obj.elemno) && isfield(BEAMLINE{elemno},'aper')
+      if ~exist('val1','var') || isempty(val1) && ~isempty(obj.elemno) && isfield(BEAMLINE{obj.elemno},'aper')
         val1=BEAMLINE{obj.elemno}.aper(1);
       end
-      if ~exist('val2','var') || isempty(val2) && ~isempty(obj.elemno) && isfield(BEAMLINE{elemno},'aper') && ...
-        length(BEAMLINE{elemno}.aper)>1
-        val2=BEAMLINE{obj.elemno}.aper(1);
+      if ~exist('val2','var') || isempty(val2) && ~isempty(obj.elemno) && isfield(BEAMLINE{obj.elemno},'aper') && ...
+        length(BEAMLINE{obj.elemno}.aper)>1
+        val2=val1;
+      elseif ~isempty(obj.elemno) && isfield(BEAMLINE{elemno},'aper') && length(BEAMLINE{obj.elemno}.aper)==1
+        val2=val1;
       end
       SetAper@ExtGeometry(obj,val1,val2);
       if isempty(obj.elemno) || ~obj.apercheck; return; end;

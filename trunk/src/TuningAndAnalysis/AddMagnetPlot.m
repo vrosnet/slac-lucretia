@@ -238,7 +238,7 @@ end
 hold(h1,'off');
 
 % Link x-axis for original and magnet bar plots
-linkprop([h0 h1],'XLim');
+%linkprop([h0 h1],'XLim');
 
 % stick the title over everything
 
