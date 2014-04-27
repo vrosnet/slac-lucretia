@@ -350,14 +350,18 @@ void TrackThruMain( struct TrackArgsStruc* ) ;
 int TrackBunchThruDrift( int, int, struct TrackArgsStruc*, int*, double ) ;
 int TrackBunchThruQSOS( int, int, struct TrackArgsStruc*, int*, int, double, double, int ) ;
 int TrackBunchThruMult( int, int, struct TrackArgsStruc*, int*, double, double ) ;
-int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, int ) ;
+int TrackBunchThruSBend( int, int, struct TrackArgsStruc*, int*, int, int, double, double  ) ;
 int TrackBunchThruRF( int, int, struct TrackArgsStruc*, int*, int ) ;
 int TrackBunchThruBPM( int, int, struct TrackArgsStruc*, int*, double ) ;
 int TrackBunchThruInst( int, int, struct TrackArgsStruc*, int*, double ) ;
 int TrackBunchThruCorrector( int, int, struct TrackArgsStruc*, int*, int, double, double ) ;				
 int TrackBunchThruCollimator( int, int, struct TrackArgsStruc*, int*, double, double ) ;
 int TrackBunchThruCoord( int, int, struct TrackArgsStruc*, int* ) ;
-
+#ifdef __CUDACC__        
+int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop,int* TFlag_gpu, int* TFlag,struct TrackArgsStruc* TrackArgs) ;
+#else
+int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct TrackArgsStruc* TrackArgs) ;
+#endif  
 
 /* return the tracking flags */
 
@@ -554,7 +558,7 @@ void AccumulateWFBinPositions( double*, double*, int,
 void ClearOldLRWFFreqKicks( int ) ;
 
 /* Deal with CSR and split track flags */
-double GetCsrTrackFlags( int, int*, int*, int, struct Bunch*, double* ) ;
+double GetCsrTrackFlags( int, int*, int*, char*, struct Bunch*, double*, double* ) ;
 
 /* External process function calls (GEANT4) */
 #ifdef LUCRETIA_G4TRACK

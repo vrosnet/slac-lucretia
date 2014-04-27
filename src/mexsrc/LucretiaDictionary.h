@@ -4,7 +4,9 @@
 
 /* AUTH:  PT, 16-dec-2004 */
 /* MOD:
-     12-Feb-2012, GW:
+     23-Apr-2014, GRW:
+         Support for LSC flags
+     12-Feb-2012, GRW:
          Support for CSR and Split flags
 		 21-May-2007, PT:
 			   support for XYCOR (combined function horizontal-
@@ -36,7 +38,7 @@
 
 /* Version string */
 
-char LucretiaDictionaryVers[] = "LucretiaDictionary Version = 12-Feb-2012" ;
+char LucretiaDictionaryVers[] = "LucretiaDictionary Version = 23-Apr-2014" ;
 
 /* useful constants */
 
@@ -69,18 +71,20 @@ const int VerifyPars = 2 ;
 
 /* tracking flags information */
 
-   #define NUM_TRACK_FLAGS 17
+   #define NUM_TRACK_FLAGS 22
 
 	enum TrackFlagIndex{
 		SynRad, Aper, GetBPMData, GetBPMBeamPars, MultiBunch,
 	   GetInstData, SRWF_T, SRWF_L, LRWF_T, LRWF_ERR, 
-	   ZMotion, LorentzDelay, GetSBPMData, CSR, CSR_SmoothFactor, Split, CSR_DriftSplit
+	   ZMotion, LorentzDelay, GetSBPMData, CSR, CSR_SmoothFactor, Split, CSR_DriftSplit,
+     LSC, LSC_cutoffFreq, LSC_smoothFactor, LSC_npow2Bins, LSC_storeData
 	} ;
 
 	const char* TrackFlagNames[] = {	
 		"SynRad","Aper","GetBPMData","GetBPMBeamPars","MultiBunch",
 		"GetInstData","SRWF_T", "SRWF_Z","LRWF_T","LRWF_ERR",
-		"ZMotion","LorentzDelay","GetSBPMData", "CSR", "CSR_SmoothFactor", "Split", "CSR_DriftSplit"
+		"ZMotion","LorentzDelay","GetSBPMData", "CSR", "CSR_SmoothFactor", "Split", "CSR_DriftSplit",
+    "LSC", "LSC_cutoffFreq", "LSC_smoothFactor", "LSC_npow2Bins", "LSC_storeData"
 	} ;
 
 	int TrackFlagSet[NUM_TRACK_FLAGS] ;
@@ -88,13 +92,15 @@ const int VerifyPars = 2 ;
 	int TrackFlagMinValue[NUM_TRACK_FLAGS] = {
 		SR_None, 0, 0, 0, 0, 
 		      0, 0, 0, 0, 0,
-		      0, 0, 0, 0, 1, 0, 0
+		      0, 0, 0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0
 	} ;
 
 	int TrackFlagMaxValue[NUM_TRACK_FLAGS] = {
 		SR_HB, 1, 1, 1, 1, 
 		    1, 1, 1, 1, 1,
-		    1, 1, 1, 10000, 1000, 1000, 1000
+		    1, 1, 1, 10000, 1000, 1000, 1000,
+        1, 2, 1000000000, 20, 1
 	} ;
 
 

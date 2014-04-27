@@ -1,4 +1,4 @@
-function [beam, W, dE, zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,driftDL)
+function [beam, W, dE, zOut]=applyCSR(beam,beamQ,stop,nbin,smoothVal,itrack,driftL,driftDL)
 % [beam W dE zOut]=applyCSR(beam,nbin,smoothVal,itrack,driftL,driftDL)
 %  Calculate CSR wake and change provided momentum profile
 %   - This function is designed to be called from the mex tracking
@@ -6,6 +6,7 @@ function [beam, W, dE, zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,dr
 %
 % beam: Lucretia macro particle beam definition (Actually pass Beam.Bunch.x)
 % beamQ: charge of macro particles
+% stop: vector of stop indices (from Lucretia Bunch)
 % nbin: number of bins to use for CSR calculation
 % smoothVal: level of smoothing to use (int >= 1)
 % itrack: BEAMLINE element number
@@ -14,7 +15,7 @@ function [beam, W, dE, zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,dr
 % (last 2 arguments only for application of CSR in downstream areas from
 % bend)
 global BEAMLINE
-persistent lastsz bininds z Z ZSP lastInd iter
+persistent bininds z Z ZSP lastInd iter
 W=[]; dE=[]; zOut=[];
 
 %- If zero length element just return
@@ -117,6 +118,8 @@ end
 % end
 
 % Bin beam particle longitudinal direction
+% - zero out charge for stopped particles
+beamQ(stop>0)=0;
 q = accumarray(bininds',beamQ')';
 bw=abs(z(2)-z(1));
 Q=sum(q);

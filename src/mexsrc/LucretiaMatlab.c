@@ -2051,43 +2051,68 @@ bool IsEmpty(const mxArray* pa)
 /*==================================================================*/
 
 /* Get Energy loss profile due to Coherent Synchrotron Radiation */
-
-/* RET:    none.
- * /* ABORT:  never.
- * /* FAIL:   never */
-
 void GetCsrEloss(struct Bunch* ThisBunch, int nbin, int smoothVal, int elementNo, double Lpos, double dL )
 {
-  mxArray *lhs, *rhs[7] ;
+  mxArray *lhs, *rhs[8] ;
   int iarr ;
   /* If less than 100 particles, don't bother */
-  if (ThisBunch->nray<100) return;
+  if (ThisBunch->nray<100)
+    return;
   /* Allocate RHS entries */
   rhs[0] =  mxCreateDoubleMatrix(6, ThisBunch->nray, mxREAL) ;
   memcpy(mxGetPr(rhs[0]),ThisBunch->x,sizeof(double)*ThisBunch->nray*6) ;
   rhs[1] =  mxCreateDoubleMatrix(1, ThisBunch->nray, mxREAL) ;
   memcpy(mxGetPr(rhs[1]),ThisBunch->Q,sizeof(double)*ThisBunch->nray) ;
-  rhs[2] = mxCreateDoubleScalar((double)nbin);
-  rhs[3] = mxCreateDoubleScalar((double)smoothVal);
-  rhs[4] = mxCreateDoubleScalar((double)elementNo+1);
-  rhs[5] = mxCreateDoubleScalar(Lpos);
-  rhs[6] = mxCreateDoubleScalar(dL);
+  rhs[2] = mxCreateDoubleMatrix(1, ThisBunch->nray, mxREAL) ;
+  memcpy(mxGetPr(rhs[2]),ThisBunch->stop,sizeof(double)*ThisBunch->nray) ;
+  rhs[3] = mxCreateDoubleScalar((double)nbin);
+  rhs[4] = mxCreateDoubleScalar((double)smoothVal);
+  rhs[5] = mxCreateDoubleScalar((double)elementNo+1);
+  rhs[6] = mxCreateDoubleScalar(Lpos);
+  rhs[7] = mxCreateDoubleScalar(dL);
   /* Call applyCSR function to calculate E loss for this element just tracked through */
   /* [beam W dE zOut]=applyCSR(beam,beamQ,nbin,smoothVal,itrack,driftL,driftDL) */
-  mexCallMATLAB(1, &lhs, 7, rhs, "applyCSR") ;
+  mexCallMATLAB(1, &lhs, 8, rhs, "applyCSR") ;
   memcpy(ThisBunch->x,mxGetPr(lhs),sizeof(double)*ThisBunch->nray*6);
-  for (iarr=0;iarr<7;iarr++)
+  for (iarr=0;iarr<8;iarr++)
     mxDestroyArray(rhs[iarr]) ;
   mxDestroyArray(lhs) ;
 }
 
+/* Process LSC information
+ - Provide element splitting requirements
+ - Calculate and apply LSC E modulation to bunch */
+double ProcLSC(struct Bunch* ThisBunch, int elemno, double L, int storeDataInd)
+{
+  mxArray *lhs[2], *rhs[6] ;
+  int iarr ;
+  
+  /* If less than 100 particles, don't bother */
+  if (ThisBunch->nray<100)
+    return 0;
+  /* Allocate RHS entries */
+  rhs[0] =  mxCreateDoubleMatrix(6, ThisBunch->nray, mxREAL) ;
+  memcpy(mxGetPr(rhs[0]),ThisBunch->x,sizeof(double)*ThisBunch->nray*6) ;
+  rhs[1] =  mxCreateDoubleMatrix(1, ThisBunch->nray, mxREAL) ;
+  memcpy(mxGetPr(rhs[1]),ThisBunch->Q,sizeof(double)*ThisBunch->nray) ;
+  rhs[2] =  mxCreateDoubleMatrix(1, ThisBunch->nray, mxREAL) ;
+  memcpy(mxGetPr(rhs[2]),ThisBunch->stop,sizeof(double)*ThisBunch->nray) ;
+  rhs[3] = mxCreateDoubleScalar((double)elemno+1);
+  rhs[4] = mxCreateDoubleScalar(L);
+  rhs[5] = mxCreateDoubleScalar((double)storeDataInd);
+  /* Call applyLSC function to calculate E modulation or split length */
+  /* [xOut, dL] = applyLSC(x,Q,stop,elemno,dL,storeBunchInd) */
+  mexCallMATLAB(2, lhs, 6, rhs, "applyLSC") ;
+  if (L>0)
+    memcpy(ThisBunch->x,mxGetPr(lhs[0]),sizeof(double)*ThisBunch->nray*6);
+  for (iarr=0;iarr<6;iarr++)
+    mxDestroyArray(rhs[iarr]) ;
+  mxDestroyArray(lhs[0]) ;
+  mxDestroyArray(lhs[1]) ;
+  return *mxGetPr(lhs[1]) ; /* dL */
+}
 
 /* Get ExtProcess class data from BEAMLINE array */
-
-/* RET: requested EXT Process object property.
- * /* ABORT:  never.
- * /* FAIL:   never */
-
 mxArray* GetExtProcessData(int* elemno, const char *propname)
 {
   mxArray* ElemCell ;   /* pointer to the cell */

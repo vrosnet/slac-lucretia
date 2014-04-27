@@ -1411,460 +1411,40 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
        * changed from last loop execution */
 
       /* track this bunch through this element */
-      if (strcmp(ElemClass,"QUAD")==0)
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-#ifdef __CUDACC__
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag_gpu, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
-#else
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
-#endif
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, 0, 0, TFlag[Aper] ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if (strcmp(ElemClass,"SEXT")==0)
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, 0, 0, TFlag[Aper] ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if (strcmp(ElemClass,"OCTU")==0)
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 4, 0, 0, TFlag[Aper] ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if (strcmp(ElemClass,"SOLENOID")==0)
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0, 0, TFlag[Aper] ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if (strcmp(ElemClass,"MULT")==0)
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS, lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0 ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-        
-      }
-      else if (strcmp(ElemClass,"SBEN")==0)
-      {
-        /* If CSR track flag set:
-         * If no Split flag, iterate through 50 times, else iterate the number of
-         * times specified by the Split flag
-         * The value of the CSR flag if >0 determines number of computation bins to use (min 10) */
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        thisS=*sp;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 1, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        
-        /* Track first split element with just upstream edge effects allowed */
-        if ( TFlag[Split]>0 || trackIter > 0 ) {
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1, 0, 1./( TFlag[Split] ), 0  ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, *GetElemNumericPar( *ElemLoop, "L", NULL )/TFlag[Split],
-                        thisS, TFLAG) ;
-          /* Apply CSR if requested */
-          if ( trackIter > 0 )
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
-        }
-        
-        /* Now track rest, if any, of the splits with neither edge effects allowed */
-        if ( TFlag[Split] > 0 ) {
-          for (iter = 0; iter < TFlag[Split]-2; iter++) {
-            TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0, 1./( TFlag[Split] ), iter+1  ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, *GetElemNumericPar( *ElemLoop, "L", NULL )/TFlag[Split],
-                          thisS, TFLAG) ;
-            /* Apply CSR if requested */
-            if ( trackIter > 0 )
-              GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
-          }
-        } /* If no splits or CSR requested, just track once as normal */
-        else if ( TFlag[Split]==0 && trackIter==0 ) {
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1, 1, 1, 0  ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, thisS, TFLAG) ;
-        }
-        /* If tracking split then track last split with downstream edge allowed only now */
-        if ( TFlag[Split] > 0 || trackIter > 0 ) {
-          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 1, 1./( TFlag[Split] ), iter+1  ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, *GetElemNumericPar( *ElemLoop, "L", NULL )/TFlag[Split],
-                        thisS, TFLAG) ;
-        }
-        /* Apply CSR if requested */
-        if ( trackIter > 0 )
-          GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, 0, 0 ) ;
-        
-        /* since the SBend has momentum compaction, clear the wakefields
-         * which are available to the just-tracked bunch */
-        
-        ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop],
-                -1,  0 ) ;
-        ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop],
-                -1,  1 ) ;
-        ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
-                -1,  0 ) ;
-        ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
-                -1,  1 ) ;
-        
-      }
-      else if (strcmp(ElemClass,"LCAV")==0)
+      /* - first deal with all element types that cannot or should not be split */
+      if (strcmp(ElemClass,"LCAV")==0)
       {
         /* Split status not supported for LCAV now- too damned complicated to figure out how to split up
          * and correctly deal with wakefield and BPM details */
-        TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFlag, 0 ) ;
-        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFLAG );
+        TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFLAG, 0 ) ;
+        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag );
       }
       else if (strcmp(ElemClass,"TCAV")==0)
       {
         /* No split status treatment for TCAV's - see above */
-        TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 1 ) ;
-        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFLAG) ;
-      }
-      else if ( (strcmp(ElemClass,"HMON")==0) ||
-              (strcmp(ElemClass,"VMON")==0) ||
-              (strcmp(ElemClass,"MONI")==0)    )
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0;
-          }
-          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, -1 ) ;
-        }
-        else {
-          TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if ( (strcmp(ElemClass,"PROF")==0) ||
-              (strcmp(ElemClass,"WIRE")==0) ||
-              (strcmp(ElemClass,"BLMO")==0) ||
-              (strcmp(ElemClass,"SLMO")==0) ||
-              (strcmp(ElemClass,"IMON")==0) ||
-              (strcmp(ElemClass,"INST")==0)    )
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-          TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, -1 ) ;
-        }
-        else {
-          TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0 ) ;
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      
-      else if ( strcmp(ElemClass,"XCOR")==0 )
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XCOR, thisS-lastS, lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XCOR, 0, 0 ) ;
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      
-      else if ( strcmp(ElemClass,"YCOR")==0 )
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, YCOR, thisS-lastS, lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, YCOR, 0, 0 ) ;
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if ( strcmp(ElemClass,"XYCOR")==0 )
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XYCOR, thisS-lastS, lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFlag, XYCOR, 0, 0 ) ;
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-      }
-      else if ( strcmp(ElemClass,"COLL")==0 )
-      {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFlag, thisS-lastS, lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG ) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0;
-          }
-        }
-        else {
-          TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFlag, 0, 0 ) ;
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
+        TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1 ) ;
+        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
       }
       else if ( strcmp(ElemClass,"COORD")==0 )
       {
         TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop,
-                TrackArgs, TFlag ) ;
-        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFLAG) ;
+                TrackArgs, TFLAG ) ;
+        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
       }
-      
-      else if ( strcmp(ElemClass,"MARK")==0 )
-      {
+      else if ( strcmp(ElemClass,"MARK")==0 ) {
         TrackStatus = 1 ;
       }
-      else /* default = drift */
+      else /* all other elements which have a standard split treatment and before/after split tracking actions */
       {
-        sp = GetElemNumericPar( *ElemLoop, "S", NULL ) ;
-        /*lp = GetElemNumericPar( *ElemLoop, "L", NULL ) ;*/
-        lastS = *sp ;
-        trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-        if ( trackIter > 0 ) {
-          while ( trackIter != 0 ) {
-            TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
-            if (TrackStatus == 0) {
-              GlobalStatus = TrackStatus ;
-              goto egress ;
-            }
-            postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFLAG) ;
-            GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, fabs(trackIter), thisS-lastS ) ;
-            lastS = thisS ;
-            if (trackIter>0)
-              trackIter = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, 2, TrackArgs->TheBeam->bunches[*BunchLoop], &thisS ) ;
-            else
-              trackIter = 0 ;
-          }
+#ifdef __CUDACC__        
+        TrackStatus = ElemTracker(ElemClass,ElemLoop,BunchLoop,TFlag_gpu,TFlag,TrackArgs) ;
+#else
+        TrackStatus = ElemTracker(ElemClass,ElemLoop,BunchLoop,TFlag,TrackArgs) ;
+#endif                
+        if (TrackStatus == 0) {
+          GlobalStatus = TrackStatus ;
+          goto egress ;
         }
-        else {
-          TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
-          if (TrackStatus == 0) {
-            GlobalStatus = TrackStatus ;
-            goto egress ;
-          }
-          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFLAG) ;
-        }
-        
       }
       
       /* latch non-unity status from the tracking procedures.  If a fatal
@@ -1977,6 +1557,8 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   
   if ( splitScale == 0 )
     splitScale = 1 ;
+  else if ( splitScale < 0 ) /* Case where INSTR or BPM class wants to just apply moment calculations */
+    splitScale = 0 ;
   else
     splitScale = splitScale / *L ;
   
@@ -2856,19 +2438,20 @@ void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, doubl
 
 int TrackBunchThruSBend( int elemno, int bunchno,
         struct TrackArgsStruc* ArgStruc,
-        int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double splitScale, int nSplit )
+        int* TrackFlag, int supEdgeEffect1, int supEdgeEffect2, double L, double thisS )
 {
   
-  double L,Tilt ;                /* some basic parameters */
+  double Tilt ;                /* some basic parameters */
   double intB, intG ;
   double BScale, GScale ;
   double E1, E2, H1, H2 ;
-  double Theta, thisS ;
+  double Theta ;
   double hgap,hgapx,fint,fintx ;
   double hgap2,hgapx2 ;
   double TotalTilt ;
   double cTT, sTT, cT, sT ;
   double Tx, Ty ;
+  double splitScale ;
   double Xfrms[6][2] ;           /* upstream and downstream coordinate
    * xfrms from magnet + girder + mover
    * offset values */
@@ -2896,7 +2479,7 @@ int TrackBunchThruSBend( int elemno, int bunchno,
     goto egress ;
   }
   
-  L = GetDBValue(SBendPar+SBendL) * splitScale ;
+  splitScale = L / GetDBValue(SBendPar+SBendL) ;
   if (L<=0)
   {
     BadElementMessage( elemno+1 ) ;
@@ -3000,10 +2583,6 @@ int TrackBunchThruSBend( int elemno, int bunchno,
   
   /* now we get the complete input- and output- transformations for the
    * element courtesy of the relevant function */
-  if ( SBendPar[SBendS].ValuePtr == NULL )
-    thisS = nSplit*L ;
-  else
-    thisS = *SBendPar[SBendS].ValuePtr + nSplit*L ;
   stat = GetTotalOffsetXfrms( SBendPar[SBendGirder].ValuePtr,
           &L,
           &thisS,
@@ -3934,12 +3513,11 @@ int TrackBunchThruBPM( int elemno, int bunchno,
   }
   
   /* start by doing the tracking */
+  /* if internally spitting tracking then finish by passing splitL<0 to get BPM data after drift tracking */
   stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TFlag, splitL ) ;
 
   /* if we do not need to save BPM information here, we can return */
-  
-  if ( ( (ArgStruc->GetInstData == 0) ||
-          ( (TrackFlags[GetBPMData] == 0)&&(TrackFlags[GetBPMBeamPars]==0) ) ) )
+  if ( ArgStruc->GetInstData == 0 || splitL > 0 || ( TrackFlags[GetBPMData] == 0 && TrackFlags[GetBPMBeamPars]==0 ) )
     goto egress ;
   
    /* if we're still here, we must want to accumulate some information, so
@@ -4410,12 +3988,11 @@ int TrackBunchThruInst( int elemno, int bunchno,
   }
   
   /* start by doing the tracking */
+  /* if internally spitting tracking then finish by passing splitL<0 to get BPM data after drift tracking */
   stat = TrackBunchThruDrift( elemno, bunchno, ArgStruc, TrackFlags, splitL ) ;
-  
-  /* if we do not need to save inst information here, we can return */
-  
-  if ( (ArgStruc->GetInstData == 0)    ||
-          (TrackFlags[GetInstData] == 0 )  )
+
+  /* if we do not need to save BPM information here, we can return */
+  if ( ArgStruc->GetInstData == 0 || splitL > 0 || TrackFlags[GetInstData] == 0 )
     goto egress ;
   
   /* if we're still here, we must want to accumulate some information, so
@@ -8858,9 +8435,9 @@ void AccumulateWFBinPositions( double* binx, double* biny, int binno,
 /*=====================================================================*/
 
 /* deal with CSR tracking flags */
-double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int classTag, struct Bunch* ThisBunch, double* thisS )
+double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, char* ElemClass, struct Bunch* ThisBunch, double* thisS, double* dL )
 {
-  static double dsL[1000] ;
+  static double dsL[10000] ;
   static double usL=0 ;
   static double angle=0 ;
   static int lPointer=0 ;
@@ -8873,30 +8450,37 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   S = GetElemNumericPar(elemNo, "S", NULL) ;
   L = GetElemNumericPar(elemNo, "L", NULL) ;
   /* Drift or other downstream of bend element */
-  if ( classTag > 1 ) {
+  if (strcmp(ElemClass,"SBEN")!=0) {
     if (elemNo == 0) return 0; /* Return if first element in deck*/
     *csrSmoothFactor = smoothFactor ;
     angle = 0 ;
     if ( *L == 0 )
       return 0 ;
-    while (dsL[lPointer] < *S && dsL[lPointer]!=0 && lPointer<1000 )
+    while (dsL[lPointer] < *S && dsL[lPointer]!=0 && lPointer<10000 )
       lPointer++ ;
-    if ( lPointer >= 1000 || dsL[lPointer] == 0 )
+    if ( lPointer >= 10000 || dsL[lPointer] == 0 )
       return 0 ;
     lPointer++;
+    //printf("CSR DS POINTER: %d S=%g\n",lPointer,dsL[lPointer]) ;
     if ( TFlag[CSR] == 0 )
       TFlag[CSR] = nhistbins ;
     if ( TFlag[CSR_SmoothFactor] == 0 )
       TFlag[CSR_SmoothFactor] = smoothFactor ;
     *csrSmoothFactor = TFlag[CSR_SmoothFactor] ;
     
-    /* if next pointer after element or after CSR consideration point, return bin to end else return dl and l*/
-    if (dsL[lPointer]>(*S+*L) || dsL[lPointer] == 0) {
-      *thisS = *S+*L ;
-      return -((*S+*L)-usL) ; /* return negative distance to u/s bend to show last time to call CSR for this ele*/
+    /* if next pointer after element or after CSR consideration point, return 0 else return dl and l*/
+    if ( dsL[lPointer]>(*S+*L) ) {
+      lPointer--;
+      return 0 ;
     }
+    else if ( dsL[lPointer] == 0 )
+      return 0 ;
     else {
       *thisS = dsL[lPointer-1] ;
+      if ( (lPointer-1) == 0 )
+        *dL = *thisS - usL ;
+      else
+        *dL = *thisS - dsL[lPointer-2] ;
       return *thisS - usL ; /* distance to u/s bend face */
     }
   }
@@ -8913,28 +8497,14 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   else
     *csrSmoothFactor = TFlag[CSR_SmoothFactor] ;
   
-  if ( TFlag[Split] > 0 ) {
-    if ( TFlag[Split] < 2 )
-      TFlag[Split] = 2 ;
-    else
-      trackIter=TFlag[Split]-2;
-  }
-  else {
-    if ( TFlag[CSR] > 0 )
-    {
-      trackIter=48;
-      TFlag[Split]=50;
-    }
-    else
-      trackIter=0;
-  }
+  if ( TFlag[Split] == 1 ) /* Things break if ask for split of 1 */
+    TFlag[Split] = 2 ;
   
   if ( TFlag[CSR] == 0 ) {
     dsL[0] = 0 ;
     lPointer = 0 ;
-    return 0.0 ;
+    return 0 ;
   }
-  
   
   /* Record Bend downstrem face location and Angle */
   usL = *S + *L ;
@@ -8946,11 +8516,12 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   if ( TFlag[CSR_DriftSplit] > 0 ) {
     rmsDim = GetRMSCoord( ThisBunch, 4 ) ;
     lDecay=3.0*pow(24*rmsDim*pow(fabs(R),2),0.333333333);
-    for ( iL=0; iL<1000; iL++ ) {
+    for ( iL=0; iL<10000; iL++ ) {
       if ( iL < TFlag[CSR_DriftSplit]-1 )
         dsL[iL] = usL + pow(10,-3.0+iL*3.0/(TFlag[CSR_DriftSplit]-1)) * lDecay ;
       else if ( iL == TFlag[CSR_DriftSplit]-1 )
         dsL[iL] = usL + lDecay ;
+      //printf("CSR DS CALC iL: %d S: %g\n",iL,dsL[iL]) ;
       else
         dsL[iL] = 0 ;
     }
@@ -8961,7 +8532,7 @@ double GetCsrTrackFlags( int elemNo, int* TFlag, int* csrSmoothFactor, int class
   
   thisS = NULL ;
   
-  return (double)trackIter ;
+  return 0 ;
 }
 
 /* Kernel to setup CUDA random number generator */
@@ -9018,6 +8589,7 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
       break ;
     }
   }
+  printf("ExtProcess: ele=%d stoppedParticles=%d\n",*elemno+1,stoppedParticles) ;
   if (stoppedParticles==0)
     return ;
   if (L == 0) /* If L passed as 0, need to look up from BEAMLINE in case of split tracking */
@@ -9058,3 +8630,197 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
   }
 }
 #endif
+
+/* Element tracker - with standard actions associated with application of coherent processes
+   and/or user-defined splitting of element */
+#ifdef __CUDACC__        
+int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop,int* TFlag_gpu, int* TFlag,struct TrackArgsStruc* TrackArgs)
+#else
+int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct TrackArgsStruc* TrackArgs)
+#endif                
+{
+  int driftCounter=0, nsplit=0, isplit, TrackStatus=0, csrSmoothFactor=0, firstSplit=1, iarr, docsr=0, dolsc=0 ;
+  double splitDL=0, L, lastS, thisS=0, docsrDrift, S_csr=0, S_other=0, LSC_drift=0, S_lsc=0, S_last=0, sarr[3], csrDL, lastS_lsc ;
+  
+  /* Get initial S location and initialize lastS reference, and get total unsplit element length */
+  lastS = *GetElemNumericPar( *ElemLoop, "S", NULL ) ;
+  lastS_lsc = lastS ;
+  L = *GetElemNumericPar(*ElemLoop, "L", NULL) ;
+  S_last = lastS+L ;
+
+  /* Has the CSR process requested this element be split? */
+  /* Returns distance to upstream SBEN (docsrDrift) [0 if nothing to do here], S_csr is S location of CSR application, csrDL is segment lenth */
+  docsrDrift = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, ElemClass, TrackArgs->TheBeam->bunches[*BunchLoop], &S_csr, &csrDL ) ;
+
+  /* Get list of user and/or LSC requested split trackpoints, take the more demanding */
+  if ( L > 0 ) {
+    if ( TFlag[LSC] > 0 ) { /* Get required LSC drift length if this Track Flag active */
+      LSC_drift = ProcLSC(TrackArgs->TheBeam->bunches[*BunchLoop],*ElemLoop,0,*BunchLoop * TFlag[LSC_storeData]) ;
+      S_lsc = lastS + LSC_drift ;
+    }
+    if ( TFlag[Split] > 0 ) { /* User requested element splitting */
+      splitDL = L / TFlag[Split] ;
+      nsplit = TFlag[Split];
+      S_other=lastS+splitDL ;
+    }
+    if (nsplit>1 && TFlag[LSC]>0 ) { /* Setting Split TrackFlag overrides LSC auto splitting */
+      S_lsc=0;
+      LSC_drift=0;
+    }
+    if (nsplit==1) { /* Just pass to regular unsplit tracking */
+      S_other=0;
+      nsplit=0;
+    }
+    if (S_other!=0 && S_lsc!=0)
+      printf("Something wrong in TrackThru:ElemTracker (Split and LSC both getting set!)\n");
+    S_other=S_other+S_lsc ;
+    splitDL=splitDL+LSC_drift;
+  }
+  /* Track bunch through this element with the requested split points, if LSC/User and CSR requested, take
+     the larger number of splits from LSC/User and merge with CSR requests */
+  if ( (docsrDrift > 0 && S_csr<=S_last) || (S_other>0 && S_other<=S_last) ) {
+    while ((docsrDrift > 0 && S_csr<=S_last) || (S_other>0 && S_other<=S_last) ) {
+      /* Set next tracking point */
+      if ( docsrDrift>0 ) {
+        if ( S_other == 0 || S_csr < S_other )
+          thisS=S_csr ;
+        else
+          thisS=S_other ;
+      }
+      else
+        thisS=S_other;
+      /* Execute integrator through this element with desired length */
+      if (strcmp(ElemClass,"QUAD")==0)
+        TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
+      else if (strcmp(ElemClass,"SEXT")==0)
+        TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
+      else if (strcmp(ElemClass,"OCTU")==0)
+        TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 4, thisS-lastS, lastS, TFlag[Aper] ) ;
+      else if (strcmp(ElemClass,"SOLENOID")==0)
+        TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, thisS-lastS, lastS, TFlag[Aper] ) ;
+      else if (strcmp(ElemClass,"MULT")==0)
+        TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS, lastS ) ;
+      else if (strcmp(ElemClass,"SBEN")==0) {
+        if ( firstSplit == 1 ) /* Track with just upstream edge effects */
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1, 0, thisS-lastS, lastS ) ;
+        else if ( nsplit > 1 ) /* Track with no edge effects */
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0, thisS-lastS, lastS  ) ;
+        else /* Track with just dowstream edge effects */
+          TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 1, thisS-lastS, lastS  ) ;
+      }
+      else if ( strcmp(ElemClass,"HMON")==0 || strcmp(ElemClass,"VMON")==0 || strcmp(ElemClass,"MONI")==0 )
+        TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
+      else if ( strcmp(ElemClass,"PROF")==0 || strcmp(ElemClass,"WIRE")==0 || strcmp(ElemClass,"BLMO")==0 ||
+                strcmp(ElemClass,"SLMO")==0 || strcmp(ElemClass,"IMON")==0 || strcmp(ElemClass,"INST")==0 )
+        TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
+      else if ( strcmp(ElemClass,"XCOR")==0 )
+        TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, XCOR, thisS-lastS, lastS ) ;
+      else if ( strcmp(ElemClass,"YCOR")==0 )
+        TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, YCOR, thisS-lastS, lastS ) ;
+      else if ( strcmp(ElemClass,"XYCOR")==0 )
+        TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, XYCOR, thisS-lastS, lastS ) ;
+      else if ( strcmp(ElemClass,"COLL")==0 )
+        TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS, lastS ) ;
+      else /* default = drift */
+        TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, thisS-lastS ) ;
+      /* Signal first pass through splitting iterator */
+      firstSplit = 0 ;
+      
+      /* Return if tracker flags an error status */
+      if (TrackStatus == 0)
+        return TrackStatus ;
+
+      /* Perform post-tracking actions */
+      postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFlag) ;
+
+      /* Apply CSR if requested (apply if this is a "CSR split" or it shares an S location with an LSC one) 
+         - then get pointer to next CSR S location to track to if there is one */
+      if ( ( docsrDrift != 0 && ( S_other==0 || S_csr<=S_other ) ) || ( strcmp(ElemClass,"SBEN")==0 && TFlag[CSR] > 0 ) ) {
+        GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, docsrDrift, csrDL ) ;
+        if ( docsrDrift > 0 )
+          docsrDrift = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, ElemClass, TrackArgs->TheBeam->bunches[*BunchLoop], &S_csr, &csrDL ) ;
+      }
+
+      /* Increment S pointer */
+      lastS = thisS ;
+      
+      /* Apply LSC if requested (apply if this is not a "CSR split" or it shares an S location with one) 
+         - if just splitting the element manually then just increment S pointer */
+      if ( S_other > 0 && ( docsrDrift <= 0 || S_other<=S_csr) ) {
+        if ( TFlag[LSC] ) {
+          ProcLSC(TrackArgs->TheBeam->bunches[*BunchLoop],*ElemLoop,thisS-lastS_lsc, (*BunchLoop+1) * TFlag[LSC_storeData]) ;
+          lastS_lsc=thisS;
+        }
+        nsplit-- ;
+        if (S_other==S_last || ( TFlag[Split] > 0 && nsplit<=0 ) )
+          S_other=0;
+        else {
+          S_other = lastS + splitDL ;
+          if ( S_other > S_last )
+            S_other = S_last ;
+        }
+      }
+    }
+    /* Post split iterator actions for elements that require them */
+    if ( (strcmp(ElemClass,"HMON")==0) || (strcmp(ElemClass,"VMON")==0) || (strcmp(ElemClass,"MONI")==0) )
+      TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, -1 ) ;
+    else if ( strcmp(ElemClass,"PROF")==0 || strcmp(ElemClass,"WIRE")==0 || strcmp(ElemClass,"BLMO")==0 ||
+                strcmp(ElemClass,"SLMO")==0 || strcmp(ElemClass,"IMON")==0 || strcmp(ElemClass,"INST")==0 )
+      TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, -1 ) ;
+  }
+  else { /* Just normal, unsplit tracking */
+    /* Execute integrator through this element through BEAMLINE element length */
+    if (strcmp(ElemClass,"QUAD")==0)
+      TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, 0, 0, TFlag[Aper] ) ;
+    else if (strcmp(ElemClass,"SEXT")==0)
+      TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, 0, 0, TFlag[Aper] ) ;
+    else if (strcmp(ElemClass,"OCTU")==0)
+      TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 4, 0, 0, TFlag[Aper] ) ;
+    else if (strcmp(ElemClass,"SOLENOID")==0)
+      TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0, 0, TFlag[Aper] ) ;
+    else if (strcmp(ElemClass,"MULT")==0)
+      TrackStatus = TrackBunchThruMult( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0 ) ;
+    else if (strcmp(ElemClass,"SBEN")==0)
+      TrackStatus = TrackBunchThruSBend( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1, 1, L, lastS  ) ;
+    else if ( (strcmp(ElemClass,"HMON")==0) || (strcmp(ElemClass,"VMON")==0) || (strcmp(ElemClass,"MONI")==0) )
+      TrackStatus = TrackBunchThruBPM( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
+    else if ( strcmp(ElemClass,"PROF")==0 || strcmp(ElemClass,"WIRE")==0 || strcmp(ElemClass,"BLMO")==0 ||
+                strcmp(ElemClass,"SLMO")==0 || strcmp(ElemClass,"IMON")==0 || strcmp(ElemClass,"INST")==0 )
+      TrackStatus = TrackBunchThruInst( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
+    else if ( strcmp(ElemClass,"XCOR")==0 )
+      TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, XCOR, 0, 0 ) ;
+    else if ( strcmp(ElemClass,"YCOR")==0 )
+      TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, YCOR, 0, 0 ) ;
+    else if ( strcmp(ElemClass,"XYCOR")==0 )
+      TrackStatus = TrackBunchThruCorrector( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, XYCOR, 0, 0 ) ;
+    else if ( strcmp(ElemClass,"COLL")==0 )
+      TrackStatus = TrackBunchThruCollimator( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0, 0 ) ;
+    else /* default = drift */
+      TrackStatus = TrackBunchThruDrift( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 0 ) ;
+    /* Process any errors */
+    if (TrackStatus == 0)
+      return TrackStatus ;
+    /* Perform post-tracking actions */
+    postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, lastS, TFlag) ;
+    /* Call CSR or LSC if flagged */
+    if ( TFlag[LSC] > 0 )
+      ProcLSC(TrackArgs->TheBeam->bunches[*BunchLoop],*ElemLoop,L,(*BunchLoop+1) * TFlag[LSC_storeData]) ;
+    if ( TFlag[CSR] > 0 && strcmp(ElemClass,"SBEN")==0 )
+      GetCsrEloss(TrackArgs->TheBeam->bunches[*BunchLoop], TFlag[CSR], csrSmoothFactor, *ElemLoop, docsrDrift, csrDL ) ;
+    
+  }
+  /* Wakefield clearance where required */
+  if (strcmp(ElemClass,"SBEN")==0) {
+    /* since the SBend has momentum compaction, clear the wakefields
+         * which are available to the just-tracked bunch */
+    ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop],
+            -1,  0 ) ;
+    ClearConvolvedSRWF( TrackArgs->TheBeam->bunches[*BunchLoop],
+            -1,  1 ) ;
+    ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
+            -1,  0 ) ;
+    ClearBinnedLRWFFreq( TrackArgs->TheBeam->bunches[*BunchLoop],
+            -1,  1 ) ;
+  }
+  return 1 ;
+}

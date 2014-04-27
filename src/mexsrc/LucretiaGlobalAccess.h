@@ -196,4 +196,6 @@ double GetMatrixNormalizer( double* ) ;
 
 void GetCsrEloss(struct Bunch*, int, int, int, double, double ) ;
 
+/* Calculation an application of longitudinal space charge */
 
+double ProcLSC(struct Bunch*, int, double, int ) ;
