@@ -1,17 +1,11 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-  <meta http-equiv="content-type"
- content="text/html; charset=ISO-8859-1">
-  <title>Lucretia: Synchrotron Radiation</title>
-  <meta name="author" content="Peter Tenenbaum">
-</head>
-<body>
-<div style="text-align: center;"><a href="home.html"><span
- style="font-size: 24pt;"><img
- style="border: 0px solid ; width: 80px; height: 90px;"
- alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif"
- align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
+<html><head>
+
+
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"><title>Lucretia: Synchrotron Radiation</title>
+  
+  <meta name="author" content="Peter Tenenbaum"></head><body>
+<div style="text-align: center;"><a href="home.html"><span style="font-size: 24pt;"><img style="border: 0px solid ; width: 80px; height: 90px;" alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif" align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
 </span>
 <div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
@@ -28,12 +22,12 @@ multipoles, and transverse-mode cavities.&nbsp; During tracking, there
 are four possible methods of synchrotron radiation simulation, which
 are determined by the SynRad tracking flag of each element:<br>
 <br>
-<span style="font-weight: bold;">TrackFlags.SynRad == 0:</span>&nbsp;
+<span style="font-weight: bold;">TrackFlag.SynRad == 0:</span>&nbsp;
 Synchrotron radiation is completely ignored.&nbsp; This is the default
 settting of the SynRad tracking flag for all elements at instantiation
 time.<br>
 <br>
-<span style="font-weight: bold;">TrackFlags.SynRad == 1:</span>&nbsp;
+<span style="font-weight: bold;">TrackFlag.SynRad == 1:</span>&nbsp;
 For each particle, the mean energy loss from synchrotron radiation is
 calculated, taking into account the particle's momentum and the actual
 field that it encounters (ie, particles which are far from the center
@@ -44,7 +38,7 @@ tracking), and half at the downstream face of the element (ie, after
 tracking).&nbsp; In this way, the effect of the energy variation on the
 particle's trajectory is approximately taken into account.<br>
 <br>
-<span style="font-weight: bold;">TrackFlags.SynRad == 2:</span>&nbsp;
+<span style="font-weight: bold;">TrackFlag.SynRad == 2:</span>&nbsp;
 For each particle, both the mean and the quantum-fluctuation components
 of the synchrotron radiation are calculated.&nbsp; This is accomplished
 by computing the photon critical energy (u_c) and mean number of
@@ -60,7 +54,7 @@ A. Wolski; this method agrees very well with the analytically-expected
 mean particle energy loss, and produces a spectrum of particle energy
 losses which is a few percent wider than the analytically-expected one.<br>
 <br>
-<span style="font-weight: bold;">TrackFlags.SynRad == 3:</span>&nbsp;
+<span style="font-weight: bold;">TrackFlag.SynRad == 3:</span>&nbsp;
 Both the mean and quantum-fluctuation components of the synchrotron
 radiation are calculated in exactly the method described above, except
 that the generation of the photons uses H. Burkhardt's method.&nbsp; In
@@ -92,11 +86,9 @@ correctors, TCAVs, and multipoles with a nonzero dipole field.&nbsp; <br>
 <h2><strong>CSR</strong></h2>
 The implementation of Coherent Synchrotron Radiation in Lucretia uses the 
 formulism developed in the paper by G. Stupakov and P. Emma in the EPAC2002 
-paper &quot;<a href="http://accelconf.web.cern.ch/AccelConf/e02/PAPERS/WEPRI029.pdf">CSR 
-Wake for a Short Magnet in Ultrarelativistic Limit</a>&quot;. The implementation in 
-Lucretia closely follows the method by which CSR was implemented in<br>
-<a href="http://www.aps.anl.gov/Accelerator_Systems_Division/Accelerator_Operations_Physics/manuals/elegant_latest/elegant.pdf">
-Elegant</a>. The Elegant implementation very well described measurement data 
+paper "<a href="http://accelconf.web.cern.ch/AccelConf/e02/PAPERS/WEPRI029.pdf">CSR 
+Wake for a Short Magnet in Ultrarelativistic Limit</a>". The implementation in 
+Lucretia closely follows the method by which CSR was implemented in<a href="http://www.aps.anl.gov/Accelerator_Systems_Division/Accelerator_Operations_Physics/manuals/elegant_latest/elegant.pdf"> Elegant</a>. The Elegant implementation very well described measurement data 
 taken during the commissioning of LCLS. The implementation here has been 
 cross-checked against the example case in the Stupakov/Emma paper. It has also 
 been cross-checked against Elegant for the specific case of FACET at SLAC.<br>
@@ -113,28 +105,27 @@ considered in all elements downstream from the bend up to the cutoff with the
 exception of RF and other bend elements. The CSR calculation relies upon a 
 Matlab function which resides inside the src/Tracking directory (applyCSR.m) 
 which should exist on your Matlab search path.<br><br>CSR tracking options (set 
-through TrackFlags on SBEN elements in BEAMLINE array, default values shown):<br>
-<strong><br>TrackFlags.CSR = 0</strong><br>A setting of 0 means no CSR tracking 
+through TrackFlag field on SBEN elements in BEAMLINE array, default values shown):<br>
+<strong><br>TrackFlag.CSR = 0</strong><br>A setting of 0 means no CSR tracking 
 to take place. An integer value &gt;0 switches on CSR effects in the corresponding 
 SBEN element. The integer value set indicates the number of longitudinal slices 
 (histogram bins) to use for the beam description in the CSR calculation. The 
 optimal number depends upon the topology and number of macro particles within 
 the tracked bunch. A minimum recommended number is 300. It is always advised to 
 experiment with this setting to find a value which produces stable results 
-without too much of a time overhead.<br><br><strong>TrackFlags.CSR_SmoothFactor 
+without too much of a time overhead.<br><br><strong>TrackFlag.CSR_SmoothFactor 
 = 5<br></strong>The longitudinal charge profile is smoothed after binning. This 
-parameter (integer &gt;=1) controls the degree of smoothing. The optimal value 
+parameter (integer &gt;= 0) controls the degree of smoothing. The optimal value 
 depends upon the number of bins used (.CSR field above) and the 'spikiness' of 
-the longitudinal beam profile. The larger the value, the more smoothing 
+the longitudinal beam profile. If set =0 then no smoothing is performed. The larger the value, the more smoothing 
 (approximately this is the width in bins of the smoothing filter). 
-Experimentation is recommended.<br><br><strong>TrackFlags.Split</strong> =
-<strong>10<br></strong>The number of slices to split the SBEN element into 
-(integer &gt;=10, &gt;=50 recommended). This tracking flag is also independent of the 
+Experimentation is recommended.<br><br><strong>TrackFlag.Split</strong> =
+<strong>10<br></strong>The number of slices to split the SBEN element into. This tracking flag is also independent of the 
 CSR fields, it can be set independently- in which case the tracking engine 
 treats the element as N sequential identical elements with lengths and strengths 
 scaled appropriately. More splitting more closely represents reality but will 
 slow down the tracking. Again, experimentation is recommended.<br><br><strong>
-TrackFlags.CSR_DriftSplit = 10<br></strong>If set to 0, then no CSR treatment is 
+TrackFlag.CSR_DriftSplit = 10<br></strong>If set to 0, then no CSR treatment is 
 applied beyond the downstream face of the SBEN. If integer &gt;0, then CSR is 
 applied to the tracked beam downstream of the bend to a point downstream 
 determined internally where the CSR field ceases to have a significant effect. 
@@ -152,12 +143,8 @@ fields are changing most rapidly. A value of &gt;50 is recommended and
 experimentation suggested.<br>
 <br>
 <a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a>
-<a
- href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
+<a href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
 2-Aug-2012<br>
-<a href="http://www.slac.stanford.edu/detailed.html"><img
- src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
- alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
- align="right"></a><br>
-</body>
-</html>
+<a href="http://www.slac.stanford.edu/detailed.html"><img src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page" alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;" align="right"></a><br>
+
+</body></html>

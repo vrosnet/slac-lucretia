@@ -1,0 +1,141 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+
+
+
+  
+  <meta content="en-us" http-equiv="Content-Language" />
+
+  
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type" /><title>External Process Interface - GEANT4</title></head><body>
+<div style="text-align: center;"><a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span style="font-size: 24pt;"> <img src="LucretiaLogo.gif" alt="LucretiaLogo" style="border: 0px solid ; width: 80px; height: 90px;" align="right" hspace="20" /></span></a><span style="font-size: 24pt;"><br />
+</span>
+<div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
+Project</span><br />
+</div>
+<span style="font-size: 24pt;"><br />
+<small>Interface Routines to Access External Processes - <span style="color: rgb(204, 51, 204); font-weight: bold;">GEANT4</span><br />
+<br />
+</small></span><br />
+<div style="text-align: left;">
+<div style="text-align: center;">
+<div style="text-align: left;">
+<div style="text-align: center;">
+<div style="text-align: left;">Access to the GEANT4 material tracking
+routines is provided through the ExtG4Process class (inherits from
+ExtProcess and ExtGeometry). This assumes you are using a version of
+Lucretia built against the GEANT4 libraries (see <a href="downloads.html">source+build </a>page). To use, first
+instantiate
+an object of this class using the <i>new</i> method of ExtProcess
+(using the constuctor or Set methods to configure. Then instantiate an
+object of the Track class to perform tracking, the tracking engine will
+automatically handle passing of Lucretia macro particles to GEANT4 for
+tracking.<br />
+The criteria for passing particles to GEANT4 for tracking is that an
+ExtG4Process object is attached to a BEAMLINE element and that a
+particle is stopped in that element during standard Lucretia tracking.
+This primarily happens when a beam exceeds a defined BEAMLINE aperture
+somewhere in that element. The macro particle is then passed to GEANT
+which generates a material volume based on the ExtG4Process properties.
+This material volume has the length of the BEAMLINE element (must not
+be zero), and cross-sectional area defined by the ExtG4Process
+properties (inherted from ExtGeometry class). If after tracking through
+the GEANT material the primary particle passes selection cuts defined
+in ExtG4Process then it re-enters the Lucretia tracking engine. If
+requested, secondary particles generated in the GEANT4 tracking process
+are stored in the <span style="font-style: italic;">SecondaryBeam</span>
+property field.<br />
+<br />
+<span style="font-weight: bold;">Warning: When tracking with active
+GEANT4 materials, do not use "clear all", "clear functions" etc which
+cause the mex file memory to be cleared as this will cause a
+segmentation violation the next time tracking is performed. This is an
+unavoidable side-effect associated with co-compilation of the GEANT4
+environment within the Lucretia mex environment.</span><br />
+<br />
+A simple example (load a Lucretia BEAMLINE, make a Track object,
+configure a collimator class element to transfer particles to GEANT4
+and perform tracking):<br />
+&gt;&gt; global BEAMLINE;<br />
+&gt;&gt; load lucretiaBeamlineData.mat BEAMLINE Initial;<br />
+&gt;&gt; Beam = MakeBeam6DWeighted( Initial, 1e6, 5, 1 );<br />
+&gt;&gt; T = Track(Beam) ;<br />
+&gt;&gt; colls = findcells(BEAMLINE,'Class','COLL') ;<br />
+&gt;&gt; BEAMLINE{colls(1)}.aper=[1e-3; 1e-3] ;<br />
+&gt;&gt; BEAMLINE{colls(1)}.Geometry='Rectangle' ;<br />&gt;&gt;
+ExtProcess.new('GEANT4',colls(1),'Material','G4_Be','Ecut',BEAMLINE{colls(1)}.P*0.1,'Thickness',0.1,'Verbose',0,'MaxPrimaryParticles',1000)
+;<br />
+&gt;&gt; BEAMLINE{colls(1)}.ExtProcess(1).Verbose=1 ;<br />
+&gt;&gt; T.trackThru() ;<br />
+<br />
+<h3 style="color: rgb(51, 102, 255);">ExtG4Process.m (inherits
+ExtProcess and ExtGeometry)</h3>
+Particles with energy &gt; Ecut and which track to the right most z
+co-ordinate of the material element get re-inserted into the Lucretia
+tracking loop (by having their <span style="font-style: italic;">stop </span>fields
+reset to zero).<br />
+On construction, the <span style="font-style: italic;">allowedMaterials</span>
+property is populated with the list of pre-defined materials allowed by
+GEANT4 in addition to any user-defined materials provided (Vacuum). See
+the GEANT4 <a href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGuides_beta/ForApplicationDeveloper/html/apas08.html">materials
+database</a>
+for options. By default the material constructed follows
+the data in the BEAMLINE element. For all elements other than COLL, a
+circular cross-section is assumed of radius BEAMLINE{ele}.aper. With
+the exception of SBEN elements which by default have vertical half-gaps
+defined by the HGAP field and infinitely large horizontal apertures.
+Collimator elements may have rectangular or elliptical cross-sectional
+shapes. It is possible to override these default assumptions using the
+Set methods to change the aperture sizes and/or shapes, but the
+Lucretia tracking engine will always use the BEAMLINE aper details to
+determine if to stop the particle (and hand it over to GEANT4 for
+tracking) or not.<br />
+<h4>Public properties</h4>
+<ul>
+  <li>Ecut = 0</li>
+  <ul>
+    <li>Kinetic energy cut: particles (both primary and secondaries) with final energy &gt; <span style="font-style: italic;">Ecut</span> are inserted back into the
+Lucretia Bunch structure.</li>
+  </ul>
+  <li>Verbose = 0</li>
+  <ul>
+    <li>Set level of info dumped to the Matlab command window whilst
+GEANT4 is processing primary and secondary tracks. Setting 1 provides
+information about physics processes, material and geometry and
+event-level information. Setting 2 provides a dump of all primary and
+secondary particles generated. 0 is as content-free as possible,
+although information is still displayed.<br />
+    </li>
+  </ul>
+</ul>
+<h4>Overloaded methods</h4>
+<ul>
+  <li>SetGeometry(<span style="font-style: italic;">type</span>)</li>
+  <ul>
+    <li>Accepts "Rectangle" or "Ellipse" as options only currently.</li>
+  </ul>
+  <li>SetMaterial(<span style="font-style: italic;">type</span>)</li>
+  <ul>
+    <li>Allows any of the GEANT4 material database types plus user-defined ones hard coded into Lucretia application listed below. See <a href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGuides_beta/ForApplicationDeveloper/html/apas08.html">GEANT4 material database list</a> for options, also the <span style="font-style: italic;">allowedMaterials</span> property can be examined.<br />
+    </li>
+  </ul>
+
+  <li>SetAper(<span style="font-style: italic;">aper1[,aper2]</span>)</li>
+  <ul>
+    <li>Provide ellipse radius <span style="font-style: italic;">aper1</span>
+or semi-major and semi-minor ellipse parameters <span style="font-style: italic;">aper1</span> and <span style="font-style: italic;">aper2</span> (or X and Y rectangular
+half-apertures).<br />
+    </li>
+  </ul>
+</ul>
+<h4><a href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br />
+</h4>
+8-Apr-2014<a href="http://www.slac.stanford.edu/detailed.html"><img src="SLAC_whitebkgd.jpg" title="Return to SLAC detailed home page" alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;" align="right" /></a></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>
