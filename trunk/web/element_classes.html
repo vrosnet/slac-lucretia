@@ -1,18 +1,14 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-  <meta http-equiv="content-type"
- content="text/html; charset=ISO-8859-1">
-  <title>Lucretia: Supported Element Classes</title>
-  <meta name="author" content="Peter Tenenbaum">
-</head>
-<body>
-<div style="text-align: center;"><a
- href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span
- style="font-size: 24pt;"><img alt="LucretiaLogo"
- title="Lucretia home page" src="LucretiaLogo.gif"
- style="border: 0px solid ; width: 80px; height: 90px;" align="right"
- hspace="20"></span></a><span style="font-size: 24pt;"><br>
+<html><head>
+
+  
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"><title>Lucretia: Supported Element Classes</title>
+  
+
+  
+  
+  <meta name="author" content="Peter Tenenbaum"></head><body>
+<div style="text-align: center;"><a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span style="font-size: 24pt;"><img alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif" style="border: 0px solid ; width: 80px; height: 90px;" align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
 </span>
 <div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 The <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
@@ -24,10 +20,8 @@ Project</span><br>
 <small>Overview<br>
 <br>
 </small></small></span>
-<div style="text-align: left;">As mentioned on the <a
- href="data_elements.html">Data Elements</a> page, Lucretia stores all
-of its element data in fully-instantiated form in the <a
- href="data_elements.html#BEAMLINE">BEAMLINE</a> cell array.&nbsp; Each
+<div style="text-align: left;">As mentioned on the <a href="data_elements.html">Data Elements</a> page, Lucretia stores all
+of its element data in fully-instantiated form in the <a href="data_elements.html#BEAMLINE">BEAMLINE</a> cell array.&nbsp; Each
 element is represented by a 1 x 1 data structure in the BEAMLINE array
 (ie, BEAMLINE{1} is a Matlab structure, as is BEAMLINE{2}, etc).&nbsp;
 Because BEAMLINE is a cell array, the structures which make up BEAMLINE
@@ -42,19 +36,16 @@ Element classes are identified by a Class field, which uses a Matlab
 string to identify the element class ("MARK" for marker, "QUAD" for
 quadrupole magnet, etc).<br>
 <br>
-<div style="text-align: center;"><span style="font-size: 24pt;"><small><small><a
- name="TrackFlag"></a>TrackingFlags</small></small></span></div>
+<div style="text-align: center;"><span style="font-size: 24pt;"><small><small><a name="TrackFlag"></a>TrackingFlags</small></small></span></div>
 <br>
 Each element also has a set of "switches," stored in a field named
 TrackFlag.&nbsp; As the name suggests, these are flags which indicate
 to the tracker whether or not to simulate some optional behavior; the
-one exception is that the synchrotron radiation flags are used by the <a
- href="momentum_profile.html">momentum
+one exception is that the synchrotron radiation flags are used by the <a href="momentum_profile.html">momentum
 profile tools</a>.&nbsp; A brief description of the tracking flags is
 given below:<br>
 <br>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Flag Name<br>
@@ -80,8 +71,7 @@ SR losses are calculated and applied, including quantum effects, using
 Burkhardt's Method<br>
 (Note:&nbsp; for more detailed description of the SR calculations, see
 the <a href="SynRad.html">Lucretia SR page</a>).<br>
-      <span style="font-weight: bold;"><span style="font-weight: bold;"><span
- style="font-weight: bold;"></span></span></span> </td>
+      <span style="font-weight: bold;"><span style="font-weight: bold;"><span style="font-weight: bold;"></span></span></span> </td>
     </tr>
     <tr>
       <td style="vertical-align: top; text-align: center;">Aper<br>
@@ -219,6 +209,29 @@ are not returned after tracking<br>
 HOM BPM readings in this RF unit are returned after tracking<br>
       </td>
     </tr>
+    <tr>
+      <td style="vertical-align: top; text-align: center;">CSR<br>
+      </td>
+      <td style="vertical-align: top; text-align: center;">0<br>
+N<br>
+      </td>
+      <td style="vertical-align: top;">Coherent synchrotron radiation
+disabled in this element.<br>
+Coherent synchrotron radiation enabled using N histogram bins (<a href="SynRad.html">more
+details and other TrackFlag elements pertaining to CSR)</a><br>
+      </td>
+    </tr><tr>
+      <td style="vertical-align: top; text-align: center;">LSC<br>
+      </td>
+      <td style="vertical-align: top; text-align: center;">0<br>
+1<br>
+      </td>
+      <td style="vertical-align: top;">Disable simulation of longitudinal space charge in this element [default]<br>
+Longitudinal space charge enabled in this element (<a href="LSC.html">more
+details and other TrackFlag elements pertaining to LSC)</a>
+      </td>
+    </tr>
+
   </tbody>
 </table>
 <br>
@@ -228,8 +241,7 @@ element by element, so that effects which are generally small can be
 turned off except in the small number of elements where they matter
 (for example, the LorentzDelay probably only matters at places in the
 beamline where the design momentum is a few MeV/c).&nbsp; To set
-tracking flags over a large stretch of BEAMLINE, use the function <a
- href="lattice_generation.html#SetTrackFlags">SetTrackFlags</a>.<br>
+tracking flags over a large stretch of BEAMLINE, use the function <a href="lattice_generation.html#SetTrackFlags">SetTrackFlags</a>.<br>
 <br>
 <div style="text-align: center;"><span style="font-size: 24pt;"><small><small>Supported
 Elements<br>
@@ -241,16 +253,9 @@ parameter fields and valid tracking flags, and a short discussion of
 the physics and modelling for each element.&nbsp; The list of supported
 elements includes:<br>
 <br>
-<a href="#Mark">Marker</a>, <a href="#Drift">drift</a>, <a
- href="#Quad">quadrupole</a>, <a href="#Sext">sextupole</a>, <a
- href="#Octu">octupole</a>, <a href="#Mult">multipole</a>, <a
- href="#SBend">sector bend</a>, <a href="#Solenoid">solenoid</a>, <a
- href="#Lcav">linear accelerator
-structure</a>, <a href="#TCAV">dipole mode RF structure</a>,&nbsp; <a
- href="#XYCor">dipole
-corrector</a>, <a href="#BPM">beam position monitor</a>, <a
- href="#Inst">beam instrument</a>, <a href="#Coll">collimator</a>, <a
- href="#coord">coordinate change</a>.<br>
+<a href="#Mark">Marker</a>, <a href="#Drift">drift</a>, <a href="#Quad">quadrupole</a>, <a href="#Sext">sextupole</a>, <a href="#Octu">octupole</a>, <a href="#Mult">multipole</a>, <a href="#SBend">sector bend</a>, <a href="#Solenoid">solenoid</a>, <a href="#Lcav">linear accelerator
+structure</a>, <a href="#TCAV">dipole mode RF structure</a>,&nbsp; <a href="#XYCor">dipole
+corrector</a>, <a href="#BPM">beam position monitor</a>, <a href="#Inst">beam instrument</a>, <a href="#Coll">collimator</a>, <a href="#coord">coordinate change</a>.<br>
 <br>
 <span style="font-size: 24pt;"><small><small><a name="Mark"></a>Marker
 -- <small>zero-length drift used as a, er, marker of some kind.<br>
@@ -272,8 +277,7 @@ TrackFlag fields:&nbsp; none.<br>
 <div style="text-align: center;">
 <div style="text-align: left;">Fields:<br>
 <br>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -320,8 +324,7 @@ TrackFlag fields:&nbsp; ZMotion, LorentzDelay</small></small></small></span><br>
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -382,8 +385,7 @@ calculated.<br>
 LorentzDelay<br>
 <br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -535,8 +537,7 @@ terms at higher orders (U-matrix and above) are always neglected.&nbsp;
 LorentzDelay<br>
 <br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -678,8 +679,7 @@ ZMotion is
 selected, the drift-like longitudinal T-matrix terms (T_5xx) are also
 calculated;
 if LorentzDelay is selected, velocity effects are included as discussed
-for <a
- href="file:///C:/PT%20Files/NLC%20and%20ILC/SW+Tools/lucretia/web/element_classes.html#Drift">drifts</a>,
+for <a href="file:///C:/PT%20Files/NLC%20and%20ILC/SW+Tools/lucretia/web/element_classes.html#Drift">drifts</a>,
 above.&nbsp; Fringe fields and map
 terms at higher orders (U-matrix and above) are always neglected.&nbsp;
 The convention for the sextupole strength is that BEAMLINE{}.B = L
@@ -693,8 +693,7 @@ d^2B/dr^2, ie the MAD convention for use of factorials is observed.<br>
 LorentzDelay<br>
 <br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -844,8 +843,7 @@ index exponent.<br>
 LorentzDelay<br>
 <br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -1055,8 +1053,7 @@ TrackFlag fields = SynRad, Aper, LorentzDelay</small></small></small></span><br>
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -1274,8 +1271,7 @@ bend.&nbsp; These terms are usually small compared to the bending and
 focusing terms, so the Lucretia sector bend map should be acceptable
 for most applications.<br>
 <br>
-By default a gradient bend is instantiated by <a
- href="lattice_generation.html#SBendStruc">SBendStruc</a> with slots
+By default a gradient bend is instantiated by <a href="lattice_generation.html#SBendStruc">SBendStruc</a> with slots
 for a single power supply and a single value for its fractional
 strength error, dB.&nbsp; In some cases, however, it is desirable to
 simulate a sector bend with separate power supplies for its bending and
@@ -1300,8 +1296,7 @@ Aper, ZMotion,
 LorentzDelay<br>
 <br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -1447,8 +1442,7 @@ ZMotion, LorentzDelay, GetSBPMData</small></small></small></span><br>
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -1702,8 +1696,7 @@ taken to be synonymous (ie, the fact that particles with different
 momenta will get different momentum increases for the same voltage and
 same energy gain is neglected).&nbsp; This feature will be added in a
 later release.</li>
-  <li>The LorentzDelay and ZMotion flags operate similarly as for <a
- href="#Drift">drifts</a>, but because the LCAV increases the particle
+  <li>The LorentzDelay and ZMotion flags operate similarly as for <a href="#Drift">drifts</a>, but because the LCAV increases the particle
 momentum the drift-like expressions are likely not good
 approximations.&nbsp; Their use is discouraged for the time being.<br>
   </li>
@@ -1754,8 +1747,7 @@ ZMotion, LorentzDelay, GetSBPMData</small></small></small></span><br>
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -1993,10 +1985,8 @@ LCAV, HOM BPMs, if any, are filled with beam data, and the deflection
 of each ray is given by dPx = Volt/P*cos(Phase + kz),
 where k = 2pi*Freq/c.&nbsp; If a Tilt is specified, the cavity can
 produce any desired combination of horizontal and vertical
-deflections.&nbsp; TCAVs will not be scaled by the <a
- href="momentum_profile.html#UpdateMomentumProfile">UpdateMomentumProfile</a>
-function.&nbsp; Like LCAVs, TCAV's can be driven by klystrons -- use <a
- href="lattice_generation.html#AssignToKlystron">AssignToKlystron</a>
+deflections.&nbsp; TCAVs will not be scaled by the <a href="momentum_profile.html#UpdateMomentumProfile">UpdateMomentumProfile</a>
+function.&nbsp; Like LCAVs, TCAV's can be driven by klystrons -- use <a href="lattice_generation.html#AssignToKlystron">AssignToKlystron</a>
 to set this up.<br>
 <br>
 <span style="font-size: 24pt;"><small><small><a name="XYCor"></a>Dipole
@@ -2011,8 +2001,7 @@ TrackFlag fields:&nbsp; SynRad, ZMotion, LorentzDelay</small></small></small></s
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -2160,8 +2149,7 @@ fields B, dB, and PS are scalar.&nbsp; If it is specified as an
 referring to the horizontal corrector windings and the second entry
 referring to the vertical corrector windings.<br>
 <br>
-</small></small></small></span><span style="font-size: 24pt;"><small><small><a
- name="BPM"></a>Beam Position Monitor -- <small>basic beam
+</small></small></small></span><span style="font-size: 24pt;"><small><small><a name="BPM"></a>Beam Position Monitor -- <small>basic beam
 instrumentation<br>
 <br>
 </small></small></small></span>
@@ -2174,8 +2162,7 @@ ZMotion, LorentzDelay</small></small></small></span><br>
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -2297,8 +2284,7 @@ bunch in the train, otherwise the train as an aggregate will be used to
 generate data.&nbsp; Note that x and y readings are generated
 regardless of whether the class is HMON,VMON, or MONI.<br>
 <br>
-</small></small></small></span><span style="font-size: 24pt;"><small><small><a
- name="Inst"></a>Instrument -- <small>advanced beam instrumentation<br>
+</small></small></small></span><span style="font-size: 24pt;"><small><small><a name="Inst"></a>Instrument -- <small>advanced beam instrumentation<br>
 <br>
 </small></small></small></span>
 <div style="margin-left: 40px;"><span style="font-size: 24pt;"><small><small><small>Class
@@ -2309,8 +2295,7 @@ TrackFlag fields:&nbsp; MultiBunch, GetInstData, ZMotion, LorentzDelay</small></
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -2395,8 +2380,7 @@ to generate readings.&nbsp; Note that all of the data listed above is
 returned for each instrument, regardless of which type of instrument it
 is (ie, even IMONs return positions and second moments).<br>
 <br>
-</small></small></small></span><span style="font-size: 24pt;"><small><small><a
- name="Coll"></a>Collimator -- <small>beam collimation<br>
+</small></small></small></span><span style="font-size: 24pt;"><small><small><a name="Coll"></a>Collimator -- <small>beam collimation<br>
 <br>
 </small></small></small></span>
 <div style="margin-left: 40px;"><span style="font-size: 24pt;"><small><small><small>Class
@@ -2407,8 +2391,7 @@ TrackFlag fields:&nbsp; Aper, ZMotion, LorentzDelay</small></small></small></spa
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="text-align: left; width: 100%;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
       <th style="vertical-align: top; text-align: center;">Field Name<br>
@@ -2554,22 +2537,17 @@ TrackFlag fields:&nbsp; ZMotion</small></small></small></span><br>
 </div>
 <span style="font-size: 24pt;"><small><small><small><br>
 </small></small></small></span>
-<table style="width: 100%; text-align: left;" border="1" cellpadding="2"
- cellspacing="2">
+<table style="width: 100%; text-align: left;" border="1" cellpadding="2" cellspacing="2">
   <tbody>
     <tr>
-      <td
- style="vertical-align: top; font-weight: bold; text-align: center;">Field
+      <td style="vertical-align: top; font-weight: bold; text-align: center;">Field
 Name<br>
       </td>
-      <td
- style="vertical-align: top; font-weight: bold; text-align: center;">Required?<br>
+      <td style="vertical-align: top; font-weight: bold; text-align: center;">Required?<br>
       </td>
-      <td
- style="vertical-align: top; font-weight: bold; text-align: center;">Size<br>
+      <td style="vertical-align: top; font-weight: bold; text-align: center;">Size<br>
       </td>
-      <td
- style="vertical-align: top; font-weight: bold; text-align: center;">Units<br>
+      <td style="vertical-align: top; font-weight: bold; text-align: center;">Units<br>
       </td>
       <td style="vertical-align: top; font-weight: bold;">Description<br>
       </td>
@@ -2633,15 +2611,12 @@ Combined function dipole-quadrupole-solenoid<br>
 <br>
 <a href="http://www.slac.stanford.edu/owner/quarkpt">quarkpt</a><br>
 02-August-2007<br>
-<a href="http://www.slac.stanford.edu/detailed.html"><img
- src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page"
- alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;"
- align="right"></a><br>
+<a href="http://www.slac.stanford.edu/detailed.html"><img src="SLAC_whitebkgd.jpg" title="Return to SLAC Detailed Home Page" alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;" align="right"></a><br>
 </div>
 </div>
 </div>
 </div>
 </div>
 </div>
-</body>
-</html>
+
+</body></html>
