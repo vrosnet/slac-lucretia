@@ -91,6 +91,7 @@ classdef Track < handle
     beamDividers_r0
     beamDividers_r1
     pTrackStopElements
+    checkExtProcess=[]; % flag to see if ExtProcess envirnoment checked to be OK
   end
   properties(Dependent)
     beamIn % Lucretia beam structure to track
@@ -289,6 +290,15 @@ classdef Track < handle
       if ~isempty(ext)
         for iele=ext
           for iproc=1:length(BEAMLINE{iele}.ExtProcess)
+            % If wanting to us an external process, check that the environment
+            % has been set up correctly one time per process type
+            if isempty(obj.checkExtProcess) || ~isfield(obj.checkExtProcess,class(BEAMLINE{iele}.ExtProcess(iproc)))
+              [resp,message]=BEAMLINE{iele}.ExtProcess(iproc).checkEnv;
+              if ~resp
+                error('Error checking ExtProcess envirnment for element # %d: %s',iele,message)
+              end
+              obj.checkExtProcess.(class(BEAMLINE{iele}.ExtProcess(iproc)))=true;
+            end
             BEAMLINE{iele}.ExtProcess(iproc).InitializeTrackingData(obj.beamIn,obj.firstBunch,obj.lastBunch);
             if ~isempty(pord)
               BEAMLINE{iele}.ExtProcess(iproc).PrimarySampleOrder=pord;
