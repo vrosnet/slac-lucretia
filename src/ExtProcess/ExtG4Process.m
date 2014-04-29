@@ -7,12 +7,27 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle
   end
   properties(Access=private)
     apercheck=true;
+    envCheckResp=[];
+  end
+  properties(Hidden)
+    envVars % structure of required environment variables
+  end
+  properties(Constant,Hidden)
+    % Required physics process data files (to be found in src/ExtProcess/)
+    dataFiles={'G4Data/G4SAIDDATA1.1' 'G4Data/G4EMLOW6.35' 'G4Data/RealSurface1.0' 'G4Data/G4NEUTRONXS1.4' 'G4Data/G4PII1.3' ...
+      'G4Data/PhotonEvaporation3.0' 'G4Data/G4ABLA3.0' 'G4Data/RadioactiveDecay4.0' 'G4Data/G4NDL4.4'};
+    % List of names of environment variables which shold be se to above data directory locations
+    evarNames={'G4SAIDXSDATA' 'G4LEDATA' 'G4REALSURFACEDATA' 'G4NEUTRONXSDATA' 'G4PIIDATA' 'G4LEVELGAMMADATA' 'G4ABLADATA' 'G4RADIOACTIVEDATA' 'G4NEUTRONHPDATA'};
   end
   methods
     function obj = ExtG4Process(varargin)
       % Superclass initialization
       obj = obj@ExtProcess() ;
       obj = obj@ExtGeometry() ;
+      % List of required environment variables
+      for ivar=1:length(obj.dataFiles)
+        obj.envVars.(obj.evarNames{ivar})=[obj.extDir obj.dataFiles{ivar}];
+      end
       % Get list of materials from GEANT4 database
       dbfile=which('G4MaterialsDatabase.txt');
       if isempty(dbfile)
@@ -47,6 +62,30 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle
     end
   end
   methods
+    function [resp,message]=checkEnv(obj)
+      if ~isempty(obj.envCheckResp) && obj.envCheckResp==true;
+        return
+      end
+      message=[];
+      df=obj.dataFiles;
+      ev=obj.envVars;
+      evf=fieldnames(ev);
+      obj.envCheckResp=true;
+      if ~isempty(df)
+        for idf=1:length(df)
+          if ~exist(fullfile(obj.extDir,df{idf}),'file')
+            obj.envCheckResp=false;
+            message=sprintf('ExtG4Process is missing required file:%s',fullfile(obj.extDir,df{idf}));
+          end
+        end
+      end
+      if ~isempty(evf)
+        for iev=1:length(evf)
+          setenv(evf{iev},ev.(evf{iev}));
+        end
+      end
+      resp=obj.envCheckResp;
+    end
     function SetMaterial(obj,material)
       SetMaterial@ExtGeometry(obj,material);
       obj.Material=obj.Material;
