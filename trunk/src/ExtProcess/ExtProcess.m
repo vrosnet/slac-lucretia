@@ -35,10 +35,25 @@ classdef ExtProcess < handle
     fMaxSecondaryParticles= uint32(0) ;
     fMaxPrimaryParticles = uint32(1e4) ;
     fNumSecondariesStored = uint32(0) ; % Number of secondary particles actually stored
+    extDir % absolute path to root ExtProcess diretcory
   end
-  
+  properties(Abstract,Constant,Hidden)
+    dataFiles % define cell array of data files associated with process type (must provide empty cell array if none) [paths relative to Lucretia/src/ExtProcess]
+  end
+  properties(Abstract,Hidden)
+    envVars % structure of required environment variables
+  end
   methods
     function obj = ExtProcess()
+      td=which('TrackThru');
+      if isempty(td)
+        error('TrackThru mex file not on search path!')
+      end
+      if isdeployed
+        obj.extDir='./';
+      else
+        obj.extDir=regexprep(td,sprintf('Tracking/TrackThru.%s',mexext),'ExtProcess/');
+      end
     end
     function val=get.MaxPrimaryParticles(obj)
       val=obj.fMaxPrimaryParticles;
@@ -89,6 +104,9 @@ classdef ExtProcess < handle
         BEAMLINE{obj.elemno}.ExtProcess_secondariesData(ibunch)=ExtSecondaryParticles();
       end
     end
+  end
+  methods(Abstract)
+    [resp,message] = checkEnv(obj) % return true if environment for Ext Process checks out OK
   end
   methods(Static)
     function new(processType,elemno,varargin)
