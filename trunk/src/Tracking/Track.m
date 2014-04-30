@@ -69,6 +69,7 @@ classdef Track < handle
     doPlasmaTrack=0; % Include tracking through plasma region (0=no)
     beamStoreInd=[]; % Store the full beam at additional points along the lattice
     centerZInd=[]; % Indices to re-center longitudinal distribution
+    centerTInd=[]; % Indices to re-center transverse distribution
     zOffset=0; % Phase offset in bunch (m), used if centerZInd present
     isgpu=false; % Wishing to track with GPU-optimized mex function?
   end
@@ -310,9 +311,9 @@ classdef Track < handle
       end
       % Asking for intermediate track locations?
       interele=obj.beamStoreInd;
-      bsind=obj.beamStoreInd; czind=obj.centerZInd;
-      if ~isempty(obj.centerZInd)
-        interele=unique([interele obj.centerZInd]);
+      bsind=obj.beamStoreInd; czind=obj.centerZInd; ctind=obj.centerTInd;
+      if ~isempty(obj.centerZInd) || ~isempty(obj.centerTInd)
+        interele=unique([interele obj.centerZInd obj.centerTInd]);
       end
       if ~isempty(interele)
         interele=interele(interele<=obj.finishInd & interele>=obj.startInd);
@@ -381,6 +382,11 @@ classdef Track < handle
                   if ismember(interele(iele),czind)
                     B.Bunch.x(5,:)=B.Bunch.x(5,:)-median(B.Bunch.x(5,:))+obj.zOffset;
                   end
+                  if ismember(interele(iele),ctind)
+                    for ind=1:4
+                      B.Bunch.x(ind,:)=B.Bunch.x(ind,:)-median(B.Bunch.x(ind,:));
+                    end
+                  end
                 end
               end
             end
@@ -429,6 +435,11 @@ classdef Track < handle
             end
             if ismember(interele(iele),czind)
               B.Bunch.x(5,:)=B.Bunch.x(5,:)-median(B.Bunch.x(5,:))+obj.zOffset;
+            end
+            if ismember(interele(iele),ctind)
+              for ind=1:4
+                B.Bunch.x(ind,:)=B.Bunch.x(ind,:)-median(B.Bunch.x(ind,:));
+              end
             end
           end
         end
