@@ -8639,7 +8639,7 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop,int* TFlag_gpu, int
 int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct TrackArgsStruc* TrackArgs)
 #endif                
 {
-  int driftCounter=0, nsplit=0, isplit, TrackStatus=0, csrSmoothFactor=0, firstSplit=1, iarr, docsr=0, dolsc=0 ;
+  int driftCounter=0, nsplit=0, isplit, TrackStatus=0, csrSmoothFactor=0, firstSplit=1, iarr, docsr=0, dolsc=0, skipCSRLSC=0 ;
   double splitDL=0, L, lastS, thisS=0, docsrDrift, S_csr=0, S_other=0, LSC_drift=0, S_lsc=0, S_last=0, sarr[3], csrDL, lastS_lsc ;
   
   /* Get initial S location and initialize lastS reference, and get total unsplit element length */
@@ -8651,7 +8651,6 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
   /* Has the CSR process requested this element be split? */
   /* Returns distance to upstream SBEN (docsrDrift) [0 if nothing to do here], S_csr is S location of CSR application, csrDL is segment lenth */
   docsrDrift = GetCsrTrackFlags( *ElemLoop, TFlag, &csrSmoothFactor, ElemClass, TrackArgs->TheBeam->bunches[*BunchLoop], &S_csr, &csrDL ) ;
-
   /* Get list of user and/or LSC requested split trackpoints, take the more demanding */
   if ( L > 0 ) {
     if ( TFlag[LSC] > 0 ) { /* Get required LSC drift length if this Track Flag active */
@@ -8679,7 +8678,7 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
   /* Track bunch through this element with the requested split points, if LSC/User and CSR requested, take
      the larger number of splits from LSC/User and merge with CSR requests */
   if ( (docsrDrift > 0 && S_csr<=S_last) || (S_other>0 && S_other<=S_last) ) {
-    while ((docsrDrift > 0 && S_csr<=S_last) || (S_other>0 && S_other<=S_last) ) {
+    while (lastS<S_last) {
       /* Set next tracking point */
       if ( docsrDrift>0 ) {
         if ( S_other == 0 || S_csr < S_other )
@@ -8689,6 +8688,12 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
       }
       else
         thisS=S_other;
+      if (thisS>=S_last || thisS==0) {
+        skipCSRLSC=1;
+        thisS=S_last;
+      }
+      if (thisS==lastS)
+        break;
       /* Execute integrator through this element with desired length */
       if (strcmp(ElemClass,"QUAD")==0)
         TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
@@ -8732,7 +8737,11 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
 
       /* Perform post-tracking actions */
       postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, thisS-lastS, lastS, TFlag) ;
-
+      
+      /* If no other physics to apply until next element then break out of tracking this element now*/
+      if (skipCSRLSC==1)
+        break;
+      
       /* Apply CSR if requested (apply if this is a "CSR split" or it shares an S location with an LSC one) 
          - then get pointer to next CSR S location to track to if there is one */
       if ( ( docsrDrift != 0 && ( S_other==0 || S_csr<=S_other ) ) || ( strcmp(ElemClass,"SBEN")==0 && TFlag[CSR] > 0 ) ) {

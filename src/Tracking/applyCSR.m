@@ -179,6 +179,6 @@ else % DRIFT or other element following bend
   end
 end
 % Apply energy loss for all particles in each bin
-beam(6,:)=beam(6,:)+dE(bininds);
+% beam(6,:)=beam(6,:)+dE(bininds);
 
 zOut=z;
