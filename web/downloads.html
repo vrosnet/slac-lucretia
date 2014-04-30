@@ -1,8 +1,10 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html><head>
+
+
   
-  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
-  <title>Lucretia: Downloads</title>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1"><title>Lucretia: Downloads</title>
+  
 
   
   
@@ -16,8 +18,7 @@
 .auto-style2 {
 	text-align: center;
 }
-  </style>
-</head><body>
+  </style></head><body>
 <div style="text-align: center;"><a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span style="font-size: 24pt;"><img style="border: 0px solid ; width: 80px; height: 90px;" alt="LucretiaLogo" title="Lucretia home page" src="LucretiaLogo.gif" align="right" hspace="20"></span></a><span style="font-size: 24pt;"><br>
 </span>
 <div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -34,9 +35,9 @@ or all of the source, examples, binaries, etc.&nbsp; Links to
 facilitate downloading are below.&nbsp; The philosophy of the Lucretia
 maintainers is to keep binaries (mex files) for the CURRENT version of
 Matlab only in the download package and file repository. All
-development and bugfixes/maintainance etc is done using the current
-Matlab release. Although most m-files and to a lesser extent the
-mexfiles will probably work for several versions back from the current,
+development and bugfixes/maintainance etc are done using the current
+Matlab release. Although most m-files, and to a lesser extent the
+mexfiles, will probably work for several versions back from the current one,
 we cannot guarantee this as supported functions and the Matlab build
 environment change over time.<br>
 
@@ -46,8 +47,9 @@ environment change over time.<br>
 Environments</span><br>
 </div>
 
+<br>
 In theory, any environment supported by Matlab should be OK for running
-Lucretia. Mathworks product support information for all Matlab versions
+Lucretia: Mathworks product support information for all Matlab versions
 can be found
 <a href="http://www.mathworks.com/support/product/sys_requirements.html?product=ML">here</a>.
 We supply build files and the source code for compiling all included
@@ -56,27 +58,13 @@ environment, see the section below and try building your own versions.<br>
 
 Lucretia is currentluy developed, and mexfiles built, under the
 following list of environments:
-<blockquote> Red Hat Linux (Enterprise Linux 5 32-bit and 64-bit) <em><strong>[no
-new 32-bit builds since Sept 2011]</strong></em></blockquote>
+<blockquote> Red Hat Linux (Enterprise Linux 6 64-bit)<em><strong><br>
+</strong></em></blockquote>
 
-<blockquote> Mac OSX (10.7, 64-bit only).</blockquote>
+<blockquote> Mac OSX (10.7, 64-bit only)<br>
+</blockquote>
 
-For now, we also include some older 32-bit windows mexfiles (.mexw32)
-extensions that were built for Matlab R2009a under Windows XP which we
-will leave in the repository as long as they continue to work. The
-binaries for windows have not been updated in the repository since Jan
-2010, so any new features added since then will not be present.<br>
 
-Note: the mexfiles for the different environments all have their own
-unique extensions so all are kept in the various Lucretia function
-directories, your Matlab session will automatically use the correct one
-for your environment.<br>
-
-Note: Mathworks will discontinue support for 32-bit architectures in
-the future, they maintain a support roadmap <a href="http://www.mathworks.com/support/sysreq/roadmap.html">
-here</a>.<br>
-
-<br>
 
 <div style="text-align: center;"><span style="font-weight: bold;">Lucretia
 Downloads</span><br>
@@ -93,10 +81,9 @@ for the Lucretia project. The project home page is:<a href="http://code.google.c
 <br>
 Here you can download compressed packages of Lucretia snapshots (bzip2
 tar format: extract with "tar --bzip2 -xf Lucretia.tar-bz2") and browse
-the source code. The source code (and compiled binaries for all
-supported architectures) is under subversion control. You can directly
-download the most recent version of Lucretia using subversion (this is
-the reccommended way of getting the code and is the most up-to-date):
+the source code. The source code and compiled binaries for all
+supported architectures are under subversion control. You can directly
+download the most recent version of Lucretia using subversion:
 <blockquote>
 <pre>svn co https://slac-lucretia.googlecode.com/svn/trunk Lucretia</pre>
 </blockquote>
@@ -104,6 +91,22 @@ the reccommended way of getting the code and is the most up-to-date):
 will download all to a directory "Lucretia" for example (linux
 command-line example), other subversion client programs for all major
 operating systems are available.<br>
+<br>
+<span style="font-weight: bold;">Note on use with GEANT4 subroutines:<br>
+</span>If you wish to make use of the GEANT4 calling subroutines, you
+must also have the required GEANT4 data files. For the tar
+distributions, these are packaged along with the Lucretia distrubution
+and you will get these automatically when you extract the everything
+else. If you are using code checked out from the subversion repository,
+you need to separately download and unpack the G4Data files into the
+ExtProcess directory:<br>
+<ul>
+  <li>Download G4Data tarball from <a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/package/G4Data.tar-bz2">here</a> into Lucretia/src/ExtProcess directory</li>
+  <li>$ cd Lucretia/src/ExtProcess</li>
+  <li>$ tar --bzip2 -xf G4Data.tar-bz2<br>
+  </li>
+</ul>
+<span style="font-weight: bold;"></span>
 </div>
 </div>
 

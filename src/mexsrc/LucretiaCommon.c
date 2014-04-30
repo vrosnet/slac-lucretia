@@ -8692,7 +8692,7 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
         skipCSRLSC=1;
         thisS=S_last;
       }
-      if (thisS==lastS)
+      if (thisS==lastS || fabs(thisS-lastS)<1e-6)
         break;
       /* Execute integrator through this element with desired length */
       if (strcmp(ElemClass,"QUAD")==0)
