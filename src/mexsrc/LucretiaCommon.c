@@ -8589,7 +8589,7 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
       break ;
     }
   }
-  printf("ExtProcess: ele=%d stoppedParticles=%d\n",*elemno+1,stoppedParticles) ;
+  //printf("ExtProcess: ele=%d stoppedParticles=%d\n",*elemno+1,stoppedParticles) ;
   if (stoppedParticles==0)
     return ;
   if (L == 0) /* If L passed as 0, need to look up from BEAMLINE in case of split tracking */
@@ -8621,8 +8621,8 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
   if (stat == 1) {
     for (ray=0 ;ray<ThisBunch->nray ; ray++)
     {
-      /* if the ray was previously stopped, ignore it  */
-      if (ThisBunch->stop[ray] != *elemno+1)
+      /* if ray in stopped state, ignore it - if it came out of G4 tracking stopped then last co-ordinates are where it stopped in volume */
+      if (ThisBunch->stop[ray] != 0)
         continue ;
       GetLocalCoordPtrs(ThisBunch->x, ray*6, &x,&px,&y,&py,&z,&p0) ;
       ApplyTotalXfrm( Xfrms, DOWNSTREAM, TrackFlag, 0,x,px,y,py,z,p0 ) ;
