@@ -246,6 +246,9 @@ void lucretiaManager::SetNextX(double x[6], int id, int doresume)
     //cout << "iray: " << iray+1 << " stop: " << fBunch->stop[iray] << "\n" ;
     fNumRaysResumed++;
   }
+  else { // coordinate should be where particle stopped
+    fBunch->x[6*iray+4] = x[4] ;
+  }
   /*cout << "SET_ID = " << id << " iray: " << iray << " X/Y/Z: " <<
    * fBunch->x[6*iray] << " / " << fBunch->x[6*iray+2] << " / " << fBunch->x[6*iray+4] <<
    * " X'/Y' : " << fBunch->x[6*iray+1] << " / " << fBunch->x[6*iray+3] << " E: " <<
