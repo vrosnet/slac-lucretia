@@ -63,10 +63,10 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle
   end
   methods
     function [resp,message]=checkEnv(obj)
+      resp=1; message=[];
       if ~isempty(obj.envCheckResp) && obj.envCheckResp==true;
         return
       end
-      message=[];
       df=obj.dataFiles;
       ev=obj.envVars;
       evf=fieldnames(ev);
