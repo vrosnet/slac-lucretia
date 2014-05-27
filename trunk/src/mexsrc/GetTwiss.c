@@ -334,7 +334,7 @@ struct RmatArgStruc* GetTwissGetCheckArgs( int nlhs, int nrhs,
 /* make sure that we have a 6 x 6 x n double-precision matrix */
 
 		int nDim = mxGetNumberOfDimensions( prhs[2] ) ;
-		const int* dims = mxGetDimensions( prhs[2] ) ;
+		const mwSize* dims = mxGetDimensions( prhs[2] ) ;
 
 		if (mxIsDouble( prhs[2] ) != 1)
 			goto Egress ;
@@ -582,12 +582,9 @@ void ReverseTwissDirection( struct RmatArgStruc* ArgStruc )
 
 /* allocate a Matlab array for the new initial parameters */
 
-		int dims[3] ;
+		const size_t dims[3]={6, 6, ArgStruc->nWolskiDimensions} ;
 		int dloop ; 
 		double *WolskiInitPtr ;
-		dims[0] = 6 ;
-		dims[1] = 6 ;
-		dims[2] = ArgStruc->nWolskiDimensions ;
 
 		WolskiInit = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL) ;
 		WolskiInitPtr = mxGetPr(WolskiInit) ;
@@ -880,7 +877,7 @@ void GetTwissCoupledSetReturn( int Status,
 	mxArray *mxrealvec ;           /* subsidiary mxArray for ReturnStruc */
 	double *mxrealp ;              /* pointer into real vectors */
 	int i ;
-	int dims[4] ;
+	size_t dims[4]={0,0,0,0} ;
 	static const char *fieldname[] = {   /* 3 field names */
 		"S","P","beta"} ;	
 

@@ -83,6 +83,14 @@ void ClearPLHSVars( ) ;
 
 bool IsEmpty( const mxArray* ) ;
 
+/* Extract data from TMAP element (note c indexing for arrays T_inds etc) */
+int TMapGetData(int, double*, double*, double*, double*, double*, double*,
+        unsigned long*, unsigned long*, unsigned long*, unsigned long*,
+        unsigned short*, unsigned short*, unsigned short*, unsigned short*) ;
+int TMapGetDataR(int, double[6][6]) ;
+int TMapParamCheck(int) ;
+void TMapGetDataLen(int, unsigned short*, unsigned short*, unsigned short*, unsigned short*) ;
+
 /* Crazily enough, Mathworks uses mxCreateDoubleScalar for version 6.5 and
    later, but mxCreateScalarDouble for 6.1 and earlier.  There is a similar
    issue with mexGetArrayPtr and mexGetVariablePtr, except that here there

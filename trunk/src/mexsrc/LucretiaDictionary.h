@@ -4,9 +4,9 @@
 
 /* AUTH:  PT, 16-dec-2004 */
 /* MOD:
-     23-Apr-2014, GRW:
+     23-Apr-2014, GW:
          Support for LSC flags
-     12-Feb-2012, GRW:
+     12-Feb-2012, GW:
          Support for CSR and Split flags
 		 21-May-2007, PT:
 			   support for XYCOR (combined function horizontal-
@@ -114,6 +114,35 @@ const int VerifyPars = 2 ;
 	corresponding enumerated data type is still consistent with the
 	dictionary! */
 
+/* TMap */
+
+#define nTMapPar 13
+
+enum TMapOrdinal {
+	TMapS, TMapP, TmapL, TMapOffset, TMapR, TMapT, TMapU, TMapV, TMapW, TMapTinds, TMapUinds, TMapVinds, TMapWinds } ;
+
+struct LucretiaParameter TMapPar[nTMapPar] = {
+  {"S",           {Required,Ignored, Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,              },
+  {"P",           {Required,Optional,Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,              },
+  {"L",           {Required,Required,Optional},{Ignored,Ignored, Ignored}, 0,0,0,0,              },
+  {"Offset",      {Required,Required,Optional},{Required,Ignored, Ignored}, 6,6,0,0,             },
+  {"R",           {Required,Required,Optional},{Required,Ignored, Ignored}, 36,36,0,0,           },
+  {"T",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,216,0,0,            },
+  {"U",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,1296,0,0,           },
+  {"V",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,7776,0,0,           },
+  {"W",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,46656,0,0,          },
+  {"Tinds",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,216,0,0,        },
+  {"Uinds",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,1296,0,0,       },
+  {"Vinds",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,7776,0,0,       },
+  {"Winds",           {Optional,Optional,Optional},{Ignored,Ignored, Ignored}, 0,46656,0,0,      }
+} ;
+
+int TMapTrackFlag[NUM_TRACK_FLAGS] = {
+	0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0,
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
+} ;  
+  
 /* Drift space */
 
 #define nDrifPar 3
@@ -130,7 +159,7 @@ struct LucretiaParameter DrifPar[nDrifPar] = {
 int DrifTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 0, 0, 0,
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* Quadrupole, also used for sextupole and octupole. 
@@ -159,7 +188,7 @@ struct LucretiaParameter QuadPar[nQuadPar] = {
 int QuadTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* Solenoid: note that any changes made to the Quad pars, above, need
@@ -186,7 +215,7 @@ struct LucretiaParameter SolePar[nSolePar] = {
 int SoleTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* Thin-lens multipole */
@@ -216,7 +245,7 @@ struct LucretiaParameter MultPar[nMultPar] = {
 int MultTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* sector bend */
@@ -248,7 +277,7 @@ struct LucretiaParameter SBendPar[nSBendPar] = {
 int SBendTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	0, 1, 0, 0, 1, 0, 0
+	0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* accelerating structures */
@@ -280,7 +309,7 @@ struct LucretiaParameter LcavPar[nLcavPar] = {
 int LcavTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 1, 0, 0, 0, 
    0, 1, 1, 1, 1,
-	1, 1, 1, 0, 1, 0, 0
+	1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 /* deflecting structures */
 
@@ -313,7 +342,7 @@ struct LucretiaParameter TcavPar[nTcavPar] = {
 int TcavTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 1, 0, 0, 0, 
    0, 1, 1, 1, 1,
-	1, 1, 1, 0, 1, 0, 0
+	1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* dipole correctors -- note that these are treated as drifts by the RMAT code.
@@ -359,7 +388,7 @@ struct LucretiaParameter XYCorrectorPar[nCorrectorPar] = {
 int CorrectorTrackFlag[NUM_TRACK_FLAGS] = {
 	1, 0, 0, 0, 0, 
    0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* beam position monitor -- BPMs are treated as drifts by the RMAT code */
@@ -383,7 +412,7 @@ struct LucretiaParameter BPMPar[nBPMPar] = {
 int BPMTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 1, 1, 1,
 	0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* instrument -- treated as a drift by the RMAT code */
@@ -404,7 +433,7 @@ struct LucretiaParameter InstPar[nInstPar] = {
 int InstTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 0, 0, 1,
 	1, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* collimator -- treated as a drift by the RMAT code.  Note that collimators also have
@@ -430,7 +459,7 @@ struct LucretiaParameter CollPar[nCollPar] = {
 int CollTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 1, 0, 0, 0,
     0, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0
+	1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 /* coordinate change element -- has an R-matrix used by the RMAT code */
@@ -449,7 +478,7 @@ struct LucretiaParameter CoordPar[nCoordPar] = {
 int CoordTrackFlag[NUM_TRACK_FLAGS] = {
 	0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0,
-	1, 0, 0, 0, 1, 0, 0
+	1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
 } ;
 
 

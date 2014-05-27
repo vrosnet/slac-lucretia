@@ -30,8 +30,8 @@
 MATPATH = /var/MATLAB/R2014a
 # Name of mex file extension for this architecture (mexglx or mexa64 or mexmaci64)
 MEXEXT = mexa64
-MCOMP:= $(MATPATH)/bin/mex
-CCOMP := $(MATPATH)/bin/mex -c
+MCOMP:= $(MATPATH)/bin/mex -largeArrayDims
+CCOMP := $(MATPATH)/bin/mex -c -largeArrayDims
 # include -DLUCRETIA_DPREC to compile for double precision, else single
 MFLAGS = -DLUCETIA_DPREC
 # include -DLUCRETIA_MLRAND to utilize Matlab's random number generation (slow) else use C generator (faster)
