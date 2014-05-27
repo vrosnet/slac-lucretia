@@ -53,418 +53,418 @@ function [stat,Initial] = XSIFToLucretia( filename, varargin )
 
 %=========================================================================
 
-  Initial = [] ; beta0name = [] ; beamname = [] ; linename = [] ;
-                 beta0indx = 0  ; beamindx = 0 ;
-  stat = InitializeMessageStack( ) ;
-  
+Initial = [] ; beta0name = [] ; beamname = [] ; linename = [] ;
+beta0indx = 0  ; beamindx = 0 ;
+stat = InitializeMessageStack( ) ;
+
 % check arguments
 
-  if (~ischar(filename))
-      error('First argument to XSIFToLucretia must be a char string') ;
+if (~ischar(filename))
+  error('First argument to XSIFToLucretia must be a char string') ;
+end
+if (nargin > 4)
+  error('Too many arguments for XSIFToLucretia') ;
+end
+if (nargin >= 2)
+  linename = varargin{1} ;
+  if ( (~ischar(linename)) && (~isempty(linename)) )
+    error('Second argument to XSIFToLucretia must be a char string') ;
   end
-  if (nargin > 4)
-      error('Too many arguments for XSIFToLucretia') ;
+end
+if (nargin >= 3)
+  beta0name = varargin{2} ;
+  if ( (~ischar(beta0name)) && (~isempty(beta0name)) )
+    error('Third argument to XSIFToLucretia must be a char string') ;
   end
-  if (nargin >= 2)
-      linename = varargin{1} ;
-      if ( (~ischar(linename)) && (~isempty(linename)) )
-          error('Second argument to XSIFToLucretia must be a char string') ;
-      end
+end
+if (nargin == 4)
+  beamname = varargin{3} ;
+  if ( (~ischar(beamname)) && (~isempty(beamname)) )
+    error('Third argument to XSIFToLucretia must be a char string') ;
   end
-  if (nargin >= 3)
-      beta0name = varargin{2} ;
-      if ( (~ischar(beta0name)) && (~isempty(beta0name)) )
-          error('Third argument to XSIFToLucretia must be a char string') ;
-      end      
-  end
-  if (nargin == 4)
-      beamname = varargin{3} ;
-      if ( (~ischar(beamname)) && (~isempty(beamname)) )
-          error('Third argument to XSIFToLucretia must be a char string') ;
-      end      
-  end
-  
+end
+
 %
 % parse the beamline and get data structures
 %
-  if (isempty(linename))
-    [S,E,P,L,B,W] = XSIFParse(filename) ;
-  else
-    [S,E,P,L,B,W] = XSIFParse(filename,linename) ;
-  end  
-  
+if (isempty(linename))
+  [S,E,P,L,B,W] = XSIFParse(filename) ;
+else
+  [S,E,P,L,B,W] = XSIFParse(filename,linename) ;
+end
+
 % handle any error messages from XSIF:  some values are unrecoverable
 % errors, others are just warnings
 
-  switch S
-      case -191
-          stat{1} = 0 ;
-          stat = AddMessageToStack(stat,...
-                 'XSIFToLucretia:  No line expanded') ;
-      case -193
-          stat{1} = 0 ;
-          stat = AddMessageToStack(stat,...
-                  'XSIFToLucretia:  Syntax error') ;
-      case -195
-          stat{1} = 0 ;
-          stat = AddMessageToStack(stat,...
-                  'XSIFToLucretia:  Couldn''t open a file') ;
-      case -199
-          stat{1} = 0 ;
-          stat = AddMessageToStack(stat,...
-                  'XSIFToLucretia:  Fatal read error') ;
-      case -201
-          stat{1} = 0 ;
-          stat = AddMessageToStack(stat,...
-                  'XSIFToLucretia:  Internal allocation error') ;
-      case {-197,197}
-          stat{1} = -1 ;
-          stat = AddMessageToStack(stat,...
-                  'XSIFToLucretia:  Undefined parameters found') ;
-  end
-  if (stat{1} == 0)
-      return ;
-  end
+switch S
+  case -191
+    stat{1} = 0 ;
+    stat = AddMessageToStack(stat,...
+      'XSIFToLucretia:  No line expanded') ;
+  case -193
+    stat{1} = 0 ;
+    stat = AddMessageToStack(stat,...
+      'XSIFToLucretia:  Syntax error') ;
+  case -195
+    stat{1} = 0 ;
+    stat = AddMessageToStack(stat,...
+      'XSIFToLucretia:  Couldn''t open a file') ;
+  case -199
+    stat{1} = 0 ;
+    stat = AddMessageToStack(stat,...
+      'XSIFToLucretia:  Fatal read error') ;
+  case -201
+    stat{1} = 0 ;
+    stat = AddMessageToStack(stat,...
+      'XSIFToLucretia:  Internal allocation error') ;
+  case {-197,197}
+    stat{1} = -1 ;
+    stat = AddMessageToStack(stat,...
+      'XSIFToLucretia:  Undefined parameters found') ;
+end
+if (stat{1} == 0)
+  return ;
+end
 
-  global BEAMLINE WF ;
+global BEAMLINE WF ;
 %
 % initialize badelm to a blank vector
 %
-  badelm = [] ;
+badelm = [] ;
 %
 % unpack and instantiate the entries in the ELEMENT table
 %
-  etable = cell(size(E)) ;
-  for count = 1:length(etable)
+etable = cell(size(E)) ;
+for count = 1:length(etable)
+  
+  ename = E(count).name ;
+  etype = E(count).type ;
+  edp   = E(count).data(1) ;
+  
+  switch( etype )
+    
+    case 1  % drift
+      etable{count} = DrifStruc( P(edp).value, ename ) ;
+    case {2,3} % bend magnets
+      etable{count} = SBendStruc( P(edp).value, ...
+        [P(edp+1).value P(edp+2).value],...
+        P(edp+1).value, ...
+        [P(edp+3).value P(edp+4).value],...
+        [P(edp+7).value P(edp+8).value],...
+        [P(edp+9).value P(edp+11).value],...
+        [P(edp+10).value P(edp+12).value],...
+        P(edp+5).value, ename ) ;
+    case 5  % quad
+      etable{count} = QuadStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, P(edp+3).value, ...
+        ename ) ;
+    case 6  % sextupole
+      etable{count} = SextStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, P(edp+3).value, ...
+        ename ) ;
+    case 7  % octupole
+      etable{count} = OctuStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, P(edp+3).value, ...
+        ename ) ;
+    case 8  % multipole
+      [mB,mT,mPI,mA] = UnpackXSIFMultPars( P, edp ) ;
+      etable{count} = MultStruc( P(edp).value, mB, mT, mPI, mA,...
+        P(edp+44).value, ename ) ;
+    case 9 % solenoid
+      etable{count} = SolenoidStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+4).value, ename ) ;
+    case { 12, 36 } % roll
+      etable{count} = CoordStruc( 0, 0, 0, 0, 0, P(edp).value, ename ) ;
+    case { 13, 35 } % rotation about y axis
+      etable{count} = CoordStruc( 0, P(edp).value, 0, 0, 0, 0, ename ) ;
+    case 14  % xcor
+      etable{count} = CorrectorStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, 1, ename ) ;
+    case 15  % ycor
+      etable{count} = CorrectorStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, 2, ename ) ;
+    case 39  % xycor
+      etable{count} = CorrectorStruc( P(edp).value, ...
+        [P(edp+1).value P(edp+2).value], ...
+        P(edp+3).value, 3, ename ) ;
+    case{ 16, 17, 18 } % BPM
+      etable{count} = BPMStruc( P(edp).value, ename ) ;
+    case 19  % marker
+      etable{count} = MarkerStruc( ename ) ;
+    case 20  % elliptical collimator
+      etable{count} = CollStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, 'Ellipse', 0, ...
+        ename ) ;
+    case 21  % rectangular collimator
+      etable{count} = CollStruc( P(edp).value, P(edp+1).value, ...
+        P(edp+2).value, 'Rectangle', 0, ...
+        ename ) ;
+    case 23 % gkick
+      if ( P(edp+10).value ~= 0 )
+        stat{1} = 0 ;
+        stat = AddMessageToStack(stat, ...
+          'GKICK with T != 0 encountered in lattice') ;
+        return ;
+      end
+      if ( P(edp).value ~= 0 )
+        stat{1} = 0 ;
+        stat = AddMessageToStack(stat, ...
+          'GKICK with nonzero length encountered in lattice') ;
+        return ;
+      end
+      % nb:  XSIF GKICK has two parameters related to the
+      % longitudinal DOF, DL and DZ.  DL is used by Lucretia, DZ is
+      % ignored.
+      etable{count} = CoordStruc( -P(edp+1).value, -P(edp+2).value, ...
+        -P(edp+3).value, -P(edp+4).value, ...
+        -P(edp+5).value, -P(edp+7).value, ename ) ;
+    case 27  % lcav
+      etable{count} = RFStruc( P(edp).value, P(edp+2).value, ...
+        P(edp+3).value, P(edp+4).value, ...
+        P(edp+7).value, P(edp+8).value, ...
+        P(edp+9).value, P(edp+12).value, ...
+        ename ) ;
       
-      ename = E(count).name ;
-      etype = E(count).type ;
-      edp   = E(count).data(1) ;
+      % there may be valid wakefields already resident in the WF structure, so
+      % offset the wake indices in the new structure in etable
       
-      switch( etype )
-          
-          case 1  % drift
-              etable{count} = DrifStruc( P(edp).value, ename ) ;
-          case {2,3} % bend magnets
-              etable{count} = SBendStruc( P(edp).value, ...
-                                          [P(edp+1).value P(edp+2).value],...
-                                          P(edp+1).value, ...
-                                          [P(edp+3).value P(edp+4).value],...
-                                          [P(edp+7).value P(edp+8).value],...
-                                          [P(edp+9).value P(edp+11).value],...
-                                          [P(edp+10).value P(edp+12).value],...
-                                          P(edp+5).value, ename ) ;
-          case 5  % quad
-              etable{count} = QuadStruc( P(edp).value, P(edp+1).value, ...
-                                         P(edp+2).value, P(edp+3).value, ...
-                                         ename ) ;
-          case 6  % sextupole
-              etable{count} = SextStruc( P(edp).value, P(edp+1).value, ...
-                                         P(edp+2).value, P(edp+3).value, ...
-                                         ename ) ;
-          case 7  % octupole
-              etable{count} = OctuStruc( P(edp).value, P(edp+1).value, ...
-                                         P(edp+2).value, P(edp+3).value, ...
-                                         ename ) ;
-          case 8  % multipole
-              [mB,mT,mPI,mA] = UnpackXSIFMultPars( P, edp ) ;
-              etable{count} = MultStruc( P(edp).value, mB, mT, mPI, mA,...
-                                         P(edp+44).value, ename ) ;
-          case 9 % solenoid
-              etable{count} = SolenoidStruc( P(edp).value, P(edp+1).value, ...
-                                             P(edp+4).value, ename ) ;
-          case { 12, 36 } % roll
-              etable{count} = CoordStruc( 0, 0, 0, 0, 0, P(edp).value, ename ) ;
-          case { 13, 35 } % rotation about y axis
-              etable{count} = CoordStruc( 0, P(edp).value, 0, 0, 0, 0, ename ) ;
-          case 14  % xcor
-              etable{count} = CorrectorStruc( P(edp).value, P(edp+1).value, ...
-                                              P(edp+2).value, 1, ename ) ;
-          case 15  % ycor
-              etable{count} = CorrectorStruc( P(edp).value, P(edp+1).value, ...
-                                              P(edp+2).value, 2, ename ) ;
-          case 39  % xycor
-              etable{count} = CorrectorStruc( P(edp).value, ...
-                                      [P(edp+1).value P(edp+2).value], ...
-                                              P(edp+3).value, 3, ename ) ;
-          case{ 16, 17, 18 } % BPM                                
-              etable{count} = BPMStruc( P(edp).value, ename ) ;
-          case 19  % marker
-              etable{count} = MarkerStruc( ename ) ;
-          case 20  % elliptical collimator
-              etable{count} = CollStruc( P(edp).value, P(edp+1).value, ...
-                                         P(edp+2).value, 'Ellipse', 0, ...
-                                         ename ) ;
-          case 21  % rectangular collimator
-              etable{count} = CollStruc( P(edp).value, P(edp+1).value, ...
-                                         P(edp+2).value, 'Rectangle', 0, ...
-                                         ename ) ;
-          case 23 % gkick
-              if ( P(edp+10).value ~= 0 )
-                stat{1} = 0 ;
-                stat = AddMessageToStack(stat, ...
-                    'GKICK with T != 0 encountered in lattice') ;
-                return ;
-              end
-              if ( P(edp).value ~= 0 )
-                stat{1} = 0 ;
-                stat = AddMessageToStack(stat, ...
-                    'GKICK with nonzero length encountered in lattice') ;
-                return ;
-              end                 
-              % nb:  XSIF GKICK has two parameters related to the
-              % longitudinal DOF, DL and DZ.  DL is used by Lucretia, DZ is
-              % ignored.
-              etable{count} = CoordStruc( -P(edp+1).value, -P(edp+2).value, ...
-                                          -P(edp+3).value, -P(edp+4).value, ...
-                                          -P(edp+5).value, -P(edp+7).value, ename ) ;
-          case 27  % lcav
-              etable{count} = RFStruc( P(edp).value, P(edp+2).value, ...
-                                       P(edp+3).value, P(edp+4).value, ...
-                                       P(edp+7).value, P(edp+8).value, ...
-                                       P(edp+9).value, P(edp+12).value, ...
-                                       ename ) ;
-                                   
-% there may be valid wakefields already resident in the WF structure, so
-% offset the wake indices in the new structure in etable
-
-
-                                       
-          case 28
-              etable{count} = InstStruc( P(edp).value, 'INST', ename ) ;
-          case 29
-              etable{count} = InstStruc( P(edp).value, 'BLMO', ename ) ;
-          case 30
-              etable{count} = InstStruc( P(edp).value, 'PROF', ename ) ;
-          case 31
-              etable{count} = InstStruc( P(edp).value, 'WIRE', ename ) ;
-          case 32
-              etable{count} = InstStruc( P(edp).value, 'SLMO', ename ) ;
-          case 33
-              etable{count} = InstStruc( P(edp).value, 'IMON', ename ) ;
-              
-      end ; % SWITCH statement
- 
-  end ; % loop over entries in E
+      
+      
+    case 28
+      etable{count} = InstStruc( P(edp).value, 'INST', ename ) ;
+    case 29
+      etable{count} = InstStruc( P(edp).value, 'BLMO', ename ) ;
+    case 30
+      etable{count} = InstStruc( P(edp).value, 'PROF', ename ) ;
+    case 31
+      etable{count} = InstStruc( P(edp).value, 'WIRE', ename ) ;
+    case 32
+      etable{count} = InstStruc( P(edp).value, 'SLMO', ename ) ;
+    case 33
+      etable{count} = InstStruc( P(edp).value, 'IMON', ename ) ;
+      
+  end ; % SWITCH statement
+  
+end ; % loop over entries in E
 %
 % loop over L and count valid elements
 %
-  nelm = 0 ;
-  for count = 1:length(L) 
-      
-      if (L(count).element == 0)
-          continue ;
-      end
-      elem = L(count).element ;
-      if (isempty(etable{elem}))
-          badelm = [badelm elem] ;
-      else
-          nelm = nelm + 1 ;
-      end
-      
+nelm = 0 ;
+for count = 1:length(L)
+  
+  if (L(count).element == 0)
+    continue ;
   end
-  nelmold = length(BEAMLINE) ;
-  BEAMLINE = [BEAMLINE ; cell(nelm,1)] ;
+  elem = L(count).element ;
+  if (isempty(etable{elem}))
+    badelm = [badelm elem] ;
+  else
+    nelm = nelm + 1 ;
+  end
+  
+end
+nelmold = length(BEAMLINE) ;
+BEAMLINE = [BEAMLINE ; cell(nelm,1)] ;
 %
 % repeat the loop and populate BEAMLINE
 %
-  nelm = 0 ;
-  for count = 1:length(L) 
-      
-      if (L(count).element == 0)
-          continue ;
-      end
-      elem = L(count).element ;
-      if (~isempty(etable{elem}))
-          nelm = nelm + 1 ;
-          BEAMLINE{nelmold+nelm} = etable{elem} ;
-      end
-      
+nelm = 0 ;
+for count = 1:length(L)
+  
+  if (L(count).element == 0)
+    continue ;
   end
+  elem = L(count).element ;
+  if (~isempty(etable{elem}))
+    nelm = nelm + 1 ;
+    BEAMLINE{nelmold+nelm} = etable{elem} ;
+  end
+  
+end
 %
 % set S positions
 %
-  SetSPositions( nelmold+1, nelmold+nelm, 0 );
+SetSPositions( nelmold+1, nelmold+nelm, 0 );
 
-% locate the requested BEAM and BETA0 elements, if possible 
+% locate the requested BEAM and BETA0 elements, if possible
 
-  if (~isempty(beta0name))
-    for betacount = 1:length(E)
-      if ( (strcmpi(beta0name,E(betacount).name)) && ...
-           (E(betacount).type == 37)                    )
-        beta0indx = betacount ;
-        break ;
-      end
-    end
-    if (beta0indx == 0)
-      stat = AddMessageToStack(stat, ...
-         ['Requested Beta0 element ',beta0name,' not found']) ;
-      stat{1} = -1 ;
-    else
-      B.betapointer = beta0indx ;
+if (~isempty(beta0name))
+  for betacount = 1:length(E)
+    if ( (strcmpi(beta0name,E(betacount).name)) && ...
+        (E(betacount).type == 37)                    )
+      beta0indx = betacount ;
+      break ;
     end
   end
-  
-  if (~isempty(beamname))
-    for betacount = 1:length(E)
-      if ( (strcmpi(beamname,E(betacount).name)) && ...
-           (E(betacount).type == 38)                    )
-        beamindx = betacount ;
-        break ;
-      end
-    end
-    if (beamindx == 0)
-      stat = AddMessageToStack(stat, ...
-         ['Requested Beam element ',beta0name,' not found']) ;
-      stat{1} = -1 ;
-    else
-      B.beampointer = beamindx ;
+  if (beta0indx == 0)
+    stat = AddMessageToStack(stat, ...
+      ['Requested Beta0 element ',beta0name,' not found']) ;
+    stat{1} = -1 ;
+  else
+    B.betapointer = beta0indx ;
+  end
+end
+
+if (~isempty(beamname))
+  for betacount = 1:length(E)
+    if ( (strcmpi(beamname,E(betacount).name)) && ...
+        (E(betacount).type == 38)                    )
+      beamindx = betacount ;
+      break ;
     end
   end
-  
+  if (beamindx == 0)
+    stat = AddMessageToStack(stat, ...
+      ['Requested Beam element ',beta0name,' not found']) ;
+    stat{1} = -1 ;
+  else
+    B.beampointer = beamindx ;
+  end
+end
+
 % if there is / are BEAM / BETA0 pointers, set values into the Initial
 % data structure.  If not, issue a warning and add a message.
 
-  if ( (B.betapointer == 0) && (B.beampointer==0) )
-    stat = AddMessageToStack(stat, ...
-        'No BETA0 or BEAM element found, initial momentum defaulting to 1 GeV/c') ;
-    stat{1} = -1 ;
-  end
+if ( (B.betapointer == 0) && (B.beampointer==0) )
+  stat = AddMessageToStack(stat, ...
+    'No BETA0 or BEAM element found, initial momentum defaulting to 1 GeV/c') ;
+  stat{1} = -1 ;
+end
 
-  Initial = InitCondStruc ;
-  MomentumError = 0 ;
-  Momentum = 0 ; %#ok<NASGU>
-  Etot = 0 ;
-  if (B.betapointer ~= 0)
-      edp = E(B.betapointer).data(1) ;
-      Initial.x.pos = P(edp+10).value ;
-      Initial.x.ang = P(edp+11).value ;
-      Initial.x.Twiss.beta = P(edp).value ;
-      Initial.x.Twiss.alpha = P(edp+1).value ;
-      Initial.x.Twiss.eta = P(edp+6).value ;
-      Initial.x.Twiss.etap = P(edp+7).value ;
-      Initial.y.pos = P(edp+12).value ;
-      Initial.y.ang = P(edp+13).value ;
-      Initial.y.Twiss.beta = P(edp+3).value ;
-      Initial.y.Twiss.alpha = P(edp+4).value ;
-      Initial.y.Twiss.eta = P(edp+8).value ;
-      Initial.y.Twiss.etap = P(edp+9).value ;
-      Initial.zpos = -P(edp+14).value ;
-      MomentumError = P(edp+15).value ;
-      Energy = P(edp+26).value ; %#ok<NASGU>
-  end
-  if (B.beampointer ~= 0)
-      edp = E(B.beampointer).data(1) ;
-      Energy = P(edp+3).value ;
-      PC = P(edp+4).value ;
-      RelGamma = P(edp+5).value ;
-
-% set momentum, with the following priority:
-%  if P is nonzero, use it; otherwise, if Energy is nonzero, use it ;
-%   otherwise, if RelGamma is > 1, use it
-
-      if (RelGamma > 1)
-          Etot = RelGamma * 0.000510998918 ;
-      end
-      if (Energy > 0)
-          Etot = Energy ;
-      end
-      if (PC>0)
-          Momentum = PC ;
-      else
-          Momentum = Etot^2 - 0.000510998918^2 ;
-          if (Momentum <=0)
-              Momentum = 0 ;
-          else
-              Momentum = sqrt(Momentum) ;
-          end
-      end
-      if (Momentum == 0)
-          stat{1} = -1 ;
-          stat = AddMessageToStack(stat,...
-              'Problem in setting momentum, PC = 1 GeV/c used') ;
-          Momentum = 1 ;
-      end
-      Initial.Momentum = Momentum * (1+MomentumError) ;
+Initial = InitCondStruc ;
+MomentumError = 0 ;
+Momentum = 0 ; %#ok<NASGU>
+Etot = 0 ;
+if (B.betapointer ~= 0)
+  edp = E(B.betapointer).data(1) ;
+  Initial.x.pos = P(edp+10).value ;
+  Initial.x.ang = P(edp+11).value ;
+  Initial.x.Twiss.beta = P(edp).value ;
+  Initial.x.Twiss.alpha = P(edp+1).value ;
+  Initial.x.Twiss.eta = P(edp+6).value ;
+  Initial.x.Twiss.etap = P(edp+7).value ;
+  Initial.y.pos = P(edp+12).value ;
+  Initial.y.ang = P(edp+13).value ;
+  Initial.y.Twiss.beta = P(edp+3).value ;
+  Initial.y.Twiss.alpha = P(edp+4).value ;
+  Initial.y.Twiss.eta = P(edp+8).value ;
+  Initial.y.Twiss.etap = P(edp+9).value ;
+  Initial.zpos = -P(edp+14).value ;
+  MomentumError = P(edp+15).value ;
+  Energy = P(edp+26).value ; %#ok<NASGU>
+end
+if (B.beampointer ~= 0)
+  edp = E(B.beampointer).data(1) ;
+  Energy = P(edp+3).value ;
+  PC = P(edp+4).value ;
+  RelGamma = P(edp+5).value ;
   
-% perform a similar operation with the emittances:  geometric emittances
-% take priority over normalized ones
-
-      RelGamma = sqrt(Initial.Momentum^2 + 0.000510998918^2) / 0.000510998918 ;
-      Initial.x.NEmit = P(edp+7).value / 4 ;
-      Initial.y.NEmit = P(edp+9).value / 4 ;
-      Initial.x.NEmit = P(edp+6).value * RelGamma ;
-      Initial.y.NEmit = P(edp+8).value * RelGamma ;
-      
-      Initial.sigz = P(edp+11).value ;
-      Initial.SigPUncorrel = Initial.Momentum * P(edp+12).value ;
-      Initial.NBunch = P(edp+13).value ;
-      Initial.Q = P(edp+14).value * 1.6e-19 ;
-      if (P(edp+15).value == 0)
-          if (Initial.NBunch > 1)
-              stat{1} = -1 ;
-              stat = AddMessageToStack(stat,...
-                  'Bunch interval not specified, setting to zero') ;
-          end
-          Initial.BunchInterval = 0 ;
-      else
-        Initial.BunchInterval = Initial.Q / P(edp+15).value ;
-      end
-      
+  % set momentum, with the following priority:
+  %  if P is nonzero, use it; otherwise, if Energy is nonzero, use it ;
+  %   otherwise, if RelGamma is > 1, use it
+  
+  if (RelGamma > 1)
+    Etot = RelGamma * 0.000510998918 ;
   end
+  if (Energy > 0)
+    Etot = Energy ;
+  end
+  if (PC>0)
+    Momentum = PC ;
+  else
+    Momentum = Etot^2 - 0.000510998918^2 ;
+    if (Momentum <=0)
+      Momentum = 0 ;
+    else
+      Momentum = sqrt(Momentum) ;
+    end
+  end
+  if (Momentum == 0)
+    stat{1} = -1 ;
+    stat = AddMessageToStack(stat,...
+      'Problem in setting momentum, PC = 1 GeV/c used') ;
+    Momentum = 1 ;
+  end
+  Initial.Momentum = Momentum * (1+MomentumError) ;
+  
+  % perform a similar operation with the emittances:  geometric emittances
+  % take priority over normalized ones
+  
+  RelGamma = sqrt(Initial.Momentum^2 + 0.000510998918^2) / 0.000510998918 ;
+  Initial.x.NEmit = P(edp+7).value / 4 ;
+  Initial.y.NEmit = P(edp+9).value / 4 ;
+  Initial.x.NEmit = P(edp+6).value * RelGamma ;
+  Initial.y.NEmit = P(edp+8).value * RelGamma ;
+  
+  Initial.sigz = P(edp+11).value ;
+  Initial.SigPUncorrel = Initial.Momentum * P(edp+12).value ;
+  Initial.NBunch = P(edp+13).value ;
+  Initial.Q = P(edp+14).value * 1.6e-19 ;
+  if (P(edp+15).value == 0)
+    if (Initial.NBunch > 1)
+      stat{1} = -1 ;
+      stat = AddMessageToStack(stat,...
+        'Bunch interval not specified, setting to zero') ;
+    end
+    Initial.BunchInterval = 0 ;
+  else
+    Initial.BunchInterval = Initial.Q / P(edp+15).value ;
+  end
+  
+end
 %
 % set the energy profile
 %
-  UpdateMomentumProfile( nelmold+1, nelmold+nelm, ...
-                               Initial.Q, Initial.Momentum, 0 ) ;
-%  
+UpdateMomentumProfile( nelmold+1, nelmold+nelm, ...
+  Initial.Q, Initial.Momentum, 0 ) ;
+%
 % convert from MAD K values to Lucretia B values
-% 
-  KtoB( nelmold+1, nelmold+nelm ) ;
+%
+KtoB( nelmold+1, nelmold+nelm ) ;
 %
 % parse the wakefields
 %
-  if (isempty(WF))
-    WF.ZSR = [] ;
-    WF.TSR = [] ;
-    WF.TLR = {} ;
-    WF.TLRErr = {} ;
+if (isempty(WF))
+  WF.ZSR = [] ;
+  WF.TSR = [] ;
+  WF.TLR = {} ;
+  WF.TLRErr = {} ;
+end
+nzsr = length(W.longit) ;
+ntsr = length(W.transv) ;
+if ( (nzsr>0) || (ntsr>0) )
+  for count = 1:nzsr
+    [retstat,parsedwf] = ParseSRWF(W.longit{count},0.1) ;
+    if (retstat{1} == 1)
+      WF.ZSR = [WF.ZSR parsedwf] ;
+    else
+      stat{1} = -1 ;
+      stat = AddMessageToStack(stat,retstat{2}) ;
+    end
   end
-  nzsr = length(W.longit) ;
-  ntsr = length(W.transv) ;
-  if ( (nzsr>0) || (ntsr>0) )
-      for count = 1:nzsr
-          [retstat,parsedwf] = ParseSRWF(W.longit{count},0.1) ;
-          if (retstat{1} == 1)
-            WF.ZSR = [WF.ZSR parsedwf] ;
-          else
-            stat{1} = -1 ;
-            stat = AddMessageToStack(stat,retstat{2}) ;
-          end
-      end
-      for count = 1:ntsr
-           [retstat,parsedwf] = ParseSRWF(W.transv{count},0.1) ;
-          if (retstat{1} == 1)
-            WF.TSR = [WF.TSR parsedwf] ;
-          else
-            stat{1} = -1 ;
-            stat = AddMessageToStack(stat,retstat{2}) ;
-          end
-      end
+  for count = 1:ntsr
+    [retstat,parsedwf] = ParseSRWF(W.transv{count},0.1) ;
+    if (retstat{1} == 1)
+      WF.TSR = [WF.TSR parsedwf] ;
+    else
+      stat{1} = -1 ;
+      stat = AddMessageToStack(stat,retstat{2}) ;
+    end
   end
+end
 
 % if any bad elements were found, make a message about them
 
-  if ~isempty(badelm)
-      stat{1} = -1 ;
-      for count = 1:length(badelm)
-          stat = AddMessageToStack(stat,...
-              ['Element # ',num2str(badelm(count)),...
-                            ', name = "',E(badelm(count)).name,'":',...
-                            ' class is not supported by Lucretia']) ;
-      end 
+if ~isempty(badelm)
+  stat{1} = -1 ;
+  for count = 1:length(badelm)
+    stat = AddMessageToStack(stat,...
+      ['Element # ',num2str(badelm(count)),...
+      ', name = "',E(badelm(count)).name,'":',...
+      ' class is not supported by Lucretia']) ;
   end
-%  
+end
+%
 %==========================================================================
 %
 function KtoB( istart, iend )
@@ -479,41 +479,41 @@ function KtoB( istart, iend )
 
 %========================================================================
 
-  global BEAMLINE ;
+global BEAMLINE ;
 
-  brhofact = 1/0.299792458 ; % convert between GeV/c and T.m
+brhofact = 1/0.299792458 ; % convert between GeV/c and T.m
 
-  for count = min(istart,iend):max(istart,iend)
+for count = min(istart,iend):max(istart,iend)
+  
+  switch BEAMLINE{count}.Class
+    
+    case{ 'XCOR' , 'YCOR' , 'RBEN', 'MULT', 'XYCOR' }
       
-      switch BEAMLINE{count}.Class
-          
-          case{ 'XCOR' , 'YCOR' , 'RBEN', 'MULT', 'XYCOR' }
-              
-              BEAMLINE{count}.B = BEAMLINE{count}.B * ...
-                                  BEAMLINE{count}.P * brhofact ;
-          case{ 'QUAD' , 'SEXT' , 'OCTU', 'SOLENOID' }
-              BEAMLINE{count}.B = BEAMLINE{count}.B * ...
-                                  BEAMLINE{count}.L * ...
-                                  BEAMLINE{count}.P * brhofact ;
-          case{ 'SBEN' }
-              BEAMLINE{count}.B = BEAMLINE{count}.B * ...
-                                  BEAMLINE{count}.P * brhofact ;
-              if (length(BEAMLINE{count}.B) > 1)
-                  BEAMLINE{count}.B(2) = BEAMLINE{count}.B(2) * ...
-                                         BEAMLINE{count}.L ;
-              end      
-                 
+      BEAMLINE{count}.B = BEAMLINE{count}.B * ...
+        BEAMLINE{count}.P * brhofact ;
+    case{ 'QUAD' , 'SEXT' , 'OCTU', 'SOLENOID' }
+      BEAMLINE{count}.B = BEAMLINE{count}.B * ...
+        BEAMLINE{count}.L * ...
+        BEAMLINE{count}.P * brhofact ;
+    case{ 'SBEN' }
+      BEAMLINE{count}.B = BEAMLINE{count}.B * ...
+        BEAMLINE{count}.P * brhofact ;
+      if (length(BEAMLINE{count}.B) > 1)
+        BEAMLINE{count}.B(2) = BEAMLINE{count}.B(2) * ...
+          BEAMLINE{count}.L ;
       end
       
   end
-%  
+  
+end
+%
 %==========================================================================
 %
 function [mB,mT,mPI,mA] = UnpackXSIFMultPars( P, edp )
 %
 % UNPACKXSIFMULTPARS Unpack the multipole field parameters from an XSIF
 %    multipole.
-%  
+%
 % [mB, mT, mPI, mA] = UnpackXSIFMultPars( ParDB, Eptr ) finds and returns
 %    the non-zero KnL components of a multipole magnet which has been
 %    parsed by XSIF, along with its component tilt values, indices to
@@ -533,29 +533,29 @@ function [mB,mT,mPI,mA] = UnpackXSIFMultPars( P, edp )
 
 %==========================================================================
 
-  mB = [] ; mT = [] ; mPI = [] ; mA = [] ; %#ok<NASGU>
-  
-  for count = 0:20
-      c2 = 2*count + 1 ;
-      if (P(edp+c2).value ~= 0)
-          mB = [mB P(edp+c2).value] ;
-          mT = [mT P(edp+c2+1).value] ;
-          mPI = [mPI count] ;
-      end
+mB = [] ; mT = [] ; mPI = [] ; mA = [] ; %#ok<NASGU>
+
+for count = 0:20
+  c2 = 2*count + 1 ;
+  if (P(edp+c2).value ~= 0)
+    mB = [mB P(edp+c2).value] ;
+    mT = [mT P(edp+c2+1).value] ;
+    mPI = [mPI count] ;
   end
-  mT = mT + P(edp+49).value ;
-  mB = mB * P(edp+43).value ;
+end
+mT = mT + P(edp+49).value ;
+mB = mB * P(edp+43).value ;
 
 % Now, the multipole can be completely blank, no strength values at all.
 % handle that case now
 
-  if (isempty(mPI))
-      mT = 0 ; mB = 0 ; mPI = 0 ;
-  end
- if (mPI(1) == 0)
-%  if (~isempty(mPI) && (mPI(1) == 0))
-      mA = [mB(1) * cos(mT(1)) mB(1) * sin(mT(1))] ;
-  else
-      mA = [0 0] ;
-  end
-  
+if (isempty(mPI))
+  mT = 0 ; mB = 0 ; mPI = 0 ;
+end
+if (mPI(1) == 0)
+  %  if (~isempty(mPI) && (mPI(1) == 0))
+  mA = [mB(1) * cos(mT(1)) mB(1) * sin(mT(1))] ;
+else
+  mA = [0 0] ;
+end
+
