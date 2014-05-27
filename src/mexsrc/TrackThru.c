@@ -648,7 +648,7 @@ void TrackThruSetReturn( struct TrackArgsStruc* TrackArgs,
   mxArray* sbpmdat ;
   mxArray* Sdat ;
   double*  realpr ;
-  int dims[3] ;              /* 3-d array for sigma matrices */
+  size_t dims[3] ;              /* 3-d array for sigma matrices */
   char** messages ;
   int nmsg ;
   

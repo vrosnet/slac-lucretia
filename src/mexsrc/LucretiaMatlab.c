@@ -47,10 +47,14 @@
  * IsEmpty
  * GetCsrEloss
  * GetExtProcessData
+ * TMapGetData
+ * TMapParamCheck
  *
  * /* AUTH: PT, 03-aug-2004 */
 /* MOD:
- * 31-March-2014, GWL
+ * 22-May-2014, GW:
+ * Add TMAP data retrieval and verification functions
+ * 31-March-2014, GW:
  * Add functionality for GEANT4 interface
  * 08-Oct-2010, GW:
  * LucretiaMatlabSetup tries to read in Lucretia BEAMLINE etc
@@ -2177,8 +2181,6 @@ mxArray* GetExtProcessPrimariesData(int* elemno)
 mxArray* GetExtProcessSecondariesData(int* elemno)
 {
   mxArray* ElemCell ;   /* pointer to the cell */
-  mxArray* extProcess ; /* pointer to the extProcess object */
-  mxArray* retprop ;
   /* start by getting a pointer to the correct beamline cell */
   ElemCell = mxGetCell( Beamline, *elemno ) ;
   /* if the element is ill-defined throw an abort */
@@ -2191,3 +2193,215 @@ mxArray* GetExtProcessSecondariesData(int* elemno)
   return mxGetField( ElemCell, 0, "ExtProcess_secondariesData" ) ;
 }
 
+/* Get data from a TMAP BEAMLINE element
+   RETURN 1 if OK, 0 if formatting errors */
+int TMapGetDataR(int elemno, double R[6][6])
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  mxArray* fieldPtr ;
+  double* Rmat ;
+  int i,i2 ;
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return 0 ;
+  if (!mxIsStruct(ElemCell))
+    return 0 ;
+  /* Return pointer to R matrix which must be defined and have dimensions 6 x 6 */
+  fieldPtr = mxGetField(ElemCell, 0, "R") ;
+  if (fieldPtr==NULL || mxGetM(fieldPtr)!=6 || mxGetN(fieldPtr)!=6)
+    return 0;
+  Rmat = mxGetPr(fieldPtr) ;
+  for (i=0; i<6; i++)
+    for (i2=0; i2<6; i2++)
+      R[i][i2]=Rmat[i+6*i2];
+  return 1 ;
+}
+void TMapGetDataLen(int elemno, unsigned short* T_size, unsigned short* U_size, unsigned short* V_size, unsigned short* W_size)
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  ElemCell = mxGetCell( Beamline, elemno ) ;
+  *T_size = (unsigned short) mxGetNumberOfElements(mxGetField(ElemCell, 0, "T")) ;
+  *U_size = (unsigned short) mxGetNumberOfElements(mxGetField(ElemCell, 0, "U")) ;
+  *V_size = (unsigned short) mxGetNumberOfElements(mxGetField(ElemCell, 0, "V")) ;
+  *W_size = (unsigned short) mxGetNumberOfElements(mxGetField(ElemCell, 0, "W")) ;
+}
+int TMapGetData(int elemno, double* Offset, double* R, double* T, double* U, double* V, double* W,
+        unsigned long* T_inds, unsigned long* U_inds, unsigned long* V_inds, unsigned long* W_inds,
+        unsigned short* T_size, unsigned short* U_size, unsigned short* V_size, unsigned short* W_size)
+{
+  mxArray* ElemCell ;   /* pointer to the cell */
+  mxArray* fieldPtr ;
+  int dim ;
+  double* tmp ;
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return 0 ;
+  if (!mxIsStruct(ElemCell))
+    return 0 ;
+  /* Offset and R fields must be present and intialised with correct dimensions */
+  fieldPtr = mxGetField(ElemCell, 0, "Offset") ;
+  if (mxGetNumberOfElements(fieldPtr)!=6)
+    return 0;
+  memcpy(Offset,mxGetPr(fieldPtr),sizeof(double)*6) ;
+  fieldPtr = mxGetField(ElemCell, 0, "R") ;
+  if (mxGetM(fieldPtr)!=6 || mxGetN(fieldPtr)!=6)
+    return 0;
+  memcpy(R,mxGetPr(fieldPtr),sizeof(double)*36) ;
+  /* Process T elements if provided else return NULL pointers */
+  fieldPtr = mxGetField(ElemCell, 0, "T") ;
+  if (fieldPtr == NULL) {
+    T=NULL;
+    T_inds=NULL;
+    *T_size=0;
+  }
+  else {
+    if (T_size==NULL || *T_size==0) {
+      T=NULL;
+      T_inds=NULL;
+      *T_size=0;
+    }
+    else {
+      tmp = mxGetPr(fieldPtr) ;
+      memcpy(T,tmp,*T_size * sizeof(double)) ;
+      fieldPtr = mxGetField(ElemCell, 0, "Tinds") ;
+      if (mxGetNumberOfElements(fieldPtr)!=*T_size)
+        return 0;
+      tmp = mxGetPr(fieldPtr) ;
+      for (dim=0;dim<*T_size;dim++)
+        T_inds[dim] = (unsigned long) tmp[dim] ;
+    }
+  }
+  /* Process U elements if provided else return NULL pointers */
+  fieldPtr = mxGetField(ElemCell, 0, "U") ;
+  if (fieldPtr == NULL) {
+    U=NULL;
+    U_inds=NULL;
+    *U_size=0;
+  }
+  else {
+    *U_size = mxGetNumberOfElements(fieldPtr) ;
+    if (U_size==NULL || *U_size==0) {
+      U=NULL;
+      U_inds=NULL;
+      *U_size=0;
+    }
+    else {
+      tmp = mxGetPr(fieldPtr) ;
+      memcpy(U,tmp,*U_size * sizeof(double)) ;
+      fieldPtr = mxGetField(ElemCell, 0, "Uinds") ;
+      if (mxGetNumberOfElements(fieldPtr)!=*U_size)
+        return 0;
+      tmp = mxGetPr(fieldPtr) ;
+      for (dim=0;dim<*U_size;dim++)
+        U_inds[dim] = (unsigned long) tmp[dim] ;
+    }
+  }
+  /* Process V elements if provided else return NULL pointers */
+  fieldPtr = mxGetField(ElemCell, 0, "V") ;
+  if (fieldPtr == NULL) {
+    V=NULL;
+    V_inds=NULL;
+    *V_size=0;
+  }
+  else {
+    *V_size = mxGetNumberOfElements(fieldPtr) ;
+    if (V_size==NULL || *V_size==0) {
+      V=NULL;
+      V_inds=NULL;
+      *V_size=0;
+    }
+    else {
+      tmp = mxGetPr(fieldPtr) ;
+      memcpy(V,tmp,*V_size * sizeof(double)) ;
+      fieldPtr = mxGetField(ElemCell, 0, "Vinds") ;
+      if (mxGetNumberOfElements(fieldPtr)!=*V_size)
+        return 0;
+      tmp = mxGetPr(fieldPtr) ;
+      for (dim=0;dim<*V_size;dim++)
+        V_inds[dim] = (unsigned long) tmp[dim] ;
+    }
+  }
+  /* Process W elements if provided else return NULL pointers */
+  fieldPtr = mxGetField(ElemCell, 0, "W") ;
+  if (fieldPtr == NULL) {
+    W=NULL;
+    W_inds=NULL;
+    *W_size=0;
+  }
+  else {
+    *W_size = mxGetNumberOfElements(fieldPtr) ;
+    if (W_size==NULL || *W_size==0) {
+      W=NULL;
+      W_inds=NULL;
+      *W_size=0;
+    }
+    else {
+      tmp = mxGetPr(fieldPtr) ;
+      memcpy(W,tmp,*W_size * sizeof(double)) ;
+      fieldPtr = mxGetField(ElemCell, 0, "Winds") ;
+      if (mxGetNumberOfElements(fieldPtr)!=*W_size)
+        return 0;
+      tmp = mxGetPr(fieldPtr) ;
+      for (dim=0;dim<*W_size;dim++)
+        W_inds[dim] = (unsigned long) tmp[dim] ;
+    }
+  }
+  return 1 ;
+}
+/* Check formatting of TMAP element class, return 1 if OK, 0 if errors */
+int TMapParamCheck(int elemno)
+{
+  mxArray* ElemCell ;
+  mxArray* fieldPtr ;
+  mxArray* fieldPtr2 ;
+  int* Order ;
+  /* start by getting a pointer to the correct beamline cell */
+  ElemCell = mxGetCell( Beamline, elemno ) ;
+  /* if the element is ill-defined throw an abort */
+  if (ElemCell == NULL)
+    return 0 ;
+  if (!mxIsStruct(ElemCell))
+    return 0 ;
+  /* Offset should be 6 x 1 */
+  fieldPtr = mxGetField(ElemCell, 0, "Offset") ;
+  if (fieldPtr == NULL)
+    return 0 ;
+  if (mxGetNumberOfElements(fieldPtr) != 6)
+    return 0 ;
+  /* R should be 6 * 6 */
+  fieldPtr = mxGetField(ElemCell, 0, "R") ;
+  if (fieldPtr == NULL)
+    return 0 ;
+  if (mxGetM(fieldPtr) != 6 || mxGetN(fieldPtr) != 6)
+    return 0 ;
+  /* T,U,V,W can be empty, but if defined Tinds etc fields must have same rows as T etc and be correctly dimensioned*/
+  fieldPtr = mxGetField(ElemCell, 0, "T") ;
+  if (fieldPtr != NULL) {
+    fieldPtr2 = mxGetField(ElemCell, 0, "Tinds") ;
+    if (fieldPtr2==NULL || mxGetNumberOfElements(fieldPtr2)!=mxGetNumberOfElements(fieldPtr))
+        return 0;
+  }
+  fieldPtr = mxGetField(ElemCell, 0, "U") ;
+  if (fieldPtr != NULL) {
+    fieldPtr2 = mxGetField(ElemCell, 0, "Uinds") ;
+    if (fieldPtr2==NULL || mxGetNumberOfElements(fieldPtr2)!=mxGetNumberOfElements(fieldPtr))
+        return 0;
+  }
+  fieldPtr = mxGetField(ElemCell, 0, "V") ;
+  if (fieldPtr != NULL) {
+    fieldPtr2 = mxGetField(ElemCell, 0, "Vinds") ;
+    if (fieldPtr2==NULL || mxGetNumberOfElements(fieldPtr2)!=mxGetNumberOfElements(fieldPtr))
+        return 0;
+  }
+  fieldPtr = mxGetField(ElemCell, 0, "W") ;
+  if (fieldPtr != NULL) {
+    fieldPtr2 = mxGetField(ElemCell, 0, "Winds") ;
+    if (fieldPtr2==NULL || mxGetNumberOfElements(fieldPtr2)!=mxGetNumberOfElements(fieldPtr))
+        return 0;
+  }
+  return 1 ;
+}

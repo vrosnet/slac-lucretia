@@ -357,6 +357,7 @@ int TrackBunchThruInst( int, int, struct TrackArgsStruc*, int*, double ) ;
 int TrackBunchThruCorrector( int, int, struct TrackArgsStruc*, int*, int, double, double ) ;				
 int TrackBunchThruCollimator( int, int, struct TrackArgsStruc*, int*, double, double ) ;
 int TrackBunchThruCoord( int, int, struct TrackArgsStruc*, int* ) ;
+int TrackBunchThruTMap( int, int,  struct TrackArgsStruc*, int* ) ;
 #ifdef __CUDACC__        
 int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop,int* TFlag_gpu, int* TFlag,struct TrackArgsStruc* TrackArgs) ;
 #else
@@ -595,6 +596,10 @@ __global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, dou
 					   double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState) ;
 __global__ void TrackBunchThruBPM_kernel(int nray, float* pXfrms, int* TrackFlags, double* qb, double* yb, double* stop, float sintilt, float costilt,
         float* xread_ret, float* yread_ret, float* Q_ret, float* P_ret, float* pxq_ret, float* pyq_ret, float* z_ret, float* sigma_ret ) ;
+__global__ void TrackBunchThruTMap_kernel(double *L, double* dZmod, double* xb, double* yb, double* stop, int* TrackFlag, int N,
+        double* Offset, double* R, unsigned short T_size, unsigned short U_size, unsigned short V_size, unsigned short W_size,
+        double* T, double* U, double* V, double* W, unsigned long* T_inds, unsigned long* U_inds, unsigned long* V_inds,
+        unsigned long* W_inds, double Pmod) ;
 #else
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,
@@ -608,5 +613,9 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
         double H2, double hgapx, double fintx, double hgapx2, int* stp) ;
 void TrackBunchThruBPM_kernel(int nray, double Xfrms[6][2], int* TrackFlags, double* qb, double* yb, double* stop, double sintilt, double costilt,
         double* xread_cnt, double* yread_cnt, double* Q_cnt, double* P_cnt, double* pxq_cnt, double* pyq_cnt, double* z_cnt, double sigma_cnt[36] ) ;
+void TrackBunchThruTMap_kernel(double *L, double* dZmod, double* xb, double* yb, double* stop, int* TrackFlag, int N,
+        double* Offset, double* R, unsigned short T_size, unsigned short U_size, unsigned short V_size, unsigned short W_size,
+        double* T, double* U, double* V, double* W, unsigned long* T_inds, unsigned long* U_inds, unsigned long* V_inds,
+        unsigned long* W_inds, double Pmod) ;
 #endif
 

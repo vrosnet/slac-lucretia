@@ -21,6 +21,7 @@
  * TrackBunchThruCorrector
  * TrackBunchThruCollimator
  * TrackBunchThruCoord
+ * TrackBunchThruTMap
  * GetTrackingFlags
  * CheckAperStopPart
  * CheckP0StopPart
@@ -83,7 +84,9 @@
  *
  * /* AUTH:  PT, 03-aug-2004 */
 /* MOD:
- * 01-apr-2014, GRW:
+ * 22-May-2014, GW:
+ * Add TMAP element class
+ * 01-apr-2014, GW:
  * code for implementation of GEANT tracking (ExtProcess)
  * 02-aug-2007, PT:
  * bugfix in CheckAperStopPart, code clean-up in
@@ -845,6 +848,17 @@ void* RmatCalculate( struct RmatArgStruc* Args )
       }
     }
     
+    /* TMap element -> just pull off the R matrix data */
+    else if (strcmp(ElemClass,"TMAP")==0)
+    {
+      int i;
+      stat1 = TMapGetDataR(count, Relem) ;
+      if (stat1==0) {
+        BadElementMessage( count+1 ) ;
+        goto HandleStat1 ;
+      }
+    }
+    
     /* if we made it this far it's something other than a marker or a quad,
      * so we can treat it as a drift element for now... */
     
@@ -1411,25 +1425,33 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
        * changed from last loop execution */
 
       /* track this bunch through this element */
-      /* - first deal with all element types that cannot or should not be split */
+      /* - first deal with all element types that cannot or should not be split or have zero length*/
       if (strcmp(ElemClass,"LCAV")==0)
       {
         /* Split status not supported for LCAV now- too damned complicated to figure out how to split up
          * and correctly deal with wakefield and BPM details */
         TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop,  TrackArgs, TFLAG, 0 ) ;
-        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag );
+        if (TrackStatus == 1) 
+          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag );
       }
       else if (strcmp(ElemClass,"TCAV")==0)
       {
         /* No split status treatment for TCAV's - see above */
         TrackStatus = TrackBunchThruRF( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 1 ) ;
-        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
+        if (TrackStatus == 1) 
+          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
       }
       else if ( strcmp(ElemClass,"COORD")==0 )
       {
-        TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop,
-                TrackArgs, TFLAG ) ;
-        postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
+        TrackStatus = TrackBunchThruCoord( *ElemLoop, *BunchLoop, TrackArgs, TFLAG ) ;
+        if (TrackStatus == 1) 
+          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
+      }
+      else if ( strcmp(ElemClass,"TMAP")==0 )
+      {
+        TrackStatus = TrackBunchThruTMap( *ElemLoop, *BunchLoop, TrackArgs, TFLAG ) ;
+        if (TrackStatus == 1) 
+          postEleTrack( TrackArgs->TheBeam, BunchLoop, ElemLoop, 0, *GetElemNumericPar( *ElemLoop, "S", NULL ), TFlag) ;
       }
       else if ( strcmp(ElemClass,"MARK")==0 ) {
         TrackStatus = 1 ;
@@ -1529,6 +1551,220 @@ void TrackThruMain( struct TrackArgsStruc* TrackArgs )
 
 /*=====================================================================*/
 
+/* perform tracking throuhj a Transfer Map element (up to 5th order). */
+
+/* RET:    Status = 1 (success), always.
+ * /* ABORT:  never.
+ * /* FAIL:   Will fail if ArgStruc does not contain a well-defined
+ * and self-consistent structure for bunch # bunchno. Or TMAP element badly formatted */
+
+int TrackBunchThruTMap( int elemno, int bunchno,  struct TrackArgsStruc* ArgStruc, int* TrackFlag )
+{
+#ifndef __CUDACC__
+  int rayloop ;
+#endif
+  double* L ;
+  double dZmod ;               /* lorentz delay for P = Pmod */
+  struct Bunch* ThisBunch ;    /* a shortcut */
+  double* Pmod ;
+  double Offset[6], R[36] ;
+  double *T,*U,*V,*W ;
+  unsigned short T_size=0, U_size=0, V_size=0, W_size=0, stat ;
+  unsigned long *T_inds, *U_inds, *V_inds, *W_inds ;
+  
+  /* get the length of the drift space */
+  L = GetElemNumericPar( elemno, "L", NULL ) ;
+  
+  /* get the design Lorentz delay */
+  Pmod = GetElemNumericPar( elemno, "P", NULL ) ;
+  dZmod = GetDesignLorentzDelay( Pmod ) ;
+  
+  /* get the address of the bunch in question */
+  ThisBunch = ArgStruc->TheBeam->bunches[bunchno] ;
+  
+  /* Get Transport Map data */
+  /* As minimum, contains offsets and R matrix */
+  /* Other elements depends on Order of map and number of elements placed */
+  TMapGetDataLen(elemno,&T_size,&U_size,&V_size,&W_size) ;
+  if (T_size>0) {
+    T_inds = (unsigned long*) malloc(T_size * sizeof(unsigned long)) ;
+    T = (double*) malloc(T_size * sizeof(double)) ;
+  }
+  if (U_size>0) {
+    U_inds = (unsigned long*) malloc(U_size * sizeof(unsigned long)) ;
+    U = (double*) malloc(U_size * sizeof(double)) ;
+  }
+  if (V_size>0) {
+    V_inds = (unsigned long*) malloc(V_size * sizeof(unsigned long)) ;
+    V = (double*) malloc(V_size * sizeof(double)) ;
+  }
+  if (W_size>0) {
+    W_inds = (unsigned long*) malloc(W_size * sizeof(unsigned long)) ;
+    W = (double*) malloc(W_size * sizeof(double)) ;
+  }
+  stat = TMapGetData(elemno, Offset, R, T, U, V, W, T_inds, U_inds, V_inds, W_inds, &T_size,&U_size,&V_size,&W_size) ;
+  if (stat==0) {
+    AddMessage("Badly formatted TMAP element",1) ;
+    return 0 ;
+  }
+  
+  /* execute ray tracking kernel (loop over rays) */
+#ifdef __CUDACC__
+  double* dZmod_gpu ;
+  double* L_gpu ;
+  double Offset_gpu, R_gpu ;
+  double *T_gpu,*U_gpu,*V_gpu,*W_gpu ;
+  unsigned long *T_inds_gpu, *U_inds_gpu, *V_inds_gpu, *W_inds_gpu ;
+  cudaMalloc(&dZmod_gpu, sizeof(double)) ;
+  cudaMalloc(&L_gpu, sizeof(double)) ;
+  cudaMemcpy(dZmod_gpu, &dZmod, sizeof(double), cudaMemcpyHostToDevice) ;
+  cudaMemcpy(L_gpu, L, sizeof(double), cudaMemcpyHostToDevice) ;
+  cudaMalloc(&Offset_gpu, sizeof(double)*6) ;
+  cudaMalloc(&R_gpu, sizeof(double)*36) ;
+  cudaMemcpy(Offset_gpu, Offset, sizeof(double)*6, cudaMemcpyHostToDevice) ;
+  cudaMemcpy(R_gpu, R, sizeof(double)*36, cudaMemcpyHostToDevice) ;
+  if (T_size>0) {
+    cudaMalloc(&T_gpu, sizeof(double)*T_size) ;
+    cudaMemcpy(T_gpu, T, sizeof(double)*T_size, cudaMemcpyHostToDevice) ;
+    cudaMalloc(&T_inds_gpu, sizeof(unsigned long)*T_size) ;
+    cudaMemcpy(T_inds_gpu, T_inds, sizeof(unsigned long)*T_size, cudaMemcpyHostToDevice) ;
+  }
+  if (U_size>0) {
+    cudaMalloc(&U_gpu, sizeof(double)*U_size) ;
+    cudaMemcpy(U_gpu, U, sizeof(double)*U_size, cudaMemcpyHostToDevice) ;
+    cudaMalloc(&U_inds_gpu, sizeof(unsigned long)*U_size) ;
+    cudaMemcpy(U_inds_gpu, U_inds, sizeof(unsigned long)*U_size, cudaMemcpyHostToDevice) ;
+  }
+  if (V_size>0) {
+    cudaMalloc(&V_gpu, sizeof(double)*V_size) ;
+    cudaMemcpy(V_gpu, V, sizeof(double)*V_size, cudaMemcpyHostToDevice) ;
+    cudaMalloc(&V_inds_gpu, sizeof(unsigned long)*V_size) ;
+    cudaMemcpy(V_inds_gpu, V_inds, sizeof(unsigned long)*V_size, cudaMemcpyHostToDevice) ;
+  }
+  if (W_size>0) {
+    cudaMalloc(&W_gpu, sizeof(double)*W_size) ;
+    cudaMemcpy(W_gpu, W, sizeof(double)*W_size, cudaMemcpyHostToDevice) ;
+    cudaMalloc(&W_inds_gpu, sizeof(unsigned long)*W_size) ;
+    cudaMemcpy(W_inds_gpu, W_inds, sizeof(unsigned long)*W_size, cudaMemcpyHostToDevice) ;
+  }
+  TrackBunchThruTMap_kernel<<<blocksPerGrid, threadsPerBlock>>>(L_gpu, dZmod_gpu, ThisBunch->x, ThisBunch->y,
+          ThisBunch->stop, TrackFlag, ThisBunch->nray, Offset_gpu, R_gpu ,T_size,U_size,V_size,W_size,
+          T_gpu, U_gpu, V_gpu, W_gpu, T_inds_gpu, U_inds_gpu, V_inds_gpu, W_inds_gpu, *Pmod);
+  cudaFree(dZmod_gpu); cudaFree(L_gpu);
+  cudaFree(R_gpu); cudaFree(Offset_gpu);
+  if (T_size>0) {
+    cudaFree(T_gpu);
+    cudaFree(T_inds_gpu);
+  }
+  if (U_size>0) {
+    cudaFree(U_gpu);
+    cudaFree(U_inds_gpu);
+  }
+  if (V_size>0) {
+    cudaFree(V_gpu);
+    cudaFree(V_inds_gpu);
+  }
+  if (W_size>0) {
+    cudaFree(W_gpu);
+    cudaFree(W_inds_gpu);
+  }
+#else
+  for ( rayloop=0 ; rayloop<ThisBunch->nray ; rayloop++ )
+    TrackBunchThruTMap_kernel(L, &dZmod, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, rayloop,
+            Offset,R,T_size,U_size,V_size,W_size, T, U, V, W, T_inds, U_inds, V_inds, W_inds, *Pmod);
+#endif
+  if (T_size>0) {
+    free(T_inds); free(T);
+  }
+  if (U_size>0) {
+    free(U_inds); free(U);
+  }
+  if (V_size>0) {
+    free(V_inds); free(V);
+  }
+  if (W_size>0) {
+    free(W_inds); free(W);
+  }
+  return 1;
+  
+}
+
+/* The TMap tracking Kernel */
+void TrackBunchThruTMap_kernel(double *L, double* dZmod, double* xb, double* yb, double* stop, int* TrackFlag, int N,
+        double* Offset, double* R, unsigned short T_size, unsigned short U_size, unsigned short V_size,
+        unsigned short W_size, double* T, double* U, double* V, double* W, unsigned long* T_inds, unsigned long* U_inds,
+        unsigned long* V_inds, unsigned long* W_inds, double Pmod)
+{
+  
+  double dZdL=0 ;
+  unsigned short mapInd, j, j2 ;
+  unsigned long dim[6], i ;
+  
+#ifdef __CUDA_ARCH__
+  i = blockDim.x * blockIdx.x + threadIdx.x ;
+  if ( i >= N ) return;
+#else
+  i = N;
+#endif
+  
+  /* if the bunch was previously stopped on an aperture, loop */
+  if (stop[i] != 0.) return ;
+  
+  if (TrackFlag[LorentzDelay] == 1)
+    dZdL += LORENTZ_DELAY(xb[6*i+5]) - *dZmod ;
+  
+  /* Apply any offsets */
+  for (j=0;j<6;j++)
+    yb[6*i+j] = Offset[j];
+  
+  /* P converted to dP/P */
+  xb[6*i+5] = (xb[6*i+5]-Pmod) / Pmod ;
+  
+  /* Apply R map */
+  for (j=0;j<6;j++)
+    for (j2=0;j2<6;j2++)
+      yb[6*i+j] += R[j+6*j2] * xb[6*i+j2] ;
+  
+  /* Apply T,U,V,W maps as required */
+  if (T_size>0) {
+    for (mapInd=0;mapInd<T_size;mapInd++) {
+      for (j=0;j<3;j++)
+        dim[2-j] = floor( ( T_inds[mapInd] % (int)pow(10,j+1)) / pow(10,j) ) - 1 ;
+      yb[6*i+dim[0]] += T[mapInd]*xb[6*i+dim[1]]*xb[6*i+dim[2]] ;
+    }
+  }
+  if (U_size>0) {
+    for (mapInd=0;mapInd<U_size;mapInd++) {
+      for (j=0;j<4;j++)
+        dim[3-j] = floor( (U_inds[mapInd] % (int)pow(10,j+1)) / pow(10,j) ) - 1;
+      yb[6*i+dim[0]] += U[mapInd]*xb[6*i+dim[1]]*xb[6*i+dim[2]]*xb[6*i+dim[3]] ;
+    }
+  }
+  if (V_size>0) {
+    for (mapInd=0;mapInd<V_size;mapInd++) {
+      for (j=0;j<5;j++)
+        dim[4-j] = floor( (V_inds[mapInd] % (int)pow(10,j+1)) / pow(10,j) ) - 1;
+      yb[6*i+dim[0]] += V[mapInd]*xb[6*i+dim[1]]*xb[6*i+dim[2]]*xb[6*i+dim[3]]*xb[6*i+dim[4]] ;
+    }
+  }
+  if (W_size>0) {
+    for (mapInd=0;mapInd<W_size;mapInd++) {
+      for (j=0;j<6;j++)
+        dim[5-j] = floor( (W_inds[mapInd] % (int)pow(10,j+1)) / pow(10,j) ) - 1;
+      yb[6*i+dim[0]] += W[mapInd]*xb[6*i+dim[1]]*xb[6*i+dim[2]]*xb[6*i+dim[3]]*xb[6*i+dim[4]]*xb[6*i+dim[5]] ;
+    }
+  }
+  
+  /* Apply Lorentz delay */
+  yb[6*i+4] += *L * dZdL ;
+  
+  /* Put P back into absolute units */
+  yb[6*i+5] = Pmod + yb[6*i+5] * Pmod ;
+  
+}
+
+/*=====================================================================*/
+
 /* perform tracking of one bunch through one drift matrix.  This
  * procedure also acts as a default tracker, tracking through any
  * elements with unrecognized class names.  If the element has no
@@ -1597,7 +1833,7 @@ int TrackBunchThruDrift( int elemno, int bunchno,
   
 }
 
-/* The DRIFT tracking Kernels */
+/* The DRIFT tracking Kernel */
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N)
 {
   
@@ -7055,6 +7291,19 @@ void VerifyLattice( )
           KlysIndex = 0 ;
           WFIndex = 0 ;
         }
+        else if ( (strcmp(ElemClass,"TMAP") == 0) ) /* TMap */
+        {
+          Dictionary = TMapPar ;
+          nPar = nTMapPar ;
+          PIndex = TMapP ;
+          LIndex = 0 ;
+          aperindex = 0 ;
+          AllowedTrackFlag = TMapTrackFlag ;
+          GirderIndex = 0 ;
+          PSIndex = 0 ;
+          KlysIndex = 0 ;
+          WFIndex = 0 ;
+        }
         else if ( (strcmp(ElemClass,"DRIF") == 0) ) /* Drift */
         {
           Dictionary = DrifPar ;
@@ -7386,6 +7635,15 @@ void VerifyLattice( )
                       count1+1, pole+1) ;
               AddMessage(message,0) ;
             }
+          }
+        }
+        
+        /* formatting checks for TMap element fields */
+        if (strcmp(ElemClass,"TMAP")==0)
+        {
+          if ( TMapParamCheck(count1) == 0 ) {
+            sprintf(message,"Error: Element %d Incorrect TMap field formatting",count1+1) ;
+            AddMessage(message,0) ;
           }
         }
         
