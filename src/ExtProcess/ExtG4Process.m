@@ -1,4 +1,4 @@
-classdef ExtG4Process < ExtProcess & ExtGeometry & handle
+classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
   %EXTG4PROCESS - class to handle interface of Lucretia beam using GEANT4 engine
   
   properties
@@ -24,6 +24,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & handle
       % Superclass initialization
       obj = obj@ExtProcess() ;
       obj = obj@ExtGeometry() ;
+      obj = obj@ExtG4EMField() ;
       % List of required environment variables
       for ivar=1:length(obj.dataFiles)
         obj.envVars.(obj.evarNames{ivar})=[obj.extDir obj.dataFiles{ivar}];

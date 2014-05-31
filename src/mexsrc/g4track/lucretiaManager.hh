@@ -6,6 +6,9 @@
 #define LUCRETIA_MANAGER
 #include "mex.h"
 
+/* Interpolation code extracted from modified ba_interp3.cpp from Mathworks File Exchange*/
+/* ba_inter3 GPL License (c) 2008 Brian Amberg http://www.brian-amberg.de/ */
+
 using namespace std;
 
 class lucretiaManager
@@ -20,9 +23,22 @@ class lucretiaManager
   void SetNextSecondary(double x[6], int id, const char* type) ;
   void SetLucretiaData() ;
   void freeMem() ;
+  void GetUniformField(double uField[3]) ;
+  double interpField(const int fieldno, const double* point) ;
   int Status ; // 0=OK; 1=No external processes defined for this BEAMLINE element
   char* GeomType ; // Geometry type ("Ellipse" | "Rectangle")
   char* Material ; // Material type -> must be from GEANT4 material tables
+  const mxArray *pBx,*pBy,*pBz,*pEx,*pEy,*pEz ; // EM field values
+  char* EMStepperMethod ;
+  double EMStepSize ;
+  double EMDeltaOneStep ;
+  double EMDeltaIntersection ;
+  double EMDeltaChord ;
+  double EMEpsMin ;
+  double EMEpsMax ;
+  char* EMInterpMethod ;
+  char EnableEM ;
+  char EMisUniform ;
   double AperX ; // Horizontal half-aperture / m
   double AperY ; // Vertical half-aperture / m
   double Ecut ; // Energy cut for storing tracks
@@ -37,6 +53,39 @@ class lucretiaManager
   int* fEle ;
 
   private:
+  int access(int M, int N, int O, int x, int y, int z) ;
+  int access_unchecked(int M, int N, int O, int x, int y, int z) ;
+  void indices_linear(
+        int &f000_i,
+        int &f100_i,
+        int &f010_i,
+        int &f110_i,
+        int &f001_i,
+        int &f101_i,
+        int &f011_i,
+        int &f111_i,
+        const int x, const int y, const int z,
+        const mwSize &M, const mwSize &N, const mwSize &O) ;
+  void indices_cubic(int f_i[64], const int x, const int y, const int z,
+                                      const mwSize &M, const mwSize &N, const mwSize &O) ;
+  void interpolate_nearest(double *pO, const double *pF,
+        const double *pX, const double *pY, const double *pZ,
+        const mwSize ND, const mwSize M, const mwSize N, const mwSize O, const mwSize P,
+        const double s_x, const double o_x,
+        const double s_y, const double o_y,
+        const double s_z, const double o_z) ;
+  void interpolate_linear(double *pO, const double *pF,
+        const double *pX, const double *pY, const double *pZ,
+        const mwSize ND, const mwSize M, const mwSize N, const mwSize O, const mwSize P,
+        const double s_x, const double o_x,
+        const double s_y, const double o_y,
+        const double s_z, const double o_z) ;
+  void interpolate_bicubic(double *pO, const double *pF,
+        const double *pX, const double *pY, const double *pZ,
+        const mwSize ND, const mwSize M, const mwSize N, const mwSize O, const mwSize P,
+        const double s_x, const double o_x,
+        const double s_y, const double o_y,
+        const double s_z, const double o_z) ;
   mxArray* fTypeCellPtr ;
   uint32_T* fPrimaryRegenID ;
   uint32_T* fSecondaryPrimaryID ;

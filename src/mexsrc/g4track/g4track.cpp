@@ -32,10 +32,10 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   static lucretiaManager* lman ;
   static int firstCall=1;
   // Collimator geometry definition (apertures and lengths are half-lengths in meters)
-  G4double length = *L ;
+  G4double length = *L/2 ;
   if (runManager == NULL) {
     // lucretiaManager manages interaction with Lucretia bunch structure and interfaces with Matlab data structures
-    lman = new lucretiaManager(blele, bunchno, ThisBunch, *L) ;
+    lman = new lucretiaManager(blele, bunchno, ThisBunch, length) ;
     // return with error if no associated EXT Process on this BEAMLINE or there is a problem with one of the EXT Process object's properties
     if (lman->Status!=0)
       return lman->Status ;
@@ -45,8 +45,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     // Setup physics processes we wish to use (for now this is just all of them)
     physicsList = new FTFP_BERT; // Default ALL physics process list
     runManager->SetUserInitialization(physicsList);
-    thisGeomConstruction = new geomConstruction(lman->GeomType, lman->Material, lman->AperX, lman->AperY,
-                lman->Thickness, length);
+    thisGeomConstruction = new geomConstruction(lman, length);
     if (thisGeomConstruction == NULL)
       return -2 ;
     runManager->SetUserInitialization(thisGeomConstruction);
@@ -55,7 +54,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     runManager->SetUserInitialization(thisAction); //
   }
   else { // If this function already called once, just re-initialise the Lucretia pointers to the new element and geometry
-    lman->Initialize(blele, bunchno, ThisBunch, *L) ;
+    lman->Initialize(blele, bunchno, ThisBunch, length) ;
     if (lman->Status!=0)
       return lman->Status ;
     runManager->ReinitializeGeometry(); // Force new run to set new geometry
