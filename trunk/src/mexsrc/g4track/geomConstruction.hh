@@ -9,6 +9,8 @@
 #ifndef LUCRETIA_MANAGER
   #include "lucretiaManager.hh"
 #endif
+#include "FieldSetup.hh"
+
 class G4LogicalVolume;
 class G4Material;
 class DetectorMessenger;
@@ -17,11 +19,7 @@ class geomConstruction : public G4VUserDetectorConstruction
 {
   public:
     geomConstruction(
-      const G4String& collType = "Rectangle",
-      const G4String& collMaterialName = "G4_Be",
-      G4double aper_x = 0*CLHEP::m,
-      G4double aper_y = 0*CLHEP::m,
-      G4double thickness = 1*CLHEP::m,
+      lucretiaManager* lman,
       G4double dz = 1*CLHEP::m);
     ~geomConstruction();
 
@@ -30,6 +28,8 @@ class geomConstruction : public G4VUserDetectorConstruction
   virtual G4VPhysicalVolume* Construct();
     // others
   void SetGeomParameters(lucretiaManager* lman);
+
+  virtual void ConstructSDandField();
 
   private:
   G4String fCollType;
@@ -53,5 +53,7 @@ class geomConstruction : public G4VUserDetectorConstruction
   G4EllipticalTube* collInnerTube ;
   G4LogicalVolume* collVolumeInner ;
   G4PVPlacement* collInnerPlacement ;
+  FieldSetup* fEmFieldSetup;
+  lucretiaManager* fLman;
 };
 
