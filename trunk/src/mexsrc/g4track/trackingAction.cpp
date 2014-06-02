@@ -51,28 +51,11 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
   }
   if (parentID==0) { // Actions for primary particles
     hitsPerParentCounter=0;
-    //std::cout << "Z: " << z << " Z_cut: " << fLman->Lcut << " momz: " << momz << " E: " << e << " E_cut: " << fLman->Ecut << " CUTS: " << passCuts << "\n" ;
     fLman->SetNextX(xLucretia, track->GetTrackID()-1, passCuts) ; // Write new tracked particle back to Lucretia Matlab Bunch
     lastPrimaryID=track->GetTrackID()-1;
-    /*std::cout << "-=-=-=-=-***USER_TRACKING****-=-=-=-= [PRIMARY PARTICLE]\n"
-	      << "ID= " << track->GetTrackID() << "  e= " << e << " Name:  "
-	      << track->GetDynamicParticle()->GetDefinition()->GetParticleName() << "  "
-	      << "X/Y/Z: " << x << " / " << y << " / " << z << "  "
-	      << "PX/PY: " << atan(momx/momz) << " / " << atan(momy/momz) << "  "
-	      << "P: " << momx << " , " << momy << " , " << momz << " "
-	      << "Parent ID= " << parentID
-	      << "\n"  ;*/
   }
   else if (dosecondaries && (uint32_T)hitsPerParentCounter<fLman->fMaxSecondaryParticlesPerPrimary) {
     hitsPerParentCounter++;
-    /*std::cout << "-=-=-=-=-***USER_TRACKING****-=-=-=-= [SECONDARY PARTICLE]\n"
-	      << "ID= " << track->GetTrackID() << "  e= " << e << " Name:  "
-	      << track->GetDynamicParticle()->GetDefinition()->GetParticleName() << "  "
-	      << "X/Y/Z: " << x << " / " << y << " / " << z << "  "
-	      << "PX/PY: " << atan(momx/momz) << " / " << atan(momy/momz) << "  "
-	      << "P: " << momx << " , " << momy << " , " << momz << " "
-	      << "Parent ID= " << parentID
-	      << "\n"  ;*/
     fLman->SetNextSecondary(xLucretia, lastPrimaryID, track->GetDynamicParticle()->GetDefinition()->GetParticleName()) ; 
   }
 }

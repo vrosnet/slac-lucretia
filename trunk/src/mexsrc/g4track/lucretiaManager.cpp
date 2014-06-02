@@ -562,15 +562,13 @@ int lucretiaManager::GetNextX()
 {
   // Return pointer to next 6D ray co-ordinates that has a stopped flag at this element #
   uint32_T iray, useray, i ;
-  //cout << "fRayCount: " << fRayCount << "\n" ;
-  if (fRayGetPtr >= (fBunch->nray-1) || fRayCount >= fMaxPrimaryParticles )
+  if (fRayGetPtr >= fBunch->nray || fRayCount >= fMaxPrimaryParticles )
     return -1 ;
   for (i=fRayGetPtr; i<fBunch->nray; i++) {
     if (fPrimOrder!=NULL)
       iray=fPrimOrder[i] ;
     else
       iray=i ;
-    //cout << "iray: " << iray << "\n" ;
     if ( fBunch->stop[iray] == *fEle+1 ) {
       fRayGetPtr = iray+1 ;
       // return if ray inside geant tracking volume
@@ -582,10 +580,6 @@ int lucretiaManager::GetNextX()
         fPrimIndex[fRayCount]=iray;
         fSecondariesPerThisPrimary[fRayCount]=0; // reset secondaries count
         fRayCount++;
-        /*cout << "GET_ID = " << fRayCount-1 << " iray: " << iray << " X/Y/Z: " <<
-         * fBunch->x[6*iray] << " / " << fBunch->x[6*iray+2] << " / " << fBunch->x[6*iray+4] <<
-         * " X'/Y' : " << fBunch->x[6*iray+1] << " / " << fBunch->x[6*iray+3] << " E: " <<
-         * fBunch->x[6*iray+5] << "\n" ;*/
         return iray ;
       }
     }
@@ -653,15 +647,10 @@ void lucretiaManager::SetNextX(double x[6], int id, int doresume)
   if (doresume == 1) {
     fBunch->stop[iray] = 0 ;
     fPrimaryRegenID[fNumRaysResumed] = iray+1 ;
-    //cout << "iray: " << iray+1 << " stop: " << fBunch->stop[iray] << "\n" ;
     fNumRaysResumed++;
   }
   else { // coordinate should be where particle stopped
     fBunch->x[6*iray+4] = x[4] ;
   }
-  /*cout << "SET_ID = " << id << " iray: " << iray << " X/Y/Z: " <<
-   * fBunch->x[6*iray] << " / " << fBunch->x[6*iray+2] << " / " << fBunch->x[6*iray+4] <<
-   * " X'/Y' : " << fBunch->x[6*iray+1] << " / " << fBunch->x[6*iray+3] << " E: " <<
-   * fBunch->x[6*iray+5] << " Resume: " << doresume << "\n" ;*/
   return ;
 }

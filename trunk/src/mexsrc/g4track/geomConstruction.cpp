@@ -2,6 +2,7 @@
 #include "G4LogicalVolume.hh"
 #include "G4Isotope.hh"
 #include "G4Element.hh"
+#include "G4Material.hh"
 #include "G4UnitsTable.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4GeometryManager.hh"
@@ -28,17 +29,27 @@ geomConstruction::geomConstruction(lucretiaManager* lman, G4double dz)
   G4double temperature, pressure, fractionmass;
   G4String name, symbol;
   G4int ncomponents;
-  density = 1.290*mg/cm3;
-  pressure    = 1.e-39*pascal;
-  temperature = 0.11*kelvin;
-  a = 14.01*g/mole;
-  elN  = new G4Element(name="Nitrogen",symbol="N" , z= 7., a);
-  a = 16.00*g/mole;
-  elO  = new G4Element(name="Oxygen"  ,symbol="O" , z= 8., a);
-  Vacuum = new G4Material(name="Vacuum"  , density, ncomponents=2, kStateGas,
-          temperature, pressure);
-  Vacuum->AddElement(elN, fractionmass=0.7);
-  Vacuum->AddElement(elO, fractionmass=0.3);
+  density = 1.e-25*g/cm3;
+  pressure    = 1.e-25*pascal;
+  temperature = 2.73*kelvin;
+  /*G4Material* Vacuum =
+          new G4Material(name="Vacuum",      //Name as String
+          1,		       //Atomic Number,  in this case we use 1 for hydrogen
+          1.008*g/mole,  //Mass per Mole "Atomic Weight"  1.008*g/mole for Hydoren
+          1.e-25*g/cm3,  //Density of Vaccuum  *Cant be Zero, Must be small insted
+          kStateGas,     //kStateGas for Gas
+          2.73*kelvin,   //Temperatuer for ga
+          1.e-25*g/cm3); //Pressure for Vaccum */
+  //a = 14.01*g/mole;
+  //elN  = new G4Element(name="Nitrogen",symbol="N" , z= 7., a);
+  //a = 16.00*g/mole;
+  //elO  = new G4Element(name="Oxygen"  ,symbol="O" , z= 8., a);
+  a = 1.008*g/mole;
+  elH = new G4Element(name="Hydrogen"  ,symbol="H" , z= 1., a);
+  Vacuum = new G4Material(name="Vacuum", density, ncomponents=1, kStateGas, temperature, pressure);
+  //Vacuum->AddElement(elN, fractionmass=0.7);
+  //Vacuum->AddElement(elO, fractionmass=0.3);
+  Vacuum->AddElement(elH, fractionmass=1.);
   
   // Store lucretiaManager class reference for field setup
   fLman=lman;
