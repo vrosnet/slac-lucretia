@@ -41,6 +41,7 @@ class geomConstruction : public G4VUserDetectorConstruction
   G4NistManager* nistManager ;
   G4Element* elN;
   G4Element* elO;
+  G4Element* elH;
   G4Material* Vacuum;
   G4Box* sWorld;
   G4LogicalVolume* worldVolume;
