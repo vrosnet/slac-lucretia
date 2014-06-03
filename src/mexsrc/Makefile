@@ -29,7 +29,7 @@
 # Link to matlab installation directory
 MATPATH = /var/MATLAB/R2014a
 # Name of mex file extension for this architecture (mexglx or mexa64 or mexmaci64)
-MEXEXT = mexa64
+MEXEXT = mexmaci64
 MCOMP:= $(MATPATH)/bin/mex -largeArrayDims
 CCOMP := $(MATPATH)/bin/mex -c -largeArrayDims
 # include -DLUCRETIA_DPREC to compile for double precision, else single
