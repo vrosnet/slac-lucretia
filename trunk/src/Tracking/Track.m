@@ -708,6 +708,9 @@ classdef Track < handle
       [ fx , bc ] = hist(beam.Bunch.x(5,:),nbin);
       [~, q] = gauss_fit(bc,fx) ;
       data.zfit=abs(q(4));
+      % Get stats at waist
+%       beam.Bunch.x=(R+L.*data.ywaist)*beam.Bunch.x;
+      
     end
     function [bunchProfile, sx, sy]=plasmaTrack(beamIn,decimate,doplot)
       persistent n_in s_in
