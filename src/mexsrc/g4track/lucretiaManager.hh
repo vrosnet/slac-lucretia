@@ -28,6 +28,7 @@ class lucretiaManager
   int Status ; // 0=OK; 1=No external processes defined for this BEAMLINE element
   char* GeomType ; // Geometry type ("Ellipse" | "Rectangle")
   char* Material ; // Material type -> must be from GEANT4 material tables
+  char* Material2 ; // Material type -> must be from GEANT4 material tables
   const mxArray *pBx,*pBy,*pBz,*pEx,*pEy,*pEz ; // EM field values
   char* EMStepperMethod ;
   double EMStepSize ;
@@ -51,6 +52,13 @@ class lucretiaManager
   uint32_T fSecondariesCounter ;
   int* fSecondariesPerThisPrimary ;
   int* fEle ;
+  double CollLen2 ;
+  double AperX2 ;
+  double AperY2 ;
+  double AperX3 ;
+  double AperY3 ;
+  double CollDX ;
+  double CollDY ;
 
   private:
   int access(int M, int N, int O, int x, int y, int z) ;

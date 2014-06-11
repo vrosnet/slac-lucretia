@@ -2,6 +2,7 @@
 <html><head>
 
 
+
   
     <meta http-equiv="content-type" content="text/html;
       charset=windows-1252"><title>Lucretia: Supported Element Classes</title>
@@ -2624,8 +2625,7 @@ Aper,
                       </td>
                       <td style="vertical-align: top; text-align: center;">-<br>
                       </td>
-                      <td style="vertical-align: top;">Thickness of
-                        target in radiation lengths<br>
+                      <td style="vertical-align: top;">Ignored<br>
                       </td>
                     </tr>
                     <tr>
@@ -2684,12 +2684,11 @@ Aper,
                 each ray is checked at the upstream and downstream face
                 of this element to make sure that it is within the
                 aperture as defined by the Aperture field and the
-                Geometry field.&nbsp; At this time only collimators with
-                infinite stopping power are supported, but it is
-                expected that in later versions multiple scattering will
-                be supported.&nbsp; Collimators respond to the Aper
+                Geometry field.&nbsp; Collimators respond to the Aper
                 tracking flag, and so collimation can be completely
-                switched off if desired.<br>
+                switched off if desired. A particle is stopped completely unless an <a href="extProcess_geant4.html">EXTG4Process</a>
+class is associated with the defined element, in which case all GEANT4
+physics processes are applied according to the settings therein.<br>
                 <br>
                 <span style="font-weight: bold;"><a name="coord"></a>Coordinate
 

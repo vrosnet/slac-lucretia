@@ -5,6 +5,7 @@
 #include "G4PVPlacement.hh"
 #include "G4Material.hh" 
 #include "G4Box.hh"
+#include "G4Trd.hh"
 #include "G4NistManager.hh"
 #ifndef LUCRETIA_MANAGER
   #include "lucretiaManager.hh"
@@ -34,10 +35,18 @@ class geomConstruction : public G4VUserDetectorConstruction
   private:
   G4String fCollType;
   G4String fCollMaterialName;
+  G4String fCollMaterialName2;
   G4double fCollAperX;
   G4double fCollAperY;
   G4double fCollThickness;
   G4double fCollLength;
+  G4double fCollLength2;
+  G4double fCollAperX2 ;
+  G4double fCollAperY2 ;
+  G4double fCollAperX3 ;
+  G4double fCollAperY3 ;
+  G4double fCollDX ;
+  G4double fCollDY ;
   G4NistManager* nistManager ;
   G4Element* elN;
   G4Element* elO;
@@ -56,5 +65,13 @@ class geomConstruction : public G4VUserDetectorConstruction
   G4PVPlacement* collInnerPlacement ;
   FieldSetup* fEmFieldSetup;
   lucretiaManager* fLman;
+  G4Box* collTapBox ;
+  G4Trd* collTapBox1 ;
+  G4Box* collTapBox2 ;
+  G4Box* collTapBox3 ;
+  G4Trd* collTapBox4 ;
+  G4PVPlacement* collInnerPlacement2 ;
+  G4PVPlacement* collInnerPlacement3 ;
+  G4PVPlacement* collInnerPlacement4 ;
 };
 

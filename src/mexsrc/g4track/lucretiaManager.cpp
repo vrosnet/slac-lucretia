@@ -15,9 +15,7 @@ lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBun
   GeomType = NULL ;
   fSecondaryBunch_x = NULL ;
   fPrimaryRegenID = NULL ;
-  printf("Do Initialize...\n");
   Initialize(blele, bunchno, ThisBunch, L) ;
-  printf("Done.\n");
 }
 
 lucretiaManager::~lucretiaManager()
@@ -139,6 +137,15 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   buflen = mxGetN(pMaterial)*sizeof(mxChar)+1;
   Material = (char*) malloc(buflen);
   mxGetString(pMaterial, Material, buflen) ;
+  //
+  mxArray* pMaterial2 = GetExtProcessData(blele,"Material2") ;
+  if (pMaterial2 == NULL) {
+    Status = 1;
+    return;
+  }
+  buflen = mxGetN(pMaterial2)*sizeof(mxChar)+1;
+  Material2 = (char*) malloc(buflen);
+  mxGetString(pMaterial2, Material2, buflen) ;
   // - X and Y Apertures
   mxArray* pAperX = GetExtProcessData(blele,"AperX") ;
   if (pAperX == NULL) {
@@ -152,6 +159,32 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     return;
   }
   AperY = *mxGetPr( pAperY ) ;
+  //
+  mxArray* pAperX2 = GetExtProcessData(blele,"AperX2") ;
+  if (pAperX2 == NULL) {
+    Status = 1;
+    return;
+  }
+  AperX2 = *mxGetPr( pAperX2 ) ;
+  mxArray* pAperY2 = GetExtProcessData(blele,"AperY2") ;
+  if (pAperY2 == NULL) {
+    Status = 1;
+    return;
+  }
+  AperY2 = *mxGetPr( pAperY2 ) ;
+  //
+  mxArray* pAperX3 = GetExtProcessData(blele,"AperX3") ;
+  if (pAperX3 == NULL) {
+    Status = 1;
+    return;
+  }
+  AperX3 = *mxGetPr( pAperX3 ) ;
+  mxArray* pAperY3 = GetExtProcessData(blele,"AperY3") ;
+  if (pAperY3 == NULL) {
+    Status = 1;
+    return;
+  }
+  AperY3 = *mxGetPr( pAperY3 ) ;
   // - Energy cut for returning tracks
   mxArray* pEcut = GetExtProcessData(blele,"Ecut") ;
   if (pEcut == NULL) {
@@ -174,6 +207,27 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     return;
   }
   Thickness = *mxGetPr( pThickness ) ;
+  //
+  mxArray* pCollDX = GetExtProcessData(blele,"CollDX") ;
+  if (pCollDX == NULL) {
+    Status = 1;
+    return;
+  }
+  CollDX = *mxGetPr( pCollDX ) ;
+  //
+  mxArray* pCollDY = GetExtProcessData(blele,"CollDY") ;
+  if (pCollDY == NULL) {
+    Status = 1;
+    return;
+  }
+  CollDY = *mxGetPr( pCollDY ) ;
+  // - Secondary collimator length option
+  mxArray* pCollLen2 = GetExtProcessData(blele,"CollLen2") ;
+  if (pCollLen2 == NULL) {
+    Status = 1;
+    return;
+  }
+  CollLen2 = *mxGetPr( pCollLen2 ) ;
   // - Verbosity control
   mxArray* pVerbose = GetExtProcessData(blele,"Verbose") ;
   Verbose = 0 ;

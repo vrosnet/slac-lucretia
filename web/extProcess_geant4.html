@@ -1,28 +1,20 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta content="en-us" http-equiv="Content-Language">
-    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
-    <title>External Process Interface - GEANT4</title>
-  </head>
-  <body>
-    <div style="text-align: center;"><a
-        href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span
-          style="font-size: 24pt;"> <img src="LucretiaLogo.gif"
-            alt="LucretiaLogo" style="border: 0px solid ; width: 80px;
-            height: 90px;" align="right" hspace="20"></span></a><span
-        style="font-size: 24pt;"><br>
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+
+  
+    <meta content="en-us" http-equiv="Content-Language" />
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" /><title>External Process Interface - GEANT4</title></head><body>
+    <div style="text-align: center;"><a href="http://www.slac.stanford.edu/accel/ilc/codes/Lucretia/"><span style="font-size: 24pt;"> <img src="LucretiaLogo.gif" alt="LucretiaLogo" style="border: 0px solid ; width: 80px; height: 90px;" align="right" hspace="20" /></span></a><span style="font-size: 24pt;"><br />
       </span>
       <div style="text-align: center;"><span style="font-size: 24pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 The
           <span style="color: rgb(214, 0, 147);">LUCRETIA</span>
-          Project</span><br>
+          Project</span><br />
       </div>
-      <span style="font-size: 24pt;"><br>
-        <small>Interface Routines to Access External Processes - <span
-            style="color: rgb(204, 51, 204); font-weight: bold;">GEANT4</span><br>
-          <br>
-        </small></span><br>
+      <span style="font-size: 24pt;"><br />
+        <small>Interface Routines to Access External Processes - <span style="color: rgb(204, 51, 204); font-weight: bold;">GEANT4</span><br />
+          <br />
+        </small></span><br />
       <div style="text-align: left;">
         <div style="text-align: center;">
           <div style="text-align: left;">
@@ -33,8 +25,7 @@ The
                 (inherits from
                 ExtProcess, ExtGeometry &amp; ExtEMField). This assumes
                 you are using a version of
-                Lucretia built against the GEANT4 libraries (see <a
-                  href="downloads.html">source+build </a>page).<br>
+                Lucretia built against the GEANT4 libraries (see <a href="downloads.html">source+build </a>page).<br />
                 To use: first
                 instantiate
                 an object of this class using the <i>new</i> method of
@@ -45,7 +36,7 @@ The
                 tracking engine will
                 automatically handle passing of Lucretia macro particles
                 to GEANT4 for
-                tracking.<br>
+                tracking.<br />
                 The criteria for passing particles to GEANT4 for
                 tracking is that an
                 ExtG4Process object is attached to a BEAMLINE element
@@ -71,8 +62,8 @@ The
                 requested, secondary particles generated in the GEANT4
                 tracking process
                 are stored in the <span style="font-style: italic;">SecondaryBeam</span>
-                property field.<br>
-                <br>
+                property field.<br />
+                <br />
                 <span style="font-weight: bold;">Warning: When tracking
                   with active
                   GEANT4 materials, do not use "clear all", "clear
@@ -83,43 +74,46 @@ The
                   performed. This is an
                   unavoidable side-effect associated with co-compilation
                   of the GEANT4
-                  environment within the Lucretia mex environment.</span><br>
-                <br>
+                  environment within the Lucretia mex environment.</span><br />
+                <br />
                 <span style="font-weight: bold;">NB: Users running
                   Lucretia from
                   subversion checked-out code, make sure you have
                   installed the GEANT4
-                  data files as described in the <a
-                    href="downloads.html">downloads</a> page.</span><br>
-                <br>
+                  data files as described in the <a href="downloads.html">downloads</a> page.</span><br />
+                <br />
                 A simple example (load a Lucretia BEAMLINE, make a Track
                 object,
                 configure a collimator class element to transfer
-                particles to GEANT4
-                and perform tracking):<br>
-                &gt;&gt; global BEAMLINE;<br>
-                &gt;&gt; load lucretiaBeamlineData.mat BEAMLINE Initial;<br>
+                particles to GEANT4, generate a simple magnetic field map [Bx linear with X]
+                and perform tracking):<br />
+                &gt;&gt; global BEAMLINE;<br />
+                &gt;&gt; load lucretiaBeamlineData.mat BEAMLINE Initial;<br />
                 &gt;&gt; Beam = MakeBeam6DWeighted( Initial, 1e6, 5, 1
-                );<br>
-                &gt;&gt; T = Track(Beam) ;<br>
-                &gt;&gt; colls = findcells(BEAMLINE,'Class','COLL') ;<br>
-                &gt;&gt; BEAMLINE{colls(1)}.aper=[1e-3; 1e-3] ;<br>
-                &gt;&gt; BEAMLINE{colls(1)}.Geometry='Rectangle' ;<br>
-                &gt;&gt;
+                );<br />
+                &gt;&gt; T = Track(Beam) ;<br />
+                &gt;&gt; colls = findcells(BEAMLINE,'Class','COLL') ;<br />
+                &gt;&gt; BEAMLINE{colls(1)}.aper=[1e-3; 1e-3] ;<br />
+                &gt;&gt; BEAMLINE{colls(1)}.Geometry='Rectangle' ;<br />
+&gt;&gt;
 ExtProcess.new('GEANT4',colls(1),'Material','G4_Be','Ecut',BEAMLINE{colls(1)}.P*0.1,'Thickness',0.1,'Verbose',0,'MaxPrimaryParticles',1000)
-                ;<br>
-                &gt;&gt; BEAMLINE{colls(1)}.ExtProcess(1).Verbose=1 ;<br>
-                &gt;&gt; T.trackThru() ;<br>
-                <br>
+;<br />
+                &gt;&gt; BEAMLINE{colls(1)}.ExtProcess(1).Verbose=1 ;<br />
+&gt;&gt; [X Y Z] = meshgrid(linspace(-0.101,0.101,100), linspace(-0.101,0.101), linspace(-0.101,0.101));<br />
+&gt;&gt; BEAMLINE{colls(1)}.ExtProcess.Bx=X.*10;<br />
+&gt;&gt; BEAMLINE{colls(1)}.ExtProcess.By=0;<br />
+&gt;&gt; BEAMLINE{colls(1)}.ExtProcess.Bz=0;<br />
+&gt;&gt; BEAMLINE{colls(1)}.ExtProcess.EnableFieldCalc();<br />
+                &gt;&gt; T.trackThru() ;<br />
+                <br />
                 <h3 style="color: rgb(51, 102, 255);">ExtG4Process.m
                   (inherits from
                   ExtProcess, ExtGeometry &amp; ExtG4EMField)</h3>
                 Particles with energy &gt; Ecut and which track to the
                 downstream edge of the material element get re-inserted
                 into the Lucretia
-                tracking loop (by having their <span style="font-style:
-                  italic;">stop </span>fields
-                reset to zero).<br>
+                tracking loop (by having their <span style="font-style: italic;">stop </span>fields
+                reset to zero).<br />
                 On construction, the <span style="font-style: italic;">allowedMaterials</span>
                 property is populated with the list of pre-defined
                 materials allowed by
@@ -127,10 +121,9 @@ ExtProcess.new('GEANT4',colls(1),'Material','G4_Be','Ecut',BEAMLINE{colls(1)}.P*
                 provided. Additionally, the volume name <i>Vacuum</i>
                 exists which is automatically set as the material type
                 inside the material aperture defined. See
-                the GEANT4 <a
-href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGuides_beta/ForApplicationDeveloper/html/apas08.html">materials
+                the GEANT4 <a href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGuides_beta/ForApplicationDeveloper/html/apas08.html">materials
                   database</a>
-                for options.<br>
+                for options.<br />
                 By default the material geometry constructed follows
                 the data in the BEAMLINE element. For all elements other
                 than COLL, a
@@ -150,14 +143,13 @@ href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGui
                 aper details to
                 determine whether to stop the particle (and hand it over
                 to GEANT4 for
-                tracking) or not.<br>
+                tracking) or not.<br />
                 <h4><u>Public properties</u></h4>
                 <ul>
                   <li><b>Ecut</b> = 0</li>
                   <ul>
                     <li>Kinetic energy cut: particles (both primary and
-                      secondaries) with final energy &gt; <span
-                        style="font-style: italic;">Ecut</span> are
+                      secondaries) with final energy &gt; <span style="font-style: italic;">Ecut</span> are
                       inserted back into the
                       Lucretia Bunch structure.</li>
                   </ul>
@@ -173,53 +165,46 @@ href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGui
                       of all primary and
                       secondary particles generated. 0 is as
                       content-free as possible,
-                      although information is still displayed.<br>
+                      although information is still displayed.<br />
                     </li>
                   </ul>
                 </ul>
                 <h4><u>Public methods</u></h4>
                 <ul>
-                  <li><b>SetGeometry</b>(<span style="font-style:
-                      italic;">type</span>)</li>
+                  <li><b>SetGeometry</b>(<span style="font-style: italic;">type</span>)</li>
                   <ul>
                     <li>Accepts "Rectangle" or "Ellipse" as options only
                       currently.</li>
                   </ul>
-                  <li><b>SetMaterial</b>(<span style="font-style:
-                      italic;">type</span>)</li>
+                  <li><b>SetMaterial</b>(<span style="font-style: italic;">type</span>)</li>
                   <ul>
                     <li>Allows any of the GEANT4 material database types
                       plus user-defined ones hard coded into Lucretia
-                      application listed below. See <a
-href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGuides_beta/ForApplicationDeveloper/html/apas08.html">GEANT4
+                      application listed below. See <a href="http://geant4.web.cern.ch/geant4/workAreaUserDocKA/Backup/Docbook_UsersGuides_beta/ForApplicationDeveloper/html/apas08.html">GEANT4
                         material database list</a> for options, also the
                       <span style="font-style: italic;">allowedMaterials</span>
-                      property can be examined.<br>
+                      property can be examined.<br />
                     </li>
                   </ul>
                   <li><b>SetAper</b>(<span style="font-style: italic;">aper1[,aper2]</span>)</li>
                   <ul>
-                    <li>Provide ellipse radius <span style="font-style:
-                        italic;">aper1</span>
-                      or semi-major and semi-minor ellipse parameters <span
-                        style="font-style: italic;">aper1</span> and <span
-                        style="font-style: italic;">aper2</span> (or X
+                    <li>Provide ellipse radius <span style="font-style: italic;">aper1</span>
+                      or semi-major and semi-minor ellipse parameters <span style="font-style: italic;">aper1</span> and <span style="font-style: italic;">aper2</span> (or X
                       and Y rectangular
                       half-apertures).</li>
                   </ul>
                 </ul>
                 <h3 style="color: rgb(51, 102, 255);">ExtG4EMField.m
-                  (inherits from ExtEMField)<br>
+                  (inherits from ExtEMField)<br />
                 </h3>
                 The ExtG4Process class adds the following properties to
-                the base EM field description class. See the <a
-href="http://geant4.web.cern.ch/geant4/G4UsersDocuments/UsersGuides/ForApplicationDeveloper/html/Detector/electroMagneticField.html">GEANT4
-                  Electromagnetic field documentation</a> for details.<br>
+                the base EM field description class. See the <a href="http://geant4.web.cern.ch/geant4/G4UsersDocuments/UsersGuides/ForApplicationDeveloper/html/Detector/electroMagneticField.html">GEANT4
+                  Electromagnetic field documentation</a> for details.<br />
                 <ul>
                   <li><b>StepMethods</b> supported:</li>
                   <ul>
                     <li>'SimpleRunge','ClassicalRK4','CashKarpRKF45','ExplicitEuler','ImplicitEuler','SimpleHeum'</li>
-                    <li>Default is 'ClassicalRK4'<br>
+                    <li>Default is 'ClassicalRK4'<br />
                     </li>
                   </ul>
                   <li>EM field <b>Interpolators </b>supported:</li>
@@ -228,15 +213,15 @@ href="http://geant4.web.cern.ch/geant4/G4UsersDocuments/UsersGuides/ForApplicati
                     <li>Default is 'linear'</li>
                   </ul>
                   <li>Additional Parameter to control the field
-                    integration stepper:<br>
+                    integration stepper:<br />
                   </li>
                   <ul>
-                    <li><b>DeltaOneStep</b> = 1e-5 <br>
+                    <li><b>DeltaOneStep</b> = 1e-5 <br />
                     </li>
                     <li><b>DeltaIntersection</b> = 1e-5</li>
                     <li><b>DeltaChord</b> = 1e-5</li>
                     <li><b>EpsMin</b> = 1e-7</li>
-                    <li><b>EpsMax</b> = 1e-5<br>
+                    <li><b>EpsMax</b> = 1e-5<br />
                     </li>
                   </ul>
                 </ul>
@@ -244,18 +229,14 @@ href="http://geant4.web.cern.ch/geant4/G4UsersDocuments/UsersGuides/ForApplicati
                   <ul>
                   </ul>
                 </ul>
-                <h4><a href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br>
+                <h4><a href="http://www.slac.stanford.edu/owner/whitegr">whitegr</a><br />
                 </h4>
-                2-June-2014<a
-                  href="http://www.slac.stanford.edu/detailed.html"><img
-                    src="SLAC_whitebkgd.jpg" title="Return to SLAC
-                    detailed home page" alt="SLAC-logo" style="border:
-                    0px solid ; width: 100px; height: 39px;"
-                    align="right"></a></div>
+                2-June-2014<a href="http://www.slac.stanford.edu/detailed.html"><img src="SLAC_whitebkgd.jpg" title="Return to SLAC
+                    detailed home page" alt="SLAC-logo" style="border: 0px solid ; width: 100px; height: 39px;" align="right" /></a></div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </body>
-</html>
+  
+</body></html>
