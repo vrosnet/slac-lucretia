@@ -15,10 +15,18 @@ geomConstruction::geomConstruction(lucretiaManager* lman, G4double dz)
 : G4VUserDetectorConstruction(),
         fCollType(lman->GeomType),
         fCollMaterialName(lman->Material),
+        fCollMaterialName2(lman->Material2),
         fCollAperX(lman->AperX),
         fCollAperY(lman->AperY),
         fCollThickness(lman->Thickness),
-        fCollLength(dz)
+        fCollLength(dz),
+        fCollLength2(lman->CollLen2),
+        fCollAperX2(lman->AperX2),
+        fCollAperY2(lman->AperY2),
+        fCollAperX3(lman->AperX3),
+        fCollAperY3(lman->AperY3),
+        fCollDX(lman->CollDX),
+        fCollDY(lman->CollDY)
 {
   // Define materials via NIST manager
   //
@@ -59,10 +67,18 @@ void geomConstruction::SetGeomParameters(lucretiaManager* lman)
 {
   fCollType=lman->GeomType;
   fCollMaterialName=lman->Material;
+  fCollMaterialName2=lman->Material2;
   fCollAperX=lman->AperX;
   fCollAperY=lman->AperY;
   fCollThickness=lman->Thickness;
   fCollLength=lman->Lcut ;
+  fCollLength2=lman->CollLen2 ;
+  fCollAperX2=lman->AperX2 ;
+  fCollAperY2=lman->AperY2 ;
+  fCollAperX3=lman->AperX3 ;
+  fCollAperY3=lman->AperY3 ;
+  fCollDX=lman->CollDX ;
+  fCollDY=lman->CollDY ;
 }
 
 geomConstruction::~geomConstruction()
@@ -74,6 +90,8 @@ G4VPhysicalVolume* geomConstruction::Construct()
   // Collimator material
   G4Material* collMaterial
           = nistManager->FindOrBuildMaterial(fCollMaterialName);
+  G4Material* collMaterial2
+          = nistManager->FindOrBuildMaterial(fCollMaterialName2);
   
   // Geometry parameters
   //
@@ -183,6 +201,94 @@ G4VPhysicalVolume* geomConstruction::Construct()
             collVolume,               //its mother  volume
             false,                      //no boolean operation
             0);                         //copy number
+  }
+  else if (strcmp( fCollType, "Tapered" ) == 0 ) {
+    //  Tapered Collimator with optional box insert
+    collTapBox
+            = new G4Box("TapColl",                        //its name
+            worldDimensions.x(),           //dimensions (half-lengths)
+            worldDimensions.y(),
+            worldDimensions.z());
+    
+    collVolume
+            = new G4LogicalVolume(collTapBox,                 //its shape
+            collMaterial,         //its material
+            "TapColl");             //its name
+    
+    collPlacement
+            = new G4PVPlacement(0,                         //no rotation
+            G4ThreeVector(),            //at (0,0,0)
+            collVolume,                 //its logical volume
+            "TapColl",                    //its name
+            worldVolume,                //its mother  volume
+            false,                      //no boolean operation
+            0);                         //copy number
+    double tapLength = (fCollLength-fCollLength*fCollLength2) ;
+    collTapBox1
+            = new G4Trd("TapColl1",
+               (fCollAperX+fCollAperX2*fCollDX)*m,
+               fCollAperX*m,
+               (fCollAperY+fCollAperY2*fCollDY)*m,
+               fCollAperY*m,
+               (tapLength/2)*m );
+    if (fCollLength2>0) {
+      collTapBox2
+              = new G4Box("TapColl2",
+                 (fCollAperX+fCollAperX3*fCollDX)*m,
+                 (fCollAperY+fCollAperY3*fCollDY)*m,
+                 (fCollLength*fCollLength2)*m);
+      collTapBox3
+              = new G4Box("TapColl3",
+                 fCollAperX*m,
+                 fCollAperY*m,
+                 (fCollLength*fCollLength2)*m);
+    }
+    collTapBox4
+            = new G4Trd("TapColl4",
+               fCollAperX*m,
+               (fCollAperX+fCollAperX2*fCollDX)*m,
+               fCollAperY*m,
+               (fCollAperY+fCollAperY2*fCollDY)*m,
+               (tapLength/2)*m);
+    collInnerPlacement
+            = new G4PVPlacement(0,    //no rotation
+            G4ThreeVector(0,0,(-fCollLength+tapLength/2)*m),
+            new G4LogicalVolume(collTapBox1,Vacuum,"TapCollInner1"),
+            "TapCollInner1",                      //its name
+            collVolume,               //its mother  volume
+            false,                      //no boolean operation
+            0);      //copy number
+    collInnerPlacement2
+            = new G4PVPlacement(0,    //no rotation
+            G4ThreeVector(0,0,(fCollLength*fCollLength2+tapLength/2)*m),
+            new G4LogicalVolume(collTapBox4,Vacuum,"TapCollInner2"),
+            "TapCollInner2",                      //its name
+            collVolume,               //its mother  volume
+            false,                      //no boolean operation
+            0);                         //copy number
+    if (fCollLength2>0) {
+      collVolumeInner
+              = new G4LogicalVolume(collTapBox2,            //its shape
+              collMaterial2,               //its material
+              "TapCollInner3");        //its name
+      collInnerPlacement3
+            = new G4PVPlacement(0,                          //no rotation
+            G4ThreeVector(),            //at (0,0,0)
+            collVolumeInner,                //its logical volume
+            "TapCollInner3",                      //its name
+            collVolume,               //its mother  volume
+            false,                      //no boolean operation
+            0);                         //copy number
+      collInnerPlacement4
+            = new G4PVPlacement(0,                          //no rotation
+            G4ThreeVector(),            //at (0,0,0)
+            new G4LogicalVolume(collTapBox3,Vacuum,"TapCollInner4"),
+            "TapCollInner4",                      //its name
+            collVolumeInner,               //its mother  volume
+            false,                      //no boolean operation
+            0);                         //copy number
+    }
+    
   }
   else {
     G4cerr << "Unknown Geometry type requested" ;

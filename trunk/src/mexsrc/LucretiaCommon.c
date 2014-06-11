@@ -8847,11 +8847,11 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
       break ;
     }
   }
-  //printf("ExtProcess: ele=%d stoppedParticles=%d\n",*elemno+1,stoppedParticles) ;
   if (stoppedParticles==0)
     return ;
   if (L == 0) /* If L passed as 0, need to look up from BEAMLINE in case of split tracking */
     L = *GetElemNumericPar( *elemno, "L", NULL ) ;
+  
   if (L == 0) /* If L is still 0 then no point passing to GEANT */
       return ;
   /* make ray coordinates into local ones */
@@ -8872,6 +8872,10 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
   }
   /* Perform required GEANT4 tracking */
   numRaysResumed = g4track(elemno, bunchno, TheBeam, &L) ;
+  if (numRaysResumed<0) { // error condition
+    printf("Error running GEANT4 interface... skipping for ele: %d\n",*elemno+1) ;
+    return ;
+  }
   /* adjust stopped particles counter to reflected those re-entered */
   ThisBunch->NGOODRAY += numRaysResumed ;
   

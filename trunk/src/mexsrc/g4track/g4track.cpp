@@ -16,7 +16,7 @@
 using namespace std ;
 
 // Interface from Lucretia to GEANT4 tracking routines
-// - returns number of Lucretia macro-particles un-stopped
+// - returns number of Lucretia macro-particles un-stopped or -1 if error parsing Lucretia data
 int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
 {                     
   struct Bunch* ThisBunch = TheBeam->bunches[*bunchno] ;
@@ -38,7 +38,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     lman = new lucretiaManager(blele, bunchno, ThisBunch, length) ;
     // return with error if no associated EXT Process on this BEAMLINE or there is a problem with one of the EXT Process object's properties
     if (lman->Status!=0)
-      return lman->Status ;
+      return -1 ;
     runManager = new G4RunManager;
     // get the pointer to the UI manager
     UI = G4UImanager::GetUIpointer();
