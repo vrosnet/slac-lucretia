@@ -15,11 +15,25 @@ lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBun
   GeomType = NULL ;
   fSecondaryBunch_x = NULL ;
   fPrimaryRegenID = NULL ;
+  int imat;
+  for (imat=0;imat<3;imat++) {
+    UserMaterial[imat].NumComponents=0;
+  }
   Initialize(blele, bunchno, ThisBunch, L) ;
 }
 
 lucretiaManager::~lucretiaManager()
 {
+  int imat,icomp;
+  for (imat=0;imat<3;imat++) {
+    if (UserMaterial[imat].NumComponents != 0) { // Free any previously allocated element memory
+      for (icomp=0;icomp<UserMaterial[imat].NumComponents;icomp++) {
+        free(UserMaterial[imat].element[icomp].Name) ;
+        free(UserMaterial[imat].element[icomp].Symbol) ;
+      }
+      free(UserMaterial[imat].element) ;
+    }
+  }
 }
 
 void lucretiaManager::freeMem()
@@ -38,6 +52,8 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   fRayGetPtr=0;
   fNumRaysResumed=0;
   fBunchNo=bunchno;
+  size_t buflen=0 ;
+  int imat,iele,icomp;
   // Clear any previously assigned memory that isn't required by Matlab session
   if ( fSecondariesPerThisPrimary != NULL )
     free(fSecondariesPerThisPrimary) ;
@@ -49,6 +65,53 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   }
   if (GeomType!=NULL)
     free(GeomType) ;
+  for (imat=0;imat<3;imat++) {
+    if (UserMaterial[imat].NumComponents != 0) {
+      free(UserMaterial[imat].state) ;
+      free(VacuumMaterial);
+      for (icomp=0;icomp<UserMaterial[imat].NumComponents;icomp++) {
+        free(UserMaterial[imat].element[icomp].Name) ;
+        free(UserMaterial[imat].element[icomp].Symbol) ;
+      }
+      free(UserMaterial[imat].element) ;
+    }
+  }
+  // Get any user defined material definitions
+  mxArray* pUserMaterial = GetExtProcessData(blele,"UserMaterial") ;
+  size_t nmat = mxGetNumberOfElements(pUserMaterial) ;
+  mxArray* pElement;
+  mxArray* pEleName;
+  mxArray* pEleSymbol;
+  mxArray* pState;
+  for (imat=0;imat<nmat;imat++) {
+    UserMaterial[imat].density = *mxGetPr(mxGetField(pUserMaterial,imat,"Density")) ;
+    UserMaterial[imat].pressure = *mxGetPr(mxGetField(pUserMaterial,imat,"Pressure")) ;
+    UserMaterial[imat].temperature = *mxGetPr(mxGetField(pUserMaterial,imat,"Temperature")) ;
+    pState = mxGetField(pUserMaterial,imat,"State") ;
+    buflen = mxGetN(pState)*sizeof(mxChar)+1;
+    UserMaterial[imat].state = (char*) malloc(buflen) ;
+    mxGetString(pState, UserMaterial[imat].state, buflen) ;
+    UserMaterial[imat].NumComponents = *mxGetPr(mxGetField(pUserMaterial,imat,"NumComponents")) ;
+    UserMaterial[imat].element = (struct UserElement*) malloc( UserMaterial[imat].NumComponents * sizeof(struct UserElement) ) ;
+    pElement = mxGetField(pUserMaterial,imat,"Element") ;
+    for (iele=0;iele<UserMaterial[imat].NumComponents;iele++) {
+      pEleName = mxGetField(pElement,iele,"Name");
+      buflen = mxGetN(pEleName)*sizeof(mxChar)+1;
+      UserMaterial[imat].element[iele].Name = (char*) malloc(buflen);
+      mxGetString(pEleName, UserMaterial[imat].element[iele].Name, buflen) ;
+      pEleSymbol = mxGetField(pElement,iele,"Symbol");
+      buflen = mxGetN(pEleSymbol)*sizeof(mxChar)+1;
+      UserMaterial[imat].element[iele].Symbol = (char*) malloc(buflen);
+      mxGetString(pEleSymbol, UserMaterial[imat].element[iele].Symbol, buflen) ;
+      UserMaterial[imat].element[iele].Z=*mxGetPr(mxGetField(pElement,iele,"Z"));
+      UserMaterial[imat].element[iele].Z=*mxGetPr(mxGetField(pElement,iele,"A"));
+      UserMaterial[imat].element[iele].Z=*mxGetPr(mxGetField(pElement,iele,"FractionMass"));
+    }
+  }
+  mxArray* pVacuumMaterial = GetExtProcessData(blele,"VacuumMaterial") ;
+  buflen = mxGetN(pVacuumMaterial)*sizeof(mxChar)+1;
+  VacuumMaterial = (char*) malloc(buflen);
+  mxGetString(pVacuumMaterial,VacuumMaterial,buflen) ;
   // Get required extProcess properties
   /* ===== Get EM field data ===== */
   // B/E field values (scalar or 3D vectors)
@@ -107,7 +170,7 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     Status = 1;
     return;
   }
-  int buflen = mxGetN(pIM)*sizeof(mxChar)+1;
+  buflen = mxGetN(pIM)*sizeof(mxChar)+1;
   EMInterpMethod = (char*) malloc(buflen);
   mxGetString(pIM, EMInterpMethod, buflen) ;
   mxArray* pStep = GetExtProcessData(blele,"StepMethod") ;

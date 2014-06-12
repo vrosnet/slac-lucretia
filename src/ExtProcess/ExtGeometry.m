@@ -6,7 +6,7 @@ classdef ExtGeometry < handle
     allowedGeometryTypes={'Rectangle','Ellipse','Tapered'};
   end
   properties(Access=protected)
-    allowedMaterials={'Vacuum'};
+    allowedMaterials={'Vacuum'}; % also allow 'UserN' where N=1:length(obj.UserMaterial)
   end
   properties(SetAccess=protected)
     GeometryType='Ellipse'; % type of shape (e.g. 'Rectangle')
@@ -22,6 +22,8 @@ classdef ExtGeometry < handle
     Thickness=1; % Geometry thickness (m) - defines half-aperture of World box
     Material='Vacuum'; % material type
     Material2='Vacuum'; % secondary material type
+    VacuumMaterial='Vacuum'; % material to associate with the vacuum interior to the defined aperture
+    UserMaterial=[] ; % Container to hold user-defined materials
   end
   
   methods
@@ -42,6 +44,75 @@ classdef ExtGeometry < handle
         obj.checkExtGeometryProps();
       catch ME
         error('Error constructing geometry:\n%',ME.message)
+      end
+      % Initialise UserMaterial structure
+      for id=1:3
+        obj.UserMaterial(id).Density=1e-19;
+        obj.UserMaterial(id).Pressure=1e-19;
+        obj.UserMaterial(id).Temperature=3;
+        obj.UserMaterial(id).State='Gas';
+        obj.UserMaterial(id).NumComponents=1;
+        obj.UserMaterial(id).Element(1).Name='Hydrogen';
+        obj.UserMaterial(id).Element(1).Symbol='H';
+        obj.UserMaterial(id).Element(1).Z=1.0;
+        obj.UserMaterial(id).Element(1).A=1.0;
+        obj.UserMaterial(id).Element(1).FractionMass=1.0;
+      end
+    end
+    function SetUserMaterial(obj,id,density,pressure,temperature,state,numComponents)
+      % SetUserMaterial(id,density,pressure,temperature,state,numComponents)
+      %  Set the User material properties
+      %   id = id of UserMaterial (integer from 1 to 3), reference using 'User1', 'User2' or 'User3' in material name fields
+      %   density / g/cm^3
+      %   pressure / pascals
+      %   temperature / Kelvin
+      %   state = 'Solid', 'Liquid' or 'Gas'
+      %   numComponents = number of elemental components making up this material
+      if id<0 || id>3
+        error('Max 3 id slots for UserMaterial: %s',evalc('help ExtGeometry.SetUserMaterial'))
+      end
+      if density<=0 || pressure<=0 || temperature<=0 || numComponents<=0
+        error('density, pressure, temperature, numComponents must be >0: %s',evalc('help ExtGeometry.SetUserMaterial'))
+      end
+      if ~ismember(state,{'Solid','Liquid','Gas'})
+        error('state must be ''Solid'',''Liquid'' or ''Gas'': %s',evalc('help ExtGeometry.SetUserMaterial'))
+      end
+      obj.UserMaterial(id).Density=density;
+      obj.UserMaterial(id).Pressure=pressure;
+      obj.UserMaterial(id).Temperature=temperature;
+      obj.UserMaterial(id).State=state;
+      obj.UserMaterial(id).NumComponents=floor(numComponents);
+      for iele=1:floor(numComponents)
+        obj.UserMaterial(id).Element(iele).Name='Hydrogen';
+        obj.UserMaterial(id).Element(iele).Symbol='H';
+        obj.UserMaterial(id).Element(iele).Z=1.0;
+        obj.UserMaterial(id).Element(iele).A=1.0;
+        obj.UserMaterial(id).Element(iele).FractionMass=1/floor(numComponents);
+      end
+    end
+    function SetUserMaterialElement(obj,id,names,symbols,Z,A,fractionMass)
+      % SetUserMaterialElement(id,names,symbols,Z,A,fractionMass)
+      %  Set elemental components of User Material
+      %    id = id of UserMaterial (from 1 to 3)
+      %    names = cell array of elemental names (length == UserMaterial(id).NumComponents)
+      %    symbols = cell array of elemental symbol strings (length == UserMaterial(id).NumComponents)
+      %    Z = vector of atomic numbers (length == UserMaterial(id).NumComponents)
+      %    A = vector of atomic masses / g/mole (length == UserMaterial(id).NumComponents)
+      %    fractionMass = vector of mass fractions (must sum to 1 and length == UserMaterial(id).NumComponents)
+      if id<0 || id>3
+        error('Max 3 id slots for UserMaterial')
+      end
+      if length(names)~=obj.UserMaterial(id).NumComponents || length(names)~=length(symbols) || ...
+          length(names)~=length(Z) || length(names)~=length(A) || sum(fractionMass)~=1 || ~iscell(names) || ...
+          ~iscell(symbols)
+        error('Badly specified parameters: %s',evalc('help ExtGeometry.SetUserMaterialElement'))
+      end
+      for iele=1:obj.UserMaterial(id).NumComponents
+        obj.UserMaterial(id).Element(iele).Name=names{iele};
+        obj.UserMaterial(id).Element(iele).Symbol=symbols{iele};
+        obj.UserMaterial(id).Element(iele).Z=Z(iele);
+        obj.UserMaterial(id).Element(iele).A=A(iele);
+        obj.UserMaterial(id).Element(iele).FractionMass=fractionMass(iele);
       end
     end
     function SetAper(obj,val1,val2)
