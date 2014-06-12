@@ -33,6 +33,7 @@ class geomConstruction : public G4VUserDetectorConstruction
   virtual void ConstructSDandField();
 
   private:
+  G4Material* ProcessMaterial(G4String materialName ) ;
   G4String fCollType;
   G4String fCollMaterialName;
   G4String fCollMaterialName2;
@@ -47,11 +48,8 @@ class geomConstruction : public G4VUserDetectorConstruction
   G4double fCollAperY3 ;
   G4double fCollDX ;
   G4double fCollDY ;
+  G4String fVacuumMaterial;
   G4NistManager* nistManager ;
-  G4Element* elN;
-  G4Element* elO;
-  G4Element* elH;
-  G4Material* Vacuum;
   G4Box* sWorld;
   G4LogicalVolume* worldVolume;
   G4VPhysicalVolume* pWorld;

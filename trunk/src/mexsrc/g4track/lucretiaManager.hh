@@ -26,9 +26,10 @@ class lucretiaManager
   void GetUniformField(double uField[3]) ;
   double interpField(const int fieldno, const double* point) ;
   int Status ; // 0=OK; 1=No external processes defined for this BEAMLINE element
-  char* GeomType ; // Geometry type ("Ellipse" | "Rectangle")
-  char* Material ; // Material type -> must be from GEANT4 material tables
-  char* Material2 ; // Material type -> must be from GEANT4 material tables
+  char* GeomType ; // Geometry type ("Ellipse" | "Rectangle" | "Tapered")
+  char* Material ; 
+  char* Material2 ; 
+  char* VacuumMaterial ;
   const mxArray *pBx,*pBy,*pBz,*pEx,*pEy,*pEz ; // EM field values
   char* EMStepperMethod ;
   double EMStepSize ;
@@ -59,6 +60,21 @@ class lucretiaManager
   double AperY3 ;
   double CollDX ;
   double CollDY ;
+  struct UserElement {
+    char* Name;
+    char* Symbol;
+    double Z;
+    double A;
+    double FractionMass;
+  } ;
+  struct {
+	  double density;
+    double pressure;
+    double temperature;
+    char* state;
+    size_t NumComponents;
+    struct UserElement* element;
+  } UserMaterial[3];
 
   private:
   int access(int M, int N, int O, int x, int y, int z) ;
