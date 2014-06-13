@@ -60,6 +60,8 @@ class lucretiaManager
   double AperY3 ;
   double CollDX ;
   double CollDY ;
+  double MatP[2] ;
+  double MatT[2] ;
   struct UserElement {
     char* Name;
     char* Symbol;

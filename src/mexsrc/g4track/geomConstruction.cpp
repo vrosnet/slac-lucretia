@@ -10,6 +10,7 @@
 #include "G4SolidStore.hh"
 #include "G4LogicalVolumeStore.hh"
 #include <iostream>
+#include <string>
 
 geomConstruction::geomConstruction(lucretiaManager* lman, G4double dz)
 : G4VUserDetectorConstruction(),
@@ -37,27 +38,52 @@ geomConstruction::geomConstruction(lucretiaManager* lman, G4double dz)
   fLman=lman;
 }
 
-G4Material* geomConstruction::ProcessMaterial(G4String materialName )
+uint32_t geomConstruction::hashL(char *key, size_t len)
+{
+    uint32_t hash, i;
+    for(hash = i = 0; i < len; ++i)
+    {
+        hash += key[i];
+        hash += (hash << 10);
+        hash ^= (hash >> 6);
+    }
+    hash += (hash << 3);
+    hash ^= (hash >> 11);
+    hash += (hash << 15);
+    return hash;
+}
+
+G4Material* geomConstruction::ProcessMaterial(G4String materialName, int matID = 1 )
 {
   // Generate GEANT4 material definition from given data
+  static const double STP_Temperature = 273.15*kelvin;
+  static const double STP_Pressure    = 1.*atmosphere;
+  static std::vector<G4Material*> materialVector ;
   G4double density,a,z;
   G4double temperature, pressure, fractionmass;
   G4String name, symbol;
+  static G4Material* vacuumMaterial=nistManager->ConstructNewGasMaterial("Vacuum","G4_H",273*kelvin,1.e-25*pascal);
   G4int ncomponents;
   G4Material* material ;
-  density = 1.e-25*g/cm3;
-  pressure    = 1.e-25*pascal;
-  temperature = 2.73*kelvin;
+  //string eleChar ;
+  //stringstream convert;
+  //convert << fLman->fEle ;
+  //eleChar = convert.str();
   if (strcmp(materialName,"Vacuum")==0) { // default perfect vacuum
-    material = new G4Material(name="Vacuum", density, ncomponents=1, kStateGas, temperature, pressure);
-    material->AddElement(new G4Element(name="Hydrogen"  ,symbol="H" , z= 1., a=1.008*g/mole), fractionmass=1.);
+    material = vacuumMaterial ;
   } // Process user generated material description(s)
   else if (strncmp(materialName,"User",4) == 0) {
     int imat = (int)(materialName[4]-'0') ;
     int ic ;
     density=fLman->UserMaterial[imat].density*g/cm3;
-    pressure=fLman->UserMaterial[imat].pressure*pascal;
-    temperature=fLman->UserMaterial[imat].temperature*kelvin;
+    if (fLman->UserMaterial[imat].pressure>0)
+      pressure=fLman->UserMaterial[imat].pressure*pascal;
+    else
+      pressure=STP_Pressure;
+    if (fLman->UserMaterial[imat].temperature>0)
+      temperature=fLman->UserMaterial[imat].temperature*kelvin;
+    else
+      temperature=STP_Temperature;
     if ( strcmp(fLman->UserMaterial[imat].state,"Solid") == 0 )
       material = new G4Material(name=materialName, density, ncomponents=fLman->UserMaterial[imat].NumComponents, kStateSolid, temperature, pressure);
     else if ( strcmp(fLman->UserMaterial[imat].state,"Liquid") == 0 )
@@ -71,8 +97,20 @@ G4Material* geomConstruction::ProcessMaterial(G4String materialName )
               fLman->UserMaterial[imat].element[ic].A*g/mole),
               fractionmass=fLman->UserMaterial[imat].element[ic].FractionMass) ;
   }
-  else // assume want something from the GEANT4 material database
-    material = nistManager->FindOrBuildMaterial(materialName);
+  else { // assume want something from the GEANT4 (NIST) material database
+    if (fLman->MatP[matID]>0)
+      pressure=fLman->MatP[matID]*pascal;
+    else
+      pressure=STP_Pressure;
+    if (fLman->MatT[matID]>0)
+      temperature=fLman->MatT[matID]*kelvin;
+    else
+      temperature=STP_Temperature;
+    if (pressure!=STP_Pressure || temperature!=STP_Temperature)
+      material = nistManager->ConstructNewGasMaterial(materialName,materialName,temperature,pressure);
+    else
+      material = nistManager->FindOrBuildMaterial(materialName);
+  }
   return material ;
 }
 
@@ -104,10 +142,10 @@ geomConstruction::~geomConstruction()
 G4VPhysicalVolume* geomConstruction::Construct()
 {
   // Vacuum definition
-  G4Material* Vacuum = ProcessMaterial(fVacuumMaterial) ;
+  Vacuum = ProcessMaterial(fVacuumMaterial) ;
   // Collimator material
-  G4Material* collMaterial = ProcessMaterial(fCollMaterialName);
-  G4Material* collMaterial2 = ProcessMaterial(fCollMaterialName2);
+  collMaterial = ProcessMaterial(fCollMaterialName,1);
+  collMaterial2 = ProcessMaterial(fCollMaterialName2,2);
   
   // Geometry parameters
   //

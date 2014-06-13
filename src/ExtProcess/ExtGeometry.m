@@ -24,6 +24,10 @@ classdef ExtGeometry < handle
     Material2='Vacuum'; % secondary material type
     VacuumMaterial='Vacuum'; % material to associate with the vacuum interior to the defined aperture
     UserMaterial=[] ; % Container to hold user-defined materials
+    MaterialPressure=0; % 0 = use STP
+    MaterialTemperature=0; % 0 = use STP
+    Material2Pressure=0; % 0 = use STP
+    Material2Temperature=0; % 0 = use STP
   end
   
   methods
@@ -48,8 +52,8 @@ classdef ExtGeometry < handle
       % Initialise UserMaterial structure
       for id=1:3
         obj.UserMaterial(id).Density=1e-19;
-        obj.UserMaterial(id).Pressure=1e-19;
-        obj.UserMaterial(id).Temperature=3;
+        obj.UserMaterial(id).Pressure=0;
+        obj.UserMaterial(id).Temperature=0;
         obj.UserMaterial(id).State='Gas';
         obj.UserMaterial(id).NumComponents=1;
         obj.UserMaterial(id).Element(1).Name='Hydrogen';
@@ -64,15 +68,15 @@ classdef ExtGeometry < handle
       %  Set the User material properties
       %   id = id of UserMaterial (integer from 1 to 3), reference using 'User1', 'User2' or 'User3' in material name fields
       %   density / g/cm^3
-      %   pressure / pascals
-      %   temperature / Kelvin
+      %   pressure / pascals (0=STP)
+      %   temperature / Kelvin (0=STP)
       %   state = 'Solid', 'Liquid' or 'Gas'
       %   numComponents = number of elemental components making up this material
       if id<0 || id>3
         error('Max 3 id slots for UserMaterial: %s',evalc('help ExtGeometry.SetUserMaterial'))
       end
-      if density<=0 || pressure<=0 || temperature<=0 || numComponents<=0
-        error('density, pressure, temperature, numComponents must be >0: %s',evalc('help ExtGeometry.SetUserMaterial'))
+      if density<=0 || pressure<0 || temperature<0 || numComponents<=0
+        error('density, numComponents must be >0 (P,T >=0): %s',evalc('help ExtGeometry.SetUserMaterial'))
       end
       if ~ismember(state,{'Solid','Liquid','Gas'})
         error('state must be ''Solid'',''Liquid'' or ''Gas'': %s',evalc('help ExtGeometry.SetUserMaterial'))
@@ -88,6 +92,32 @@ classdef ExtGeometry < handle
         obj.UserMaterial(id).Element(iele).Z=1.0;
         obj.UserMaterial(id).Element(iele).A=1.0;
         obj.UserMaterial(id).Element(iele).FractionMass=1/floor(numComponents);
+      end
+    end
+    function SetMaterialPressure(obj,id,pressure)
+      if pressure<0
+        error('Set pressure >=0')
+      end
+      if ~ismember(id,[1 2])
+        error('id= 1 or 2');
+      end
+      if id==1
+        obj.MaterialPressure=pressure;
+      else
+        obj.Material2Pressure=pressure;
+      end
+    end
+    function SetMaterialTemperature(obj,id,temp)
+      if temp<0
+        error('Set temp >=0')
+      end
+      if ~ismember(id,[1 2])
+        error('id= 1 or 2');
+      end
+      if id==1
+        obj.MaterialTemperature=temp;
+      else
+        obj.Material2Temperature=temp;
       end
     end
     function SetUserMaterialElement(obj,id,names,symbols,Z,A,fractionMass)

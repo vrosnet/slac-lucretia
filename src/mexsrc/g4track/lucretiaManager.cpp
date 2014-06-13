@@ -65,10 +65,11 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   }
   if (GeomType!=NULL)
     free(GeomType) ;
+  if (UserMaterial[0].NumComponents != 0)
+    free(VacuumMaterial);
   for (imat=0;imat<3;imat++) {
     if (UserMaterial[imat].NumComponents != 0) {
       free(UserMaterial[imat].state) ;
-      free(VacuumMaterial);
       for (icomp=0;icomp<UserMaterial[imat].NumComponents;icomp++) {
         free(UserMaterial[imat].element[icomp].Name) ;
         free(UserMaterial[imat].element[icomp].Symbol) ;
@@ -248,6 +249,31 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     return;
   }
   AperY3 = *mxGetPr( pAperY3 ) ;
+  // Material pressures / temperatures
+  mxArray* pMatP = GetExtProcessData(blele,"MaterialPressure") ;
+  if (pMatP == NULL) {
+    Status = 1;
+    return;
+  }
+  MatP[0] = *mxGetPr(pMatP) ;
+  mxArray* pMatP2 = GetExtProcessData(blele,"Material2Pressure") ;
+  if (pMatP2 == NULL) {
+    Status = 1;
+    return;
+  }
+  MatP[1] = *mxGetPr(pMatP2) ;
+  mxArray* pMatT = GetExtProcessData(blele,"MaterialTemperature") ;
+  if (pMatT == NULL) {
+    Status = 1;
+    return;
+  }
+  MatT[0] = *mxGetPr(pMatT) ;
+  mxArray* pMatT2 = GetExtProcessData(blele,"Material2Temperature") ;
+  if (pMatT2 == NULL) {
+    Status = 1;
+    return;
+  }
+  MatT[1] = *mxGetPr(pMatT2) ;
   // - Energy cut for returning tracks
   mxArray* pEcut = GetExtProcessData(blele,"Ecut") ;
   if (pEcut == NULL) {
