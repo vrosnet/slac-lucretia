@@ -19,6 +19,7 @@
 The
 
 
+
           <span style="color: rgb(214, 0, 147);">LUCRETIA</span> Project</span><br>
       </div>
       <span style="font-size: 24pt;"><br>
@@ -27,7 +28,12 @@ The
         </small></span><span style="font-size: 24pt;"></span></div>
     <span style="font-weight: bold;"><span style="font-weight: bold;"></span></span><span
       style="font-weight:"><br>
-      <span style="font-weight:"><b>2-June-2014:</b><br>
+      <span style="font-weight:"><b>13-June-2014:<br>
+        </b>* Added "Tapered" geometry type in ExtProcess (GEANT4).<br>
+        * Added capability for user-defined material types for
+        ExtProcess (GEANT4)<br>
+        <b><br>
+          2-June-2014:</b><br>
         Added capability to define and associate an electromagnetic
         field to a BEAMLINE element using ExtProcess interface.
         Implemented GEANT4 handling of electromagnetic fields. See
@@ -62,6 +68,7 @@ The
     <br>
     <span style="font-weight: bold;"> 2-August-2012:</span><br>
     Added Coherent Synchrotron Radiation capability.<strong> </strong>See
+
 
 
     <a href="SynRad.html">here</a> for more details.<strong><br>
@@ -148,10 +155,12 @@ The
 user
 
 
+
         can optionally request vectors of the floor coordinates of all
         elements as output.</li>
       <li><a href="function_status.html#DisplayMessageStack">DisplayMessageStack:</a>&nbsp;
 a
+
 
 
         tool for displaying the contents of a message stack.</li>
@@ -175,6 +184,7 @@ href="http://www.slac.stanford.edu/cgi-wrap/cvsweb/Lucretia/?cvsroot=ILC-main">L
 CVS
 
 
+
           web interface</a>!<br>
       </li>
     </ul>
@@ -193,6 +203,7 @@ CVS
     &nbsp;&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; CreateBlankBeam<br>
     <br>
     <span style="font-weight: bold;"><span style="font-weight: bold;"></span>&nbsp;&nbsp;&nbsp;
+
 
 
     </span>Tuning and Analysis:<br>
@@ -240,6 +251,7 @@ CVS
     <ul>
       <li><a href="element_classes.html#xXYCor">New element type XYCOR</a>:&nbsp;
 combined-function
+
 
 
         horizontal and vertical DC dipole corrector (ie, both sets of
@@ -296,6 +308,7 @@ combined-function
 the
 
 
+
         benchmarking tests used to certify codes for simulation of
         linear accelerators have now been run through Lucretia, with
         good results.</li>
@@ -343,11 +356,13 @@ the
 user
 
 
+
         can now specify desired final coordinates, instead of desired
         initial coordinates for a region of BEAMLINE.<br>
       </li>
       <li><a href="tuning_analysis.html#GetNEmitFromBeam">GetNEmitFromBeam</a>:&nbsp;
 combines
+
 
 
         the functionality of the GetBeamPars function and the
@@ -357,10 +372,12 @@ combines
 uses
 
 
+
         Helm's method to compute the synchrotron radiation integrals I<sub>1</sub>
         through I<sub>5</sub> in both planes.</li>
       <li><a href="tuning_analysis.html#ReturnMatchedTwiss">ReturnMatchedTwiss</a>:&nbsp;
 now
+
 
 
         returns the matched dispersions as well as the matched betas and
@@ -497,10 +514,12 @@ now
 coordinate
 
 
+
           system</a> are now supported.</li>
       <li><a href="twiss.html#GetTwiss">Coupled Twiss calculations</a>
         in the Wolski formalism are now supported, along with the <a
           href="beam_generation.html#CoupledTwissFromInitial">calculation
+
 
 
           of initial coupled Twiss parameters</a>.</li>
@@ -582,6 +601,7 @@ coordinate
       <li>Map calculation of <a href="element_classes.html#SBend">sector
 
 
+
           bends</a> for R-matrix and tracking operations is
         improved.&nbsp; In particular the map is now symplectic, and the
         accuracy of the longitudinal terms is improved.<br>
@@ -593,12 +613,14 @@ coordinate
 power
 
 
+
           supplies</a> for the bending and focusing components,
         corresponding to a magnet which uses separate dipole and
         quadrupole windings to achieve its total field.&nbsp; <br>
       </li>
       <li>A gradient bend can have <a href="element_classes.html#SBend">separate
 field
+
 
 
           errors</a> for its dipole and quadrupole components,
