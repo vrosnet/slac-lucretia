@@ -19,7 +19,6 @@ function [h0,h1] = AddMagnetPlot( istart, iend, han, opt )
 % Version date:  11-Apr-2006.
 %
 % Modifications:
-% 3/24/2014, GRW, link x-axis of magnet plot and original
 % 10/24/2008, GRW, added ability to replace current axis
 %
 %==========================================================================
@@ -88,7 +87,7 @@ while (count < iend)
       if (isfield(BEAMLINE{count},'PS'))
         ps = BEAMLINE{count}.PS ;
         if (ps > 0)
-          strength = strength * PS(BEAMLINE{count}.PS).SetPt ;
+          strength = strength * PS(BEAMLINE{count}.PS).Ampl ;
         end
       end
       if (strength<0)

@@ -6,7 +6,7 @@ classdef ExtGeometry < handle
     allowedGeometryTypes={'Rectangle','Ellipse','Tapered'};
   end
   properties(Access=protected)
-    allowedMaterials={'Vacuum'}; % also allow 'UserN' where N=1:length(obj.UserMaterial)
+    allowedMaterials={'Vacuum','User1','User2','User3'};
   end
   properties(SetAccess=protected)
     GeometryType='Ellipse'; % type of shape (e.g. 'Rectangle')
@@ -120,7 +120,7 @@ classdef ExtGeometry < handle
         obj.Material2Temperature=temp;
       end
     end
-    function SetUserMaterialElement(obj,id,names,symbols,Z,A,fractionMass)
+    function SetUserMaterialElements(obj,id,names,symbols,Z,A,fractionMass)
       % SetUserMaterialElement(id,names,symbols,Z,A,fractionMass)
       %  Set elemental components of User Material
       %    id = id of UserMaterial (from 1 to 3)
@@ -198,6 +198,12 @@ classdef ExtGeometry < handle
       end
       obj.Material=material;
     end
+    function SetVacuumMaterial(obj,material)
+      if ~any(strcmp(material,obj.allowedMaterials))
+        error('Material not found in database');
+      end
+      obj.VacuumMaterial=material;
+    end
     function SetMaterial2(obj,material)
       if ~any(strcmp(material,obj.allowedMaterials))
         error('Material not found in database');
@@ -237,6 +243,12 @@ classdef ExtGeometry < handle
         error('Must provide DY parameter >0 & <= obj.Thickness (m)')
       end
       obj.CollDY=val;
+    end
+    function SetCollLen2(obj,val)
+      if val<0 || val>1
+        error('CollLen2 parameter must be [0:1] (fraction of element length)');
+      end
+      obj.CollLen2=val;
     end
     function checkExtGeometryProps(obj)
       obj.SetGeometryType(obj.GeometryType);
