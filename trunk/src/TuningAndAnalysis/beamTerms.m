@@ -27,7 +27,7 @@ warnstate=warning('query','MATLAB:nearlySingularMatrix');
 warning('off','MATLAB:nearlySingularMatrix');
 
 % remove stopped particles
-beam.Bunch.x(beam.Bunch.stop>0)=[];
+beam.Bunch.x(:,beam.Bunch.stop>0)=[];
 if isempty(beam.Bunch.x)
   error('All particles in provided beam stopped!')
 end

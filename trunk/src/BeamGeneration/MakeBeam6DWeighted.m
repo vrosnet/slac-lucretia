@@ -1,10 +1,10 @@
-function beamout = MakeBeam6DWeighted( Initial, nrays, nsigma, allsame )
+function beamout = MakeBeam6DWeighted( Initial, nrays, nsigma, allsame, dist )
 %
 % MAKEBEAM6DWEIGHTED Create a beam with with rays uniformly randomly
 % distributed on the interval [-nsigma:nsigma] with charge weighting
 % according to a normal distribution function
 %
-% beamout = MakeBeam6DWeighted( Initial, nrays, nsigma, allsame ) returns a
+% beamout = MakeBeam6DWeighted( Initial, nrays, nsigma, allsame [,dist] ) returns a
 %    beam in which the bunches have been populated with rays which are
 %    uniformly randomly distributed in each degree of freedom and have charges
 %    assigned according to a normal probability distribution.
@@ -15,6 +15,7 @@ function beamout = MakeBeam6DWeighted( Initial, nrays, nsigma, allsame )
 %    bunch, whereas if allsame == 1 the rays generated for bunch 1 are
 %    reused for each subsequent bunch.  If allsame == 1, then all bunches
 %    will have nrays(1) rays regardless of the value of nrays(2:end).
+%    dist= ('gaussian','linear','halo') (default=gaussian)
 %
 % See also:  MakeBeam6DGauss, MakeBeam6DSparse, MakeBeamPZGrid, MakeBeamPZGauss,
 %            CreateBlankBeam, InitCondStruc.
@@ -25,8 +26,17 @@ function beamout = MakeBeam6DWeighted( Initial, nrays, nsigma, allsame )
 % get a blank beam with the correct # of bunches etc
 beamout = CreateBlankBeam(Initial.NBunch,1,1,Initial.BunchInterval) ;
 
+% Requested distribution
+if ~exist('dist','var')
+  dist='gaussian'; 
+else
+  dist=lower(dist);
+end
+
 % get useful stuff out of the arguments
-nsigma = nsigma(:) ;
+if length(nsigma)==1
+  nsigma=ones(6,1).*nsigma;
+end
 nrays = nrays(:) ;
 if (length(nrays) == Initial.NBunch)
   nraygen = nrays ;
@@ -83,11 +93,24 @@ for bunchno = 1:Initial.NBunch
     for count = 1:6
       % Create a uniformly distributed random vector of ray coordinates
       % from -nsigma to nsigma
-      v = nsigma.*(2.*rand(1,nraygen(bunchno))-1) ;
+      v = nsigma(count).*(2.*rand(1,nraygen(bunchno))-1) ;
       x(count,:) = sig(count) * v ;
       offset(count,:) = centroid(count)*ov ;
       % calculate pdf for these particles
-      pdf(count,:)=(1/sqrt(2*pi)).*exp(-v.^2./2);
+      switch dist
+        case 'gaussian'
+          pdf(count,:)=(1/sqrt(2*pi)).*exp(-v.^2./2);
+        case 'linear'
+          pdf(count,:)=1./v;
+        case 'halo' % linear transverse, gaussian energy
+          if count==6
+            pdf(count,:)=(1/sqrt(2*pi)).*exp(-v.^2./2);
+          else
+            pdf(count,:)=1./abs(v);
+          end
+        otherwise
+          error('Unsupported distribution')
+      end
     end
     % Weight each particle in bunch according to PDF (assign a charge to
     % each macro-particle such that the correct distributions are
