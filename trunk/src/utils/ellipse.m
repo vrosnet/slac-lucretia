@@ -1,4 +1,4 @@
-function [x,y]=ellipse(X,p,q)
+function [x,y]=ellipse(X,p,q,N)
 
 %  function [x,y]=ellipse(X,p,q)
 %
@@ -41,8 +41,10 @@ a=X(1,1);
 b=X(1,2);
 c=X(2,2);
 
-delta=0.0001;
-theta=(0:delta:pi)';
+if ~exist('N','var')
+  N=20000;
+end
+theta=linspace(0,pi,ceil(N/2))';
 C=cos(theta);
 S=sin(theta);
 
