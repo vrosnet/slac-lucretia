@@ -30,7 +30,7 @@ function [x,y]=ellipse(X,p,q)
 %===============================================================================
 
 [r,c]=size(X);
-if ((r~=2)|(c~=2))
+if ((r~=2)||(c~=2))
   error('X must be a 2x2 matrix')
 end
 if (abs(X(1,2)-X(2,1))>(abs(.001*X(1,2))+eps))
@@ -41,8 +41,8 @@ a=X(1,1);
 b=X(1,2);
 c=X(2,2);
 
-delta=0.001;
-theta=[0:delta:pi]';
+delta=0.0001;
+theta=(0:delta:pi)';
 C=cos(theta);
 S=sin(theta);
 
@@ -51,5 +51,5 @@ r=[r,r];
 C=[C,-C];
 S=[S,-S];
 
-x=r.*C;         
-y=r.*S;         
+x=r.*C+p;         
+y=r.*S+q;         
