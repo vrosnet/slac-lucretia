@@ -77,7 +77,7 @@ x_ymax=mean(x(th));
 % of x with y>threshold
 
 xstd=1.3*std(x(th));
-p = [x_ymax xstd 0 1 2];
+p = [x_ymax xstd 1 0.01 2];
 
 p = fminsearch(@gaussHalo_min,p,optimset('MaxIter',5000,'MaxFunEvals',5000),arg1);
 z = sqrt(2*pi)*p(2)*gauss(x,p(1),p(2)) + ...
