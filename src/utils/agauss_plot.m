@@ -1,4 +1,4 @@
-function [q,dq,xf,yf] = agauss_plot(x,y,dy,y_off,no_txt)
+function [q,dq,xf,yf] = agauss_plot(x,y,dy,y_off,no_txt,ax,fcol,pcol)
 
 %	[q,dq,xf,yf] = agauss_plot(x,y[,dy,y_off,no_txt])
 %
@@ -29,13 +29,31 @@ function [q,dq,xf,yf] = agauss_plot(x,y,dy,y_off,no_txt)
 
 %===============================================================================
 
+% Which axes to plot on
+if ~exist('ax','var')
+  figure
+  ax=gca;
+end
+
+if ~exist('fcol','var')
+  fcol='r';
+end
+
+if ~exist('pcol','var')
+  pcol='b';
+end
+
 x = x(:);
 y = y(:);
 nx = length(x);
 ny = length(y);
 if nx ~= ny,error('X and Y data vectors must be the same length'),end
-if ~exist('y_off','var'),y_off = 1;end
-if ~exist('no_txt','var'),no_txt = 1;end
+if ~exist('y_off','var') || isempty(y_off)
+  y_off = 1;
+end
+if ~exist('no_txt','var') || isempty(no_txt)
+  no_txt = 1;
+end
 
 minx = min(x);
 maxx = max(x);
@@ -44,10 +62,10 @@ stpx = widx/100;
 xx = minx:stpx:maxx;
 xx = xx(:);
 
-if ~exist('dy')
-  [yf,p,dp,chisq] = agauss_fit(x,y);
+if ~exist('dy','var') || isempty(dy)
+  [~,p,dp,chisq] = agauss_fit(x,y);
   yyf = p(1)*ones(size(xx)) + p(2)*sqrt(2*pi)*p(4)*agauss(xx,p(3),p(4),p(5)); 
-  plot(x,y,'o',xx,yyf,'-')
+  semilogy(ax,x,y,[pcol '.'],xx,yyf,[fcol '-'],'LineWidth',3)
 else
   dy = dy(:);
   ndy = length(dy);
@@ -58,12 +76,12 @@ else
   if ndy ~= nx
     error('dY error data vector must be the same length as X and Y')
   end
-  [yf,p,dp,chisq] = agauss_fit(x,y,dy,y_off);
+  [~,p,dp,chisq] = agauss_fit(x,y,dy,y_off);
   yyf = p(1)*ones(size(xx)) + p(2)*sqrt(2*pi)*p(4)*agauss(xx,p(3),p(4),p(5)); 
-  plot(x,y,'o',xx,yyf,'-')
-  hold on
-  plot_bars(x,y,dy,'o')
-  hold off
+  plot(ax,x,y,',',xx,yyf,[fcol '-'])
+  hold(ax,'on');
+  plot_bars(x,y,dy,'.','k',ax)
+  hold(ax,'off');
 end
 
 if no_txt==1
@@ -83,10 +101,8 @@ if no_txt==1
   text(tx,ty,sprintf('CHISQ/NDF = %8.3g',chisq),'FontSize',10)
 end
 
-if nargout>=2
-  q = p;
- dq = dp;
-end
+q = p;
+dq = dp;
 
 xf = xx;
 yf = yyf;

@@ -19,15 +19,13 @@ x  = x(:);
 y  = y(:);
 dy = dy(:);
 
-[rx,cx] = size(x);
-[ry,cy] = size(y);
+[~,cx] = size(x);
+[~,cy] = size(y);
 [rdy,cdy] = size(dy);
 
 if (cx~=1) || (cy~=1) || (cdy~=1)
   error('*** PLOT_BARS only plots vectors ***')
 end
-
-n = rx;
 
 if rdy==1
   dy = dy*ones(size(y));
