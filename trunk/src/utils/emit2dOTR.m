@@ -209,15 +209,24 @@ for n=1:notr
   My(n,2)=2*Ry(n,1)*Ry(n,2);
   My(n,3)=Ry(n,2)^2;
 end
-zx=x./dx;zy=y./dy;
-Bx=zeros(notr,3);By=zeros(notr,3);
-for n=1:notr
-  Bx(n,:)=Mx(n,:)/dx(n);
-  By(n,:)=My(n,:)/dy(n);
+
+for itry=1:2
+  zx=x./dx;zy=y./dy;
+  Bx=zeros(notr,3);By=zeros(notr,3);
+  for n=1:notr
+    Bx(n,:)=Mx(n,:)/dx(n);
+    By(n,:)=My(n,:)/dy(n);
+  end
+  Tx=inv(Bx'*Bx);Ty=inv(By'*By);
+  u=Tx*Bx'*zx;du=sqrt(diag(Tx));  %#ok<MINV>
+  v=Ty*By'*zy;dv=sqrt(diag(Ty));  %#ok<MINV>
+  if itry==1
+    chi2x=zx'*zx-zx'*Bx*Tx*Bx'*zx; %#ok<MINV>
+    chi2y=zy'*zy-zy'*By*Ty*By'*zy; %#ok<MINV>
+    dx=dx.*sqrt(chi2x);
+    dy=dy.*sqrt(chi2y);
+  end
 end
-Tx=inv(Bx'*Bx);Ty=inv(By'*By);
-u=Tx*Bx'*zx;chi2x=zx'*zx-zx'*Bx*Tx*Bx'*zx;du=sqrt(diag(Tx)); %#ok<NASGU,MINV>
-v=Ty*By'*zy;chi2y=zy'*zy-zy'*By*Ty*By'*zy;dv=sqrt(diag(Ty)); %#ok<NASGU,MINV>
 
 % convert fitted input sigma matrix elements to emittance, BMAG, ...
 [px,dpx]=emit_params(u(1),u(2),u(3),Tx,bx0,ax0);
@@ -293,10 +302,16 @@ betaxip=px(4);dbetaxip=dpx(4);
 alphxip=px(5);dalphxip=dpx(5);
 
 % waist shift, beta, beam size, and beam divergence at the waist
-[pxw,dpxw]=waist_params(sigip(1,1),sigip(1,2),sigip(2,2),T);
-Lxw=pxw(1);dLxw=dpxw(1);
-betaxw=pxw(2);dbetaxw=dpxw(2);
-sigxw=pxw(3);dsigxw=dpxw(3);
+try
+  [pxw,dpxw]=waist_params(sigip(1,1),sigip(1,2),sigip(2,2),T);
+  Lxw=pxw(1);dLxw=dpxw(1);
+  betaxw=pxw(2);dbetaxw=dpxw(2);
+  sigxw=pxw(3);dsigxw=dpxw(3);
+catch
+  Lxw=0;dLxw=0;
+  betaxw=0;dbetaxw=0;
+  sigxw=0;dsigxw=0;
+end
 
 sig0=[v(1),v(2);v(2),v(3)];
 Ry=Rab(3:4,3:4);
@@ -312,10 +327,16 @@ betayip=py(4);dbetayip=dpy(4);
 alphyip=py(5);dalphyip=dpy(5);
 
 % waist shift, beta, beam size, and beam divergence at the waist
-[pyw,dpyw]=waist_params(sigip(1,1),sigip(1,2),sigip(2,2),T);
-Lyw=pyw(1);dLyw=dpyw(1);
-betayw=pyw(2);dbetayw=dpyw(2);
-sigyw=pyw(3);dsigyw=dpyw(3);
+try
+  [pyw,dpyw]=waist_params(sigip(1,1),sigip(1,2),sigip(2,2),T);
+  Lyw=pyw(1);dLyw=dpyw(1);
+  betayw=pyw(2);dbetayw=dpyw(2);
+  sigyw=pyw(3);dsigyw=dpyw(3);
+catch
+  Lyw=0; dLyw=0;
+  betayw=0; dbetayw=0;
+  sigyw=0; dsigyw=0;
+end
 
 % results txt
 txt{end+1}=' ';
@@ -439,7 +460,7 @@ emitData=[emitData ...
   Lyw dLyw betayw dbetayw sigyw dsigyw];
 
 % copy results to a structure for saving
-data=emitDataUnpack(otruse,emitData);
+data=emitDataUnpack(otruse,emitData); %#ok<NASGU>
 
 % save everything
 if (useEllipse)
