@@ -91,7 +91,7 @@ else
   else
     X=((BEAMLINE{itrack}.S+BEAMLINE{itrack}.L)-(BEAMLINE{bendele(1)}.S+BEAMLINE{bendele(1)}.L))/R;
   end
-  lDecay=3*(24*std(beam(5,:))*R^2)^(1/3);
+  lDecay=3*(24*std(beam(5,~stop))*R^2)^(1/3);
 %   fprintf('iele: %d driftL: %g driftDL: %g\n',itrack,driftL-driftDL/2,driftDL)
   if X*R > lDecay; return; end;
   % get bins and smoothing parameter from upstream bend element
@@ -106,20 +106,20 @@ end
 % Generate longitudinal grid, only when beam length changes by
 % more than 10%
 % if isempty(z) || (abs(std(beam(5,:))-lastsz)/lastsz)>0.1
-  zmin=min(-beam(5,:));
-  zmax=max(-beam(5,:));
+  zmin=min(-beam(5,~stop));
+  zmax=max(-beam(5,~stop));
   if zmin==zmax
     error('Need some spread in z-distribution of bunch to compute CSR!')
   end
   z=linspace(zmin,zmax,nbin);
-  [~,bininds] = histc(-beam(5,:),z);
+  [~,bininds] = histc(-beam(5,~stop),z);
   [Z, ZSP]=meshgrid(z,z);
 %   lastsz=std(beam(5,:));
 % end
 
 % Bin beam particle longitudinal direction
 % - zero out charge for stopped particles
-beamQ(stop>0)=0;
+beamQ(stop>0)=[];
 q = accumarray(bininds',beamQ')';
 bw=abs(z(2)-z(1));
 Q=sum(q);
@@ -179,6 +179,6 @@ else % DRIFT or other element following bend
   end
 end
 % Apply energy loss for all particles in each bin
-beam(6,:)=beam(6,:)+dE(bininds);
+beam(6,~stop)=beam(6,~stop)+dE(bininds);
 
 zOut=z;

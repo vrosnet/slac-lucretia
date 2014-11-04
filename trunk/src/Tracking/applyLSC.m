@@ -88,11 +88,11 @@ if elemno<1 || elemno>length(BEAMLINE) || ~isfield(BEAMLINE{elemno},'TrackFlag')
 end
 
 % get data from provided bunch
-z=bunchIn(5,:);
-x=bunchIn(1,:);
-y=bunchIn(3,:);
-E=bunchIn(6,:);
-beamQ(stop>0)=0; % Zero charge for stopped particles
+z=bunchIn(5,~stop);
+x=bunchIn(1,~stop);
+y=bunchIn(3,~stop);
+E=bunchIn(6,~stop);
+beamQ(stop)=[];
 sx=std(x); sy=std(y);
 rb=1.7*(sx+sy)/2;
 gamma=mean(E)./0.511e-3;
@@ -159,7 +159,7 @@ Z(1)=0; Y(1)=0; % remove DC component
 % Calculate energy modulation and apply to bunch
 V=real(ifft(Z.*Y,nbins)).*L;
 bunchOut=bunchIn;
-bunchOut(6,:)=bunchOut(6,:)+V(bininds).*1e-9 ;
+bunchOut(6,~stop)=bunchOut(6,~stop)+V(bininds).*1e-9 ;
 
 % Keep data if requested
 if storeDataBunchNo>0
