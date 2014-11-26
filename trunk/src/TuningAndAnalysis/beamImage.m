@@ -1,5 +1,5 @@
 function data=beamImage(beam,nsig,E0,asym,nbins,axhan,dpk,numpix)
-% [sigx,sigy,rmsx,rmsy]=beamImage(beam,nsig [,E0,asym,nbins,axhan,dpk])
+% data=beamImage(beam,nsig [,E0,asym,nbins,axhan,dpk])
 %
 % Graphical plot of Lucretia beam in transverse plane including gaussian fits
 % beam = Lucretia beam structure
@@ -191,7 +191,7 @@ if (asym)
   xi=u;
 else
   if dpk(2)
-    [q,~,~,xi,yfit]=peakfit([u' v'],0,0,2,1,0,10,0,0,0,0); qE=q;
+    [q,~,~,xi,yfit]=peakfit([u' v],0,0,2,1,0,10,0,0,0,0); qE=q;
   else
     [yfit,q]=gauss_fit(u,v,[],0);
     xi=u;
@@ -219,7 +219,7 @@ if (asym)
   xi=u;
 else
   if dpk(2)
-    [q,~,~,xi,xfit]=peakfit([u' v'],0,0,2,1,0,10,0,0,0,0);
+    [q,~,~,xi,xfit]=peakfit([u v'],0,0,2,1,0,10,0,0,0,0);
   else
     [xfit,q]=gauss_fit(u,v,[],0);
     xi=u;

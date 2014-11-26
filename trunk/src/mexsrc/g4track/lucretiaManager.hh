@@ -49,6 +49,7 @@ class lucretiaManager
   double Lcut; // Final track must be >= this to make it back into Lucretia
   int fNumRaysResumed ; // Keep count of number of un-stopped rays
   uint32_T fMaxSecondaryParticles ; // Max number of secondaries to keep
+  uint8_T fSecondaryStorageCuts ; // Control conditions under which secondary particles are stored (0= all 1=d/s face only)
   uint32_T fMaxSecondaryParticlesPerPrimary ; // Max secondaries to store per primary launched
   uint32_T fSecondariesCounter ;
   int* fSecondariesPerThisPrimary ;

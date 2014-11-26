@@ -35,13 +35,14 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
   int dosecondaries = 0;
   static int hitsPerParentCounter ;
   static int lastPrimaryID ;
+  
   if ( fLman->fMaxSecondaryParticles>0 && fLman->fMaxSecondaryParticlesPerPrimary>0)
     dosecondaries = 1 ;
   if (parentID==0 || dosecondaries ) { 
     xLucretia[0] = x; xLucretia[2] = y; xLucretia[4] = z; // z doesn't get copied back to Lucretia bunch
     xLucretia[1] = atan(momx/momz) ; xLucretia[3] = atan(momy/momz) ;
     xLucretia[5] = e ;
-    if (z>=fLman->Lcut && momz>=fLman->Ecut && e>=fLman->Ecut)
+    if ((z>=fLman->Lcut || fLman->fSecondaryStorageCuts==0) && momz>=fLman->Ecut && e>=fLman->Ecut)
       passCuts=1;
     if (dosecondaries && passCuts &&
             fLman->fSecondariesCounter < fLman->fMaxSecondaryParticles )

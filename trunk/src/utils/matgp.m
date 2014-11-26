@@ -36,13 +36,13 @@ for f=[1 3]
 end % for f
 
 % Grid size and Ngrids
-gridSize=3*xsize+xoffset;
-nGrids=2^nextpow2(ceil((gridSize/xsize)*5));
-if nGrids<16
-  nGrids=16;
-elseif nGrids>128
+% gridSize=3*xsize+xoffset;
+% nGrids=2^nextpow2(ceil((gridSize/xsize)*5));
+% if nGrids<16
+%   nGrids=16;
+% elseif nGrids>128
   nGrids=128;
-end
+% end
 
 accFile=fopen('acc.dat','r');
 tline={};
@@ -52,11 +52,11 @@ while 1
   if length(tline)==6
     tline{end}=['n_x=',num2str(nGrids),';']; %#ok<AGROW>
   elseif length(tline)==7
-    tline{end}='n_y=128;'; %#ok<AGROW>
+    tline{end}='n_y=256;'; %#ok<AGROW>
   elseif length(tline)==8
     tline{end}=['cut_x=',num2str(3*xsize+2*xoffset),';']; %#ok<AGROW>
   elseif length(tline)==9
-    tline{end}=['cut_y=',num2str(20*ysize+4.5*yoffset),';']; %#ok<AGROW>
+    tline{end}=['cut_y=',num2str(10*ysize+4.5*yoffset),';']; %#ok<AGROW>
   elseif length(tline)==10
     tline{end}=['rndm_seed=',num2str(nSeed),';']; %#ok<AGROW>
   end

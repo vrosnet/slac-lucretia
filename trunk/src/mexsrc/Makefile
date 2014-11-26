@@ -65,9 +65,9 @@ install::
 
 cpu_init::
 
-g4_init::
+g4_init:
 	-cp TrackThru.c TrackThru_g4.c
-MFLAGS := ${MFLAGS} -DLUCRETIA_G4TRACK CFLAGS='$$CFLAGS ${G4FLAGS}'
+MFLAGS:=${MFLAGS} -DLUCRETIA_G4TRACK CFLAGS='$$CFLAGS ${G4FLAGS}'
 
 
 gpu_init::

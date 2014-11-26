@@ -8847,6 +8847,7 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
       break ;
     }
   }
+  
   if (stoppedParticles==0)
     return ;
   if (L == 0) /* If L passed as 0, need to look up from BEAMLINE in case of split tracking */

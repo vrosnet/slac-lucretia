@@ -358,8 +358,8 @@ G4VPhysicalVolume* geomConstruction::Construct()
 void geomConstruction::ConstructSDandField()
 {
   // Construct the field creator - this will register the field it creates
-  if (fEmFieldSetup)
-    delete fEmFieldSetup ;
+  //if (fEmFieldSetup)
+  //  delete fEmFieldSetup ;
   if (fLman->EnableEM==1) {
     if (fLman->Verbose>=1)
       printf("Generating EM field map...\n") ;

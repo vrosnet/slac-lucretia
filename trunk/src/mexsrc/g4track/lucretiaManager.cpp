@@ -354,6 +354,12 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     fMaxSecondaryParticlesPerPrimary = *(uint32_T*)mxGetData( pMaxSecondariesPerPrimary ) ;
   //
   fSecondariesPerThisPrimary = (int*) malloc(fMaxPrimaryParticles*sizeof(int)) ;
+  // - Control of when to store secondary particles (0= store all, 1= store only those which make it to d/s face of element
+   mxArray* pSecondaryStorageCuts = GetExtProcessData(blele,"SecondaryStorageCuts") ;
+  if ( pSecondaryStorageCuts == NULL)
+    fSecondaryStorageCuts = 1 ;
+  else
+    fSecondaryStorageCuts = *(uint8_T*)mxGetData( pSecondaryStorageCuts ) ;
   // - Create secondary return bunch structure
   if (fMaxSecondaryParticles>0) {
     if (fSecondaryBunch_x!=NULL) {
