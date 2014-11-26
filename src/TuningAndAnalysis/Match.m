@@ -305,7 +305,7 @@ classdef Match < handle & physConsts
       % linear response matrix no longer any good, clear it
       obj.linMat=[];
     end
-    function display(obj)
+    function disp(obj)
       try
         fprintf('Lucretia match using optimizer: %s\n',obj.optim)
         fprintf('-----------------------------------------\n')

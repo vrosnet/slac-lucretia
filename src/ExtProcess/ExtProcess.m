@@ -28,6 +28,7 @@ classdef ExtProcess < handle
     MaxSecondaryParticlesPerPrimary
     MaxSecondaryParticles % set >0 to store up to N secondary particles produced
     MaxPrimaryParticles
+    SecondaryStorageCuts % 1 = only store hits on d/s element face, 0 = store all
   end
   properties(Access=protected)
     fPrimarySampleOrder ;
@@ -35,6 +36,7 @@ classdef ExtProcess < handle
     fMaxSecondaryParticles= uint32(0) ;
     fMaxPrimaryParticles = uint32(1e4) ;
     fNumSecondariesStored = uint32(0) ; % Number of secondary particles actually stored
+    fSecondaryStorageCuts = uint8(1) ;
     extDir % absolute path to root ExtProcess diretcory
   end
   properties(Abstract,Constant,Hidden)
@@ -54,6 +56,12 @@ classdef ExtProcess < handle
       else
         obj.extDir=regexprep(td,sprintf('Tracking/TrackThru.%s',mexext),'ExtProcess/');
       end
+    end
+    function val = get.SecondaryStorageCuts(obj)
+      val=obj.fSecondaryStorageCuts;
+    end
+    function set.SecondaryStorageCuts(obj,val)
+      obj.fSecondaryStorageCuts=uint8(val);
     end
     function val=get.MaxPrimaryParticles(obj)
       val=obj.fMaxPrimaryParticles;

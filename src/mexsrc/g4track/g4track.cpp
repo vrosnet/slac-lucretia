@@ -54,17 +54,16 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     runManager->SetUserInitialization(thisAction); //
   }
   else { // If this function already called once, just re-initialise the Lucretia pointers to the new element and geometry
-    printf("LMAN INIT...\n");
+    //printf("LMAN INIT...\n");
     lman->Initialize(blele, bunchno, ThisBunch, length) ;
     if (lman->Status!=0)
       return lman->Status ;
-    printf("reinitgeom...\n");
+    //printf("reinitgeom...\n");
     runManager->ReinitializeGeometry(); // Force new run to set new geometry
-    printf("newgeom...\n");
+    //printf("newgeom...\n");
     thisGeomConstruction->SetGeomParameters(lman) ; // Create the new geometry
-    printf("done.\n");
+    //printf("done.\n");
   }
-  
   // initialize G4 kernel
   if (firstCall==0) {
     //UI->ApplyCommand("/run/physicsModified");
