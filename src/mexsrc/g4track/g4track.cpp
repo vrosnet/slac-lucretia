@@ -8,7 +8,8 @@
 #include "G4UImanager.hh"
 #include "geomConstruction.hh"
 #include "actionInitialization.hh"
-#include "FTFP_BERT.hh"
+//#include "FTFP_BERT.hh"
+#include "PhysicsList.hh"
 #include "G4StepLimiterPhysics.hh"
 #include "CLHEP/Units/SystemOfUnits.h"
 #include <string>
@@ -27,7 +28,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   static G4RunManager* runManager ;
   static G4UImanager* UI ;
   static geomConstruction* thisGeomConstruction ;
-  static G4VModularPhysicsList* physicsList ;
+  //static G4VModularPhysicsList* physicsList ;
   static actionInitialization* thisAction ;
   static lucretiaManager* lman ;
   static int firstCall=1;
@@ -35,7 +36,9 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   G4double length = *L/2 ;
   if (runManager == NULL) {
     // lucretiaManager manages interaction with Lucretia bunch structure and interfaces with Matlab data structures
+    // printf("LMAN INIT...\n");
     lman = new lucretiaManager(blele, bunchno, ThisBunch, length) ;
+    // printf("done.\n");
     // return with error if no associated EXT Process on this BEAMLINE or there is a problem with one of the EXT Process object's properties
     if (lman->Status!=0)
       return -1 ;
@@ -43,8 +46,9 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     // get the pointer to the UI manager
     UI = G4UImanager::GetUIpointer();
     // Setup physics processes we wish to use (for now this is just all of them)
-    physicsList = new FTFP_BERT; // Default ALL physics process list
-    runManager->SetUserInitialization(physicsList);
+    // physicsList = new FTFP_BERT; // Default ALL physics process list
+    //runManager->SetUserInitialization(physicsList);
+    runManager->SetUserInitialization(new PhysicsList) ;
     thisGeomConstruction = new geomConstruction(lman, length);
     if (thisGeomConstruction == NULL)
       return -2 ;

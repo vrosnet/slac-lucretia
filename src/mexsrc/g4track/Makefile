@@ -17,7 +17,7 @@
  CFLAGS := CXXFLAGS='$$CXXFLAGS $(shell geant4-config --cflags)'
 
 # g4track Library
-all : g4track.o lucretiaManager.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o FieldSetup.o GlobalField.o
+all : g4track.o PhysicsList.o lucretiaManager.o geomConstruction.o actionInitialization.o eventAction.o primaryGeneratorAction.o runAction.o trackingAction.o FieldSetup.o GlobalField.o
 
 # cleanup
 clean::
@@ -28,6 +28,10 @@ clean::
 g4track.o : ../LucretiaCommon.h g4track.h geomConstruction.hh actionInitialization.hh
 	$(CCOMP) $(CFLAGS) $(CLIBS) -c g4track.cpp
 	ar -ru libg4track.a g4track.o
+
+PhysicsList.o: PhysicsList.hh
+	$(CCOMP) $(CFLAGS) $(CLIBS) -c PhysicsList.cpp
+	ar -ru libg4track.a PhysicsList.o
 
 geomConstruction.o: geomConstruction.hh
 	$(CCOMP) $(CFLAGS) $(CLIBS) -c geomConstruction.cpp
