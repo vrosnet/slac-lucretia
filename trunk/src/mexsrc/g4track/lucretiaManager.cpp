@@ -441,7 +441,7 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   const double y_low = -(AperY+Thickness)*1e3; const double y_high = (AperY+Thickness)*1e3;
   const double z_low = -Lcut*1e3; const double z_high = Lcut*1e3;
   //if (fieldno==0)
-    //printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);
+  //printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);
   const double s_x = (double(1)-double(N))/(x_low - x_high);
   const double s_y = (double(1)-double(M))/(y_low - y_high);
   const double s_z = (double(1)-double(O))/(z_low - z_high);
@@ -465,8 +465,8 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
     default:
       mexErrMsgTxt("Unimplemented interpolation method.");
   }
-  if (fieldno==0)
-    //printf("B: %g (BMAX: %g)\n",pO,pF[0]);
+  //if (fieldno==0)
+  //printf("B: %g (BMAX: %g)\n",pO,pF[0]);
   // Return the interpolated field value
   return pO ;
 }
