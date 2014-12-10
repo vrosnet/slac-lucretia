@@ -8,9 +8,8 @@
 #include "G4UImanager.hh"
 #include "geomConstruction.hh"
 #include "actionInitialization.hh"
-//#include "FTFP_BERT.hh"
+//#include "FTFP_BERT_HP.hh"
 #include "PhysicsList.hh"
-#include "G4StepLimiterPhysics.hh"
 #include "CLHEP/Units/SystemOfUnits.h"
 #include <string>
 
@@ -34,6 +33,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   static int firstCall=1;
   // Collimator geometry definition (apertures and lengths are half-lengths in meters)
   G4double length = *L/2 ;
+
   if (runManager == NULL) {
     // lucretiaManager manages interaction with Lucretia bunch structure and interfaces with Matlab data structures
     // printf("LMAN INIT...\n");
@@ -45,10 +45,10 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     runManager = new G4RunManager;
     // get the pointer to the UI manager
     UI = G4UImanager::GetUIpointer();
-    // Setup physics processes we wish to use (for now this is just all of them)
-    // physicsList = new FTFP_BERT; // Default ALL physics process list
-    //runManager->SetUserInitialization(physicsList);
-    runManager->SetUserInitialization(new PhysicsList) ;
+    // Setup physics processes
+    //G4VModularPhysicsList* physicsList = new FTFP_BERT_HP;
+    PhysicsList* physicsList = new PhysicsList ;
+    runManager->SetUserInitialization(physicsList);
     thisGeomConstruction = new geomConstruction(lman, length);
     if (thisGeomConstruction == NULL)
       return -2 ;
@@ -68,12 +68,17 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     thisGeomConstruction->SetGeomParameters(lman) ; // Create the new geometry
     //printf("done.\n");
   }
+  // Set Random number
+  CLHEP::HepRandom::setTheEngine(new CLHEP::RanecuEngine);
+  CLHEP::HepRandom::setTheSeed(lman->RandSeed);
   // initialize G4 kernel
   if (firstCall==0) {
     //UI->ApplyCommand("/run/physicsModified");
   }
   else {
     firstCall = 0;
+    UI->ApplyCommand("/cuts/setLowEdge 1 eV");
+    UI->ApplyCommand("/cuts/setMaxCutEnergy 1000");
     runManager->Initialize();
   }
   // set verbosities
@@ -97,6 +102,8 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/tracking/verbose 0");
     UI->ApplyCommand("/control/verbose 0");
   }
+  lman->ApplyRunCuts(UI); // Apply user cuts on particles and processes specified from Lucretia ExtProcess object
+  //UI->ApplyCommand("/process/list");
   // start a run
   runManager->BeamOn(runno);
   runno++;

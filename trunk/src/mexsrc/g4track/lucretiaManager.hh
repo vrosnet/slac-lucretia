@@ -5,6 +5,8 @@
 #include <string>
 #define LUCRETIA_MANAGER
 #include "mex.h"
+#include "matrix.h"
+#include "G4UImanager.hh"
 
 /* Interpolation code extracted from modified ba_interp3.cpp from Mathworks File Exchange*/
 /* ba_inter3 GPL License (c) 2008 Brian Amberg http://www.brian-amberg.de/ */
@@ -25,6 +27,7 @@ class lucretiaManager
   void freeMem() ;
   void GetUniformField(double uField[3]) ;
   double interpField(const int fieldno, const double* point) ;
+  void ApplyRunCuts(G4UImanager* UI) ;
   int Status ; // 0=OK; 1=No external processes defined for this BEAMLINE element
   char* GeomType ; // Geometry type ("Ellipse" | "Rectangle" | "Tapered")
   char* Material ; 
@@ -52,6 +55,7 @@ class lucretiaManager
   uint8_T fSecondaryStorageCuts ; // Control conditions under which secondary particles are stored (0= all 1=d/s face only)
   uint32_T fMaxSecondaryParticlesPerPrimary ; // Max secondaries to store per primary launched
   uint32_T fSecondariesCounter ;
+  uint32_T RandSeed ;
   int* fSecondariesPerThisPrimary ;
   int* fEle ;
   double CollLen2 ;
@@ -123,5 +127,8 @@ class lucretiaManager
   int fRayGetPtr ;
   int* fPrimIndex ;
   uint32_T fMaxPrimaryParticles ; // Max number of primaries to generate from Lucretia beam
+  bool fForceProcess ; // Force macro particles to be processed by ExtProcess regardless of aperture cuts
+  bool* fProcessSelection ;
+  double* fParticleCuts ;
 } ;
 

@@ -1,11 +1,9 @@
-classdef ExtProcess < handle
+classdef ExtProcess < handle & ExtPhysics
   % EXTPROCESS - Class for handling interfaces to external code linked with Lucretia
   % Currently supported is GEANT4
   
   properties(Constant, Hidden)
     supportedProcessTypes = {'GEANT4'} ;
-    supportedProcessPhysics = {'All'} ;
-    supportedParticleTypes = {'All'} ;
   end
   properties(Abstract)
     Verbose ;
@@ -29,6 +27,7 @@ classdef ExtProcess < handle
     MaxSecondaryParticles % set >0 to store up to N secondary particles produced
     MaxPrimaryParticles
     SecondaryStorageCuts % 1 = only store hits on d/s element face, 0 = store all
+    ForceProcess % Force ExtProcess regardless of aperture if == true
   end
   properties(Access=protected)
     fPrimarySampleOrder ;
@@ -37,6 +36,7 @@ classdef ExtProcess < handle
     fMaxPrimaryParticles = uint32(1e4) ;
     fNumSecondariesStored = uint32(0) ; % Number of secondary particles actually stored
     fSecondaryStorageCuts = uint8(1) ;
+    fForceProcess = false ; % Force ExtProcess regardless of aperture
     extDir % absolute path to root ExtProcess diretcory
   end
   properties(Abstract,Constant,Hidden)
@@ -56,6 +56,12 @@ classdef ExtProcess < handle
       else
         obj.extDir=regexprep(td,sprintf('Tracking/TrackThru.%s',mexext),'ExtProcess/');
       end
+    end
+    function val = get.ForceProcess(obj)
+      val=obj.fForceProcess;
+    end
+    function set.ForceProcess(obj,val)
+      obj.fForceProcess=logical(val);
     end
     function val = get.SecondaryStorageCuts(obj)
       val=obj.fSecondaryStorageCuts;

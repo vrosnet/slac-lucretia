@@ -1,6 +1,6 @@
 # 
 # Makefile for construction of Lucretia mex files
-#  Written for use on a Linux OS (EL5+ & SL5+ 32 and 64-bit supported)
+#  Written for use on a Linux OS (EL5+ & SL5+ 64-bit supported)
 #  - edit MATPATH variable to link to the location of your
 #    Matlab  installation
 #  - mex should be on your search path (ie ${MATPATH}/bin)
@@ -12,7 +12,7 @@
 #    requires >R2013a, compiled mex files have _gpu suffix
 #  - type "make g4track" to build (cpu) version of TrackThru which
 #    also allows interfacing to GEANT4. This requires GEANT4 (v.10+)
-#    installed fully (with "geant4-config" shell on the system search
+#    installed fully (with "geant4-config" script on the system search
 #    path)
 #
 # Auth: GRW: Aug 4 2011
@@ -26,7 +26,7 @@
 #===================================================================
 
 # ===== Link to matlab installation directory (needed for GPU compilation)
-MATPATH = /var/MATLAB/R2014a
+MATPATH = /var/MATLAB/R2014b
 # ===== mex compiler to use
 MCOMP:= mex -largeArrayDims CC=c++ # used to build mex files
 CCOMP:= mex -c -largeArrayDims CC=c++ # used for compiling library objects
@@ -65,10 +65,11 @@ install::
 
 cpu_init::
 
-g4_init:
+g4_init: g4_init_defs
 	-cp TrackThru.c TrackThru_g4.c
-MFLAGS:=${MFLAGS} -DLUCRETIA_G4TRACK CFLAGS='$$CFLAGS ${G4FLAGS}'
 
+g4_init_defs:
+MFLAGS:=${MFLAGS} -DLUCRETIA_G4TRACK CFLAGS='$$CFLAGS ${G4FLAGS}'
 
 gpu_init::
 	MFLAGS:="${MFLAGS} CC='$NVCC'"

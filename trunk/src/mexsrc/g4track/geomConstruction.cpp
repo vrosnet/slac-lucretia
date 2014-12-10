@@ -201,18 +201,18 @@ G4VPhysicalVolume* geomConstruction::Construct()
             worldVolume,                //its mother  volume
             false,                      //no boolean operation
             0);                         //copy number
-    
-    collInnerBox
+    if (fCollAperX>0 && fCollAperY>0) {
+      collInnerBox
             = new G4Box("RCollInner",                   //its name
             fCollAperX*m,                    //dimensions (half-lengths)
             fCollAperY*m,
             fCollLength*m);
     
-    collVolumeInner
+      collVolumeInner
             = new G4LogicalVolume(collInnerBox,            //its shape
             Vacuum,               //its material
             "RCollInner");        //its name
-    collInnerPlacement
+      collInnerPlacement
             = new G4PVPlacement(0,                          //no rotation
             G4ThreeVector(),            //at (0,0,0)
             collVolumeInner,                //its logical volume
@@ -220,6 +220,7 @@ G4VPhysicalVolume* geomConstruction::Construct()
             collVolume,               //its mother  volume
             false,                      //no boolean operation
             0);                         //copy number
+    }
   }
   else if (strcmp( fCollType, "Ellipse" ) == 0) {
     // Elliptical tube: surface equation: 1 = (x/Dx)^2 + (y/Dy)^2
@@ -239,15 +240,16 @@ G4VPhysicalVolume* geomConstruction::Construct()
             worldVolume,                //its mother  volume
             false,                      //no boolean operation
             0);                         //copy number
-    collInnerTube = new G4EllipticalTube( "ECollInner",                  // name
+    if (fCollAperX>0 && fCollAperY>0) {
+      collInnerTube = new G4EllipticalTube( "ECollInner",                  // name
             fCollAperX*m,    // Dx
             fCollAperY*m,    // Dy
             fCollLength*m );  // Dz
-    collVolumeInner
+      collVolumeInner
             = new G4LogicalVolume(collInnerTube,            //its shape
             Vacuum,               //its material
             "ECollInner");        //its name
-    collInnerPlacement
+      collInnerPlacement
             = new G4PVPlacement(0,                          //no rotation
             G4ThreeVector(),            //at (0,0,0)
             collVolumeInner,                //its logical volume
@@ -256,6 +258,7 @@ G4VPhysicalVolume* geomConstruction::Construct()
             collVolume,               //its mother  volume
             false,                      //no boolean operation
             0);                         //copy number
+    }
   }
   else if (strcmp( fCollType, "Tapered" ) == 0 ) {
     //  Tapered Collimator with optional box insert

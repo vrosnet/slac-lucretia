@@ -154,6 +154,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "mex.h"           
+#include "matrix.h"
           
 /* File-scoped variables: */
 
@@ -8812,7 +8813,9 @@ void postEleTrack( struct Beam* TheBeam, int* bunchno, int* elemno, double L, do
 {
  struct Bunch* ThisBunch = TheBeam->bunches[*bunchno] ;
  /* Exchange post-track rays (y) with pre-tracked rays (x) for next track operation */
- XYExchange( ThisBunch ) ;
+ mxArray* pForceProcess = GetExtProcessData(elemno,"ForceProcess") ;
+ if (pForceProcess==NULL || !*(bool*)mxGetLogicals( pForceProcess )) // don't exchange if forcing ExtProcess (Lucretia tracking not happened)
+  XYExchange( ThisBunch ) ;
  #ifndef __CUDACC__
  /* Perform any external processes (e.g. GEANT4 tracking) */
  #ifdef LUCRETIA_G4TRACK
@@ -8838,16 +8841,17 @@ void ExtProcess(int* elemno, struct Beam* TheBeam, int* bunchno, double L, doubl
   mxArray* pMaterial;
   double *x, *px, *y, *py, *z, *p0 ;
   struct Bunch* ThisBunch = TheBeam->bunches[*bunchno] ;
+  // First check to see if there is ExtProcess stuff defined for this element
   pMaterial = GetExtProcessData(elemno, "Material") ;
   if (pMaterial == NULL)
     return ;
+  // Look to see if any particles flagged as stopped for this element -> signal to send to ExtProcess
   for (ray=0; ray<ThisBunch->nray; ray++) {
     if (ThisBunch->stop[ray] == *elemno+1) {
       stoppedParticles=1;
       break ;
     }
   }
-  
   if (stoppedParticles==0)
     return ;
   if (L == 0) /* If L passed as 0, need to look up from BEAMLINE in case of split tracking */
@@ -8902,9 +8906,9 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop,int* TFlag_gpu, int
 int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct TrackArgsStruc* TrackArgs)
 #endif                
 {
-  int driftCounter=0, nsplit=0, isplit, TrackStatus=0, csrSmoothFactor=0, firstSplit=1, iarr, docsr=0, dolsc=0, skipCSRLSC=0 ;
+  int driftCounter=0, nsplit=0, isplit, TrackStatus=0, csrSmoothFactor=0, firstSplit=1, iarr, docsr=0, dolsc=0, skipCSRLSC=0, ray ;
   double splitDL=0, L, lastS, thisS=0, docsrDrift, S_csr=0, S_other=0, LSC_drift=0, S_lsc=0, S_last=0, sarr[3], csrDL, lastS_lsc ;
-  
+  mxArray *pForceProcess;
   /* Get initial S location and initialize lastS reference, and get total unsplit element length */
   lastS = *GetElemNumericPar( *ElemLoop, "S", NULL ) ;
   lastS_lsc = lastS ;
@@ -8938,6 +8942,15 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
     S_other=S_other+S_lsc ;
     splitDL=splitDL+LSC_drift;
   }
+  /* If ExtProcess present and wanting to force tracking to go to ExtProcess, label particles stopped for this element*/
+  pForceProcess = GetExtProcessData(ElemLoop,"ForceProcess") ;
+  if (pForceProcess!=NULL && *(bool*)mxGetLogicals( pForceProcess )) {
+    for (ray=0; ray< TrackArgs->TheBeam->bunches[*BunchLoop]->nray; ray++) {
+      if (TrackArgs->TheBeam->bunches[*BunchLoop]->stop[ray] == 0) {
+        TrackArgs->TheBeam->bunches[*BunchLoop]->stop[ray] = *ElemLoop+1;
+      }
+    }
+  }
   /* Track bunch through this element with the requested split points, if LSC/User and CSR requested, take
      the larger number of splits from LSC/User and merge with CSR requests */
   if ( (docsrDrift > 0 && S_csr<=S_last) || (S_other>0 && S_other<=S_last) ) {
@@ -8957,8 +8970,10 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
       }
       if (thisS==lastS || fabs(thisS-lastS)<1e-6)
         break;
-      /* Execute integrator through this element with desired length */
-      if (strcmp(ElemClass,"QUAD")==0)
+      /* Execute intergrater through this element with desired length */
+      if (pForceProcess!=NULL && *(bool*)mxGetLogicals( pForceProcess ))
+	TrackStatus=1;
+      else if (strcmp(ElemClass,"QUAD")==0)
         TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, thisS-lastS, lastS, TFlag[Aper] ) ;
       else if (strcmp(ElemClass,"SEXT")==0)
         TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, thisS-lastS, lastS, TFlag[Aper] ) ;
@@ -9042,8 +9057,11 @@ int ElemTracker(char* ElemClass,int* ElemLoop,int* BunchLoop, int* TFlag, struct
   }
   else { /* Just normal, unsplit tracking */
     /* Execute integrator through this element through BEAMLINE element length */
-    if (strcmp(ElemClass,"QUAD")==0)
+    if (pForceProcess!=NULL && *(bool*)mxGetLogicals( pForceProcess ))
+      TrackStatus=1;
+    else if (strcmp(ElemClass,"QUAD")==0) {
       TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 2, 0, 0, TFlag[Aper] ) ;
+    }
     else if (strcmp(ElemClass,"SEXT")==0)
       TrackStatus = TrackBunchThruQSOS( *ElemLoop, *BunchLoop, TrackArgs, TFLAG, 3, 0, 0, TFlag[Aper] ) ;
     else if (strcmp(ElemClass,"OCTU")==0)

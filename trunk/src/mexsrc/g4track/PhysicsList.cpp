@@ -1,36 +1,3 @@
-//
-// ********************************************************************
-// * License and Disclaimer                                           *
-// *                                                                  *
-// * The  Geant4 software  is  copyright of the Copyright Holders  of *
-// * the Geant4 Collaboration.  It is provided  under  the terms  and *
-// * conditions of the Geant4 Software License,  included in the file *
-// * LICENSE and available at  http://cern.ch/geant4/license .  These *
-// * include a list of copyright holders.                             *
-// *                                                                  *
-// * Neither the authors of this software system, nor their employing *
-// * institutes,nor the agencies providing financial support for this *
-// * work  make  any representation or  warranty, express or implied, *
-// * regarding  this  software system or assume any liability for its *
-// * use.  Please see the license in the file  LICENSE  and URL above *
-// * for the full disclaimer and the limitation of liability.         *
-// *                                                                  *
-// * This  code  implementation is the result of  the  scientific and *
-// * technical work of the GEANT4 collaboration.                      *
-// * By using,  copying,  modifying or  distributing the software (or *
-// * any work based  on the software)  you  agree  to acknowledge its *
-// * use  in  resulting  scientific  publications,  and indicate your *
-// * acceptance of all terms of the Geant4 Software license.          *
-// ********************************************************************
-//
-/// \file electromagnetic/TestEm16/src/PhysicsList.cc
-/// \brief Implementation of the PhysicsList class
-//
-// $Id: PhysicsList.cc 67268 2013-02-13 11:38:40Z ihrivnac $
-//
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-
 #include "PhysicsList.hh"
 //#include "PhysicsListMessenger.hh"
 
@@ -38,11 +5,17 @@
 #include "G4ProcessManager.hh"
 #include "G4ParticleTypes.hh"
 #include "G4ParticleTable.hh"
-
+#include "G4DecayPhysics.hh"
+#include "G4HadronElasticPhysics.hh"
+#include "G4HadronInelasticQBBC.hh"
+#include "G4NeutronTrackingCut.hh"
+#include "G4HadronPhysicsFTFP_BERT_HP.hh"
 #include "G4ComptonScattering.hh"
 #include "G4GammaConversion.hh"
 #include "G4PhotoElectricEffect.hh"
 #include "G4RayleighScattering.hh"
+#include "G4GammaConversionToMuons.hh"
+#include "G4AnnihiToMuPair.hh"
 
 #include "G4eMultipleScattering.hh"
 #include "G4eIonisation.hh"
@@ -61,55 +34,22 @@
 
 #include "G4SystemOfUnits.hh"
 
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-
-PhysicsList::PhysicsList()
-: G4VUserPhysicsList()
-  //fMess(0)
+PhysicsList::PhysicsList(): G4VModularPhysicsList()
 {
-  defaultCutValue = 1.*km;
-  
-  fSRType = true; 
   //fMess = new PhysicsListMessenger(this);
+  defaultCutValue = 1.*km;
+  fSRType = true; 
+  RegisterPhysics( new G4HadronPhysicsFTFP_BERT_HP(1) );
 }
-
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
 PhysicsList::~PhysicsList()
 { 
   //delete fMess;
 }
 
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-
 void PhysicsList::ConstructParticle()
 {
-  // In this method, static member functions should be called
-  // for all particles which you want to use.
-  // This ensures that objects of these particle types will be
-  // created in the program.
-
-  ConstructBosons();
-  ConstructLeptons();
-}
-
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-
-void PhysicsList::ConstructBosons()
-{
-  // pseudo-particles
-  G4Geantino::GeantinoDefinition();
-  G4ChargedGeantino::ChargedGeantinoDefinition();
-
-  // gamma
-  G4Gamma::GammaDefinition();
-}
-
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-
-void PhysicsList::ConstructLeptons()
-{
-  // leptons
+   // leptons
   G4Electron::ElectronDefinition();
   G4Positron::PositronDefinition();
   G4MuonPlus::MuonPlusDefinition();
@@ -119,21 +59,26 @@ void PhysicsList::ConstructLeptons()
   G4AntiNeutrinoE::AntiNeutrinoEDefinition();
   G4NeutrinoMu::NeutrinoMuDefinition();
   G4AntiNeutrinoMu::AntiNeutrinoMuDefinition();
-}
 
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+  // baryons
+  G4Proton::ProtonDefinition();
+  G4AntiProton::AntiProtonDefinition();
+  G4Neutron::NeutronDefinition();
+  G4AntiNeutron::AntiNeutronDefinition();
+
+  // pseudo-particles
+  G4Geantino::GeantinoDefinition();
+  G4ChargedGeantino::ChargedGeantinoDefinition();
+
+  // gamma
+  G4Gamma::GammaDefinition();
+  G4OpticalPhoton::OpticalPhotonDefinition();
+
+}
 
 void PhysicsList::ConstructProcess()
 {
   AddTransportation();
-  ConstructEM();
-  ConstructGeneral();
-}
-
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
-
-void PhysicsList::ConstructEM()
-{
   theParticleIterator->reset();
   while( (*theParticleIterator)() ){
     G4ParticleDefinition* particle = theParticleIterator->value();
@@ -141,14 +86,12 @@ void PhysicsList::ConstructEM()
     G4String particleName = particle->GetParticleName();
 
     if (particleName == "gamma") {
-      // gamma
       pmanager->AddDiscreteProcess(new G4PhotoElectricEffect);
       pmanager->AddDiscreteProcess(new G4ComptonScattering);
       pmanager->AddDiscreteProcess(new G4GammaConversion);
       pmanager->AddDiscreteProcess(new G4RayleighScattering);
-            
+      pmanager->AddDiscreteProcess(new G4GammaConversionToMuons);
     } else if (particleName == "e-") {
-      //electron
       pmanager->AddProcess(new G4eMultipleScattering,       -1, 1, 1);
       pmanager->AddProcess(new G4eIonisation,               -1, 2, 2);
       pmanager->AddProcess(new G4eBremsstrahlung,           -1, 3, 3);
@@ -160,7 +103,6 @@ void PhysicsList::ConstructEM()
       pmanager->AddProcess(new G4StepLimiter,               -1,-1, 5);
      
     } else if (particleName == "e+") {
-      //positron
       pmanager->AddProcess(new G4eMultipleScattering,       -1, 1, 1);
       pmanager->AddProcess(new G4eIonisation,               -1, 2, 2);
       pmanager->AddProcess(new G4eBremsstrahlung,           -1, 3, 3);
@@ -171,10 +113,8 @@ void PhysicsList::ConstructEM()
 	pmanager->AddProcess(new G4SynchrotronRadiationInMat, -1,-1, 5);
       }
       pmanager->AddProcess(new G4StepLimiter,               -1,-1, 6);
-      
-    } else if( particleName == "mu+" ||
-               particleName == "mu-"    ) {
-      //muon
+      pmanager->AddDiscreteProcess(new G4AnnihiToMuPair);
+    } else if( particleName == "mu+" || particleName == "mu-"    ) {
       pmanager->AddProcess(new G4MuMultipleScattering, -1, 1, 1);
       pmanager->AddProcess(new G4MuIonisation,         -1, 2, 2);
       pmanager->AddProcess(new G4MuBremsstrahlung,     -1, 3, 3);
@@ -182,9 +122,9 @@ void PhysicsList::ConstructEM()
       
     }
   }
+  
+  ConstructGeneral();
 }
-
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
 #include "G4Decay.hh"
 
@@ -205,7 +145,6 @@ void PhysicsList::ConstructGeneral()
   }
 }
 
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
 void PhysicsList::SetCuts()
 {
@@ -222,4 +161,6 @@ void PhysicsList::SetCuts()
   if (verboseLevel>0) DumpCutValuesTable();
 }
 
-//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+
+
