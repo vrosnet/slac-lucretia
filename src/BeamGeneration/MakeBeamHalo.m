@@ -102,12 +102,12 @@ for bunchno = 1:Initial.NBunch
         % Choose emittance randomly emit1:emit2
         e=emitx1+rand(1,nraygen(bunchno)).*(emitx2-emitx1);
         % Get "radius" of ellipse for random theta
-        th=rand(1,nraygen(bunchno)).*2.*pi;
+        th=rand(1,nraygen(bunchno)).*(pi*2);
         a=sqrt(e.*Initial.x.Twiss.beta ); b=sqrt(e./Initial.x.Twiss.beta);
         r=(a.*b)./sqrt((b.*cos(th)).^2+(a.*sin(th)).^2);
         % Populate distribution and get charge weighting factor
-        x(1,:) = r.*cos(th) ;
-        x(2,:) = r.*sin(th) ;
+        x(1,:) = a.*cos(th) ;
+        x(2,:) = b.*sin(th) ;
         pdf(1,:) = 1./r ;
         pdf(2,:) = 1./r ;
       elseif count==3 % do y & y' distribution
@@ -118,8 +118,8 @@ for bunchno = 1:Initial.NBunch
         a=sqrt(e.*Initial.y.Twiss.beta ); b=sqrt(e./Initial.y.Twiss.beta);
         r=(a.*b)./sqrt((b.*cos(th)).^2+(a.*sin(th)).^2);
         % Populate distribution and get charge weighting factor
-        x(3,:) = r.*cos(th) ;
-        x(4,:) = r.*sin(th) ;
+        x(3,:) = a.*cos(th) ;
+        x(4,:) = b.*sin(th) ;
         pdf(3,:) = 1./r ;
         pdf(4,:) = 1./r ;
       end

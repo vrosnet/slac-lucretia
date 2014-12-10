@@ -2,7 +2,8 @@
 #include <iostream>
 #include <math.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
+#include <sstream>
 
 using namespace std;
 
@@ -281,6 +282,34 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
     return;
   }
   Ecut = *mxGetPr( pEcut ) ;
+  // - Switch for forcing EXT process instead of using aperture cuts
+  mxArray* pForceProcess = GetExtProcessData(blele,"ForceProcess") ;
+  if (pForceProcess == NULL) {
+    Status = 1;
+    return;
+  }
+  fForceProcess = *(bool*)mxGetLogicals( pForceProcess ) ;
+  // - Process selection list by particle
+  mxArray* pProcessSelection = GetExtProcessData(blele,"processSelection") ;
+  if (pProcessSelection == NULL) {
+    Status = 1;
+    return;
+  }
+  fProcessSelection = (bool*)mxGetLogicals( pProcessSelection ) ;
+  // - Particle Cuts
+  mxArray* pParticleCuts = GetExtProcessData(blele,"particleCuts") ;
+  if (pParticleCuts == NULL) {
+    Status = 1 ;
+    return;
+  }
+  fParticleCuts = mxGetPr(pParticleCuts);
+  // Random Number Seed
+  mxArray* pRandSeed =  GetExtProcessData(blele,"RandSeed") ;
+  if (pRandSeed == NULL) {
+    Status = 1 ;
+    return;
+  }
+  RandSeed = *(uint32_T*)mxGetData( pRandSeed ) ;
   // - Max Number of primary particles to track
   mxArray* pMax = GetExtProcessData(blele,"MaxPrimaryParticles") ;
   if (pMax == NULL) {
@@ -372,6 +401,54 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   fTypeCellPtr = mxCreateCellMatrix(1,fMaxSecondaryParticles) ;
 }
 
+void lucretiaManager::ApplyRunCuts(G4UImanager* UI)
+{
+  // Apply Process cuts by particle type
+  string inactiveString = "/process/inactivate ";
+  string activeString = "/process/activate ";
+  string cutStringGamma = "/run/setCutForAGivenParticle gamma ";
+  string cutStringElec = "/run/setCutForAGivenParticle e- ";
+  string cutStringPosi = "/run/setCutForAGivenParticle e+ ";
+  int ipart,iproc ;
+  string buffer, gamCut, elecCut, posiCut ;
+  ostringstream gamConvert,elecConvert,posiConvert;
+  string partName[5] ;
+  string procName[14] ;
+  partName[0] = "gamma";
+  partName[1] = "e-";
+  partName[2] = "e+";
+  partName[3] = "mu-";
+  partName[4] = "mu+";
+  procName[0] = "msc";
+  procName[1] = "eIoni";
+  procName[2] = "eBrem";
+  procName[3] = "annihil";
+  procName[4] = "SynRad";
+  procName[5] = "phot";
+  procName[6] = "compt";
+  procName[7] = "conv";
+  procName[8] = "Rayl";
+  procName[9] = "muIoni";
+  procName[10] = "muBrems";
+  procName[11] = "muPairProd";
+  procName[12] = "AnnihiToMuPair";
+  procName[13] = "GammaToMuPair";
+  gamConvert << fParticleCuts[0];
+  UI->ApplyCommand(cutStringGamma + gamConvert.str() + " mm") ; 
+  elecConvert << fParticleCuts[1];
+  UI->ApplyCommand(cutStringElec + elecConvert.str() + " mm") ;
+  posiConvert << fParticleCuts[2];
+  UI->ApplyCommand(cutStringPosi + posiConvert.str() + " mm") ;
+  for (ipart=0; ipart<5; ipart++) {
+    for (iproc=0; iproc<14; iproc++) {
+      if (fProcessSelection[ipart+iproc*5])
+	UI->ApplyCommand(activeString + procName[iproc] + " " + partName[ipart]) ; 
+      else
+	UI->ApplyCommand(inactiveString + procName[iproc] + " " + partName[ipart]) ;
+    }
+  }
+}
+
 void lucretiaManager::GetUniformField(double uField[3])
 {
   if (EMisUniform==1) {
@@ -440,8 +517,11 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   const double x_low = -(AperX+Thickness)*1e3; const double x_high = (AperX+Thickness)*1e3;
   const double y_low = -(AperY+Thickness)*1e3; const double y_high = (AperY+Thickness)*1e3;
   const double z_low = -Lcut*1e3; const double z_high = Lcut*1e3;
-  //if (fieldno==0)
-  //printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);
+  /*if (fieldno==0)
+    printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);*/
+  if (*pX<x_low || *pX>x_high || *pY<y_low || *pY>y_high || *pZ<z_low || *pZ>z_high)
+    return 0;
+
   const double s_x = (double(1)-double(N))/(x_low - x_high);
   const double s_y = (double(1)-double(M))/(y_low - y_high);
   const double s_z = (double(1)-double(O))/(z_low - z_high);
@@ -465,8 +545,12 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
     default:
       mexErrMsgTxt("Unimplemented interpolation method.");
   }
-  //if (fieldno==0)
-  //printf("B: %g (BMAX: %g)\n",pO,pF[0]);
+  /*if (fieldno==0)
+    printf("Bx: %g (BMAX: %g)\n",pO,pF[0]);
+  if (fieldno==1)
+    printf("By: %g (BMAX: %g)\n",pO,pF[0]);
+  if (fieldno==2)
+  printf("Bz: %g (BMAX: %g)\n",pO,pF[0]);*/
   // Return the interpolated field value
   return pO ;
 }
@@ -598,7 +682,6 @@ void lucretiaManager::interpolate_linear(double *pO, const double *pF,
     int f000_i, f100_i, f010_i, f110_i;
     int f001_i, f101_i, f011_i, f111_i;
     
-    // TODO: Use openmp
     indices_linear(
             f000_i, f100_i, f010_i, f110_i,
             f001_i, f101_i, f011_i, f111_i,
