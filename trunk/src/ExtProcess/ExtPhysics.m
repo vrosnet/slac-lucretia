@@ -8,7 +8,6 @@ classdef ExtPhysics < handle
   properties(Dependent)
     processSelection
     particleCuts
-    currentRandSeed
     RandSeed
   end
   properties(Access=private)
