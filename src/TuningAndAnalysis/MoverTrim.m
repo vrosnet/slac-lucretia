@@ -44,6 +44,9 @@ function stat = MoverTrim( girdlist, varargin )
         continue ;
       end
       for count2 = 1:length(GIRDER{girdno}.Mover)
+        if length(GIRDER{girdno}.MoverStep)<count2
+          GIRDER{girdno}.MoverStep(count2)=0;
+        end
         if (GIRDER{girdno}.MoverStep(count2) == 0) 
            GIRDER{girdno}.MoverPos(count2) = ...
            GIRDER{girdno}.MoverSetPt(count2)     ;

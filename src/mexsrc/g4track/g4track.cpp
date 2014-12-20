@@ -8,7 +8,7 @@
 #include "G4UImanager.hh"
 #include "geomConstruction.hh"
 #include "actionInitialization.hh"
-//#include "FTFP_BERT_HP.hh"
+#include "lSession.hh"
 #include "PhysicsList.hh"
 #include "CLHEP/Units/SystemOfUnits.h"
 #include <string>
@@ -27,11 +27,10 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   static G4RunManager* runManager ;
   static G4UImanager* UI ;
   static geomConstruction* thisGeomConstruction ;
-  //static G4VModularPhysicsList* physicsList ;
   static actionInitialization* thisAction ;
   static lucretiaManager* lman ;
   static int firstCall=1;
-  // Collimator geometry definition (apertures and lengths are half-lengths in meters)
+  // Geometry definition - apertures and lengths are half-lengths in meters
   G4double length = *L/2 ;
 
   if (runManager == NULL) {
@@ -68,6 +67,9 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     thisGeomConstruction->SetGeomParameters(lman) ; // Create the new geometry
     //printf("done.\n");
   }
+  // Define Lucreia (Matlab) console status and error output streams
+  lSession* thisSession = new lSession(lman);
+  UI->SetCoutDestination(thisSession);
   // Set Random number
   CLHEP::HepRandom::setTheEngine(new CLHEP::RanecuEngine);
   CLHEP::HepRandom::setTheSeed(lman->RandSeed);
@@ -88,6 +90,9 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/tracking/verbose 0");
     UI->ApplyCommand("/control/verbose 2");
     UI->ApplyCommand("/run/dumpRegion") ;
+    UI->ApplyCommand("/process/verbose 1");
+    UI->ApplyCommand("/run/particle/verbose 1");
+    UI->ApplyCommand("/process/setVerbose 1 all");
   }
   else if (lman->Verbose==2) {
     UI->ApplyCommand("/run/verbose 2");
@@ -95,12 +100,18 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/tracking/verbose 1");
     UI->ApplyCommand("/control/verbose 2");
     UI->ApplyCommand("/run/dumpRegion") ;
+    UI->ApplyCommand("/process/verbose 1");
+    UI->ApplyCommand("/run/particle/verbose 2");
+    UI->ApplyCommand("/process/setVerbose 2 all");
   }
   else {
     UI->ApplyCommand("/run/verbose 0");
     UI->ApplyCommand("/event/verbose 0");
     UI->ApplyCommand("/tracking/verbose 0");
     UI->ApplyCommand("/control/verbose 0");
+    UI->ApplyCommand("/process/verbose 0");
+    UI->ApplyCommand("/run/particle/verbose 0");
+    UI->ApplyCommand("/process/setVerbose 0 all");
   }
   lman->ApplyRunCuts(UI); // Apply user cuts on particles and processes specified from Lucretia ExtProcess object
   //UI->ApplyCommand("/process/list");
@@ -111,6 +122,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
   // return
   // - return variables to Matlab workspace
   lman->SetLucretiaData() ;
+  delete thisSession ;
   return lman->fNumRaysResumed ;
 }
 

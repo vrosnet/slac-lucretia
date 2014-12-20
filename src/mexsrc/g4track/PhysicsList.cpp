@@ -30,6 +30,8 @@
 #include "G4SynchrotronRadiation.hh"
 #include "G4SynchrotronRadiationInMat.hh"
 
+#include "G4EmProcessOptions.hh"
+
 #include "G4StepLimiter.hh"
 
 #include "G4SystemOfUnits.hh"
@@ -39,7 +41,7 @@ PhysicsList::PhysicsList(): G4VModularPhysicsList()
   //fMess = new PhysicsListMessenger(this);
   defaultCutValue = 1.*km;
   fSRType = true; 
-  RegisterPhysics( new G4HadronPhysicsFTFP_BERT_HP(1) );
+  //RegisterPhysics( new G4HadronPhysicsFTFP_BERT_HP(1) );
 }
 
 PhysicsList::~PhysicsList()
@@ -80,6 +82,7 @@ void PhysicsList::ConstructProcess()
 {
   AddTransportation();
   theParticleIterator->reset();
+  G4EmProcessOptions opt;
   while( (*theParticleIterator)() ){
     G4ParticleDefinition* particle = theParticleIterator->value();
     G4ProcessManager* pmanager = particle->GetProcessManager();
@@ -91,6 +94,7 @@ void PhysicsList::ConstructProcess()
       pmanager->AddDiscreteProcess(new G4GammaConversion);
       pmanager->AddDiscreteProcess(new G4RayleighScattering);
       pmanager->AddDiscreteProcess(new G4GammaConversionToMuons);
+      opt.SetVerbose(0);
     } else if (particleName == "e-") {
       pmanager->AddProcess(new G4eMultipleScattering,       -1, 1, 1);
       pmanager->AddProcess(new G4eIonisation,               -1, 2, 2);
@@ -101,7 +105,7 @@ void PhysicsList::ConstructProcess()
 	pmanager->AddProcess(new G4SynchrotronRadiationInMat, -1,-1, 4); 
       }
       pmanager->AddProcess(new G4StepLimiter,               -1,-1, 5);
-     
+      opt.SetVerbose(0);
     } else if (particleName == "e+") {
       pmanager->AddProcess(new G4eMultipleScattering,       -1, 1, 1);
       pmanager->AddProcess(new G4eIonisation,               -1, 2, 2);
@@ -114,15 +118,16 @@ void PhysicsList::ConstructProcess()
       }
       pmanager->AddProcess(new G4StepLimiter,               -1,-1, 6);
       pmanager->AddDiscreteProcess(new G4AnnihiToMuPair);
+      opt.SetVerbose(0);
     } else if( particleName == "mu+" || particleName == "mu-"    ) {
       pmanager->AddProcess(new G4MuMultipleScattering, -1, 1, 1);
       pmanager->AddProcess(new G4MuIonisation,         -1, 2, 2);
       pmanager->AddProcess(new G4MuBremsstrahlung,     -1, 3, 3);
       pmanager->AddProcess(new G4MuPairProduction,     -1, 4, 4);
-      
+      opt.SetVerbose(0);
     }
   }
-  
+
   ConstructGeneral();
 }
 
@@ -134,8 +139,7 @@ void PhysicsList::ConstructGeneral()
   G4Decay* theDecayProcess = new G4Decay();
   theParticleIterator->reset();
   while ((*theParticleIterator)()){
-      G4ParticleDefinition* particle = theParticleIterator->value();
-      G4ProcessManager* pmanager = particle->GetProcessManager();
+      G4ParticleDefinition* particle = theParticleIterator->value();      G4ProcessManager* pmanager = particle->GetProcessManager();
       if (theDecayProcess->IsApplicable(*particle)) {
         pmanager ->AddProcess(theDecayProcess);
         // set ordering for PostStepDoIt and AtRestDoIt
