@@ -16,7 +16,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
     % Required physics process data files (to be found in src/ExtProcess/)
     dataFiles={'G4Data/G4SAIDDATA1.1' 'G4Data/G4EMLOW6.35' 'G4Data/RealSurface1.0' 'G4Data/G4NEUTRONXS1.4' 'G4Data/G4PII1.3' ...
       'G4Data/PhotonEvaporation3.0' 'G4Data/G4ABLA3.0' 'G4Data/RadioactiveDecay4.0' 'G4Data/G4NDL4.4'};
-    % List of names of environment variables which shold be se to above data directory locations
+    % List of names of environment variables which shold be set to above data directory locations
     evarNames={'G4SAIDXSDATA' 'G4LEDATA' 'G4REALSURFACEDATA' 'G4NEUTRONXSDATA' 'G4PIIDATA' 'G4LEVELGAMMADATA' 'G4ABLADATA' 'G4RADIOACTIVEDATA' 'G4NEUTRONHPDATA'};
   end
   methods
@@ -65,7 +65,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
   methods
     function [resp,message]=checkEnv(obj)
       resp=1; message=[];
-      if ~isempty(obj.envCheckResp) && obj.envCheckResp==true;
+      if labindex>1 || (~isempty(obj.envCheckResp) && obj.envCheckResp==true)
         return
       end
       df=obj.dataFiles;
@@ -76,7 +76,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
         for idf=1:length(df)
           if ~exist(fullfile(obj.extDir,df{idf}),'file')
             obj.envCheckResp=false;
-            message=sprintf('ExtG4Process is missing required file:%s',fullfile(obj.extDir,df{idf}));
+            message=sprintf('ExtG4Process is missing required file (labindex= %d) :%s',labindex,fullfile(obj.extDir,df{idf}));
           end
         end
       end
