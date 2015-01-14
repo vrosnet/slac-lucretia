@@ -114,6 +114,7 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/process/setVerbose 0 all");
   }
   lman->ApplyRunCuts(UI); // Apply user cuts on particles and processes specified from Lucretia ExtProcess object
+  
   //UI->ApplyCommand("/process/list");
   // start a run
   runManager->BeamOn(runno);

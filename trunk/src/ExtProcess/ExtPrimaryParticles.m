@@ -1,9 +1,12 @@
-classdef ExtPrimaryParticles
+classdef ExtPrimaryParticles < handle
   %EXTPRIMARYPARTICLES - Data associated with primary particles handed over
   %to EXT processes
   
   properties
     regeneratedID % List of particles stopped by Lucretia tracking that EXT process re-started
+    TrackingData_x % tracking data points (x,y,z) recorded by EXT process if requested with TrackStoreMax>0
+    TrackingData_y % data is stored in 2d array: 
+    TrackingData_z % [bunch ID(1:nmacro_particles), track point ID(1:max # points recorded {<=TrackStoreMax})]
   end
   
   methods

@@ -15,8 +15,12 @@ trackingAction::trackingAction(lucretiaManager* lman)
 { }
 
 
-void trackingAction::PreUserTrackingAction(const G4Track*)
+void trackingAction::PreUserTrackingAction(const G4Track* track)
 {
+  //if(track->GetParentID()!=0)
+  // {
+  //fpTrackingManager->SetStoreTrajectory(2);
+  //}
 }
 
 void trackingAction::PostUserTrackingAction(const G4Track* track)
@@ -42,7 +46,11 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
     xLucretia[0] = x; xLucretia[2] = y; xLucretia[4] = z; // z doesn't get copied back to Lucretia bunch for primaries
     xLucretia[1] = atan(momx/momz) ; xLucretia[3] = atan(momy/momz) ;
     xLucretia[5] = e ;
-    if (z>=fLman->Lcut*0.99 && e>=fLman->Ecut) // Primaries get put back into Lucretia tracking if hit d/s face of element with E>Ecut
+    if (z<fLman->Lcut) { // If not at right edge of world, track there assuming vacuum
+      xLucretia[0] += (fLman->Lcut - z) * xLucretia[1] ;
+      xLucretia[2] += (fLman->Lcut - z) * xLucretia[3] ;
+    }
+    if (e>=fLman->Ecut) // Primaries get put back into Lucretia tracking if E>Ecut
       passCuts=1;
     // Secondaries need E>Ecut or override
     if (dosecondaries && (fLman->fSecondaryStorageCuts==0 || e>=fLman->Ecut)  && fLman->fSecondariesCounter < fLman->fMaxSecondaryParticles ) 

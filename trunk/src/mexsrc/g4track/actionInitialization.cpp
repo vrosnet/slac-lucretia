@@ -27,7 +27,7 @@ void actionInitialization::Build() const
   primaryGeneratorAction* prim = new primaryGeneratorAction(fLman) ;
   SetUserAction(prim);
   SetUserAction(new runAction);
-  SetUserAction(new eventAction);
+  SetUserAction(new eventAction(fLman));
   SetUserAction(new trackingAction(fLman));
 }  
 

@@ -28,5 +28,7 @@ void GlobalField::GetFieldValue(const G4double* point, G4double* field) const
     for (ifield=3;ifield<6;ifield++)
       field[ifield]=fLman->interpField(ifield,point)*kilovolt/m;
   }
-  //cout << "POINT: " << point[0]*m << " " << point[1]*m << " " << point[2]*m << " FIELD: " << field[0]/tesla << " " << field[1]/tesla << " " << field[2]/tesla << "\n" ;
+  //cout << "POINT: " << point[0]/m << " " << point[1]/m << " " << point[2]/m << " FIELD: " << field[0]/tesla << " " << field[1]/tesla << " " << field[2]/tesla << "\n" ;
+  if (fLman->fMaxTrackStore>0)
+    fLman->WritePrimaryTrackData(point[0]/m, point[1]/m, point[2]/m);
 }

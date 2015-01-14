@@ -16,6 +16,10 @@ lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBun
   GeomType = NULL ;
   fSecondaryBunch_x = NULL ;
   fPrimaryRegenID = NULL ;
+  fTrackStoreData_x = NULL ;
+  fTrackStoreData_y = NULL ;
+  fTrackStoreData_z = NULL ;
+  PrimaryType = NULL ;
   int imat;
   for (imat=0;imat<3;imat++) {
     UserMaterial[imat].NumComponents=0;
@@ -25,7 +29,7 @@ lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBun
 
 lucretiaManager::~lucretiaManager()
 {
-  int imat,icomp;
+  unsigned int imat,icomp;
   for (imat=0;imat<3;imat++) {
     if (UserMaterial[imat].NumComponents != 0) { // Free any previously allocated element memory
       for (icomp=0;icomp<UserMaterial[imat].NumComponents;icomp++) {
@@ -54,7 +58,7 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   fNumRaysResumed=0;
   fBunchNo=bunchno;
   size_t buflen=0 ;
-  int imat,iele,icomp;
+  unsigned int imat,iele,icomp;
   // Clear any previously assigned memory that isn't required by Matlab session
   if ( fSecondariesPerThisPrimary != NULL )
     free(fSecondariesPerThisPrimary) ;
@@ -114,7 +118,13 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   buflen = mxGetN(pVacuumMaterial)*sizeof(mxChar)+1;
   VacuumMaterial = (char*) malloc(buflen);
   mxGetString(pVacuumMaterial,VacuumMaterial,buflen) ;
-  // Get required extProcess properties
+  /* ==== Primary particle type for tracking */
+  if (PrimaryType!=NULL)
+    free(PrimaryType) ;
+  mxArray* pPrimaryType = GetExtProcessData(blele,"PrimaryType") ;
+  buflen = mxGetN(pPrimaryType)*sizeof(mxChar)+1;
+  PrimaryType = (char*) malloc(buflen);
+  mxGetString(pPrimaryType,PrimaryType,buflen);
   /* ===== Get EM field data ===== */
   // B/E field values (scalar or 3D vectors)
   pBx = GetExtProcessData(blele,"Bx") ;
@@ -361,6 +371,32 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   else {
     fPrimOrder = (uint32_T*) mxGetData(pOrder) ;
   }
+  // - Tracking point data for primaries
+  //mexPrintf("Tracking data init...\n");
+  mxArray* pMaxTrackStore = GetExtProcessData(blele,"TrackStoreMax" ) ;
+  fMaxTrackStore = 0 ;
+  if (pMaxTrackStore != NULL)
+    fMaxTrackStore = *(uint32_T*)mxGetData( pMaxTrackStore ) ;
+  //mexPrintf("fMaxTrackSore: %d\n",fMaxTrackStore);
+  fTrackStoreCounter=0;
+  if (fMaxTrackStore>0) {
+    //mexPrintf("free TrackStoreData...\n");
+    if (fTrackStoreData_x != NULL) {
+      free(fTrackStoreData_x) ;
+      free(fTrackStoreData_y) ;
+      free(fTrackStoreData_z) ;
+    } 
+    //mexPrintf("Allocate TrackStoreData...\n");
+    fTrackStoreData_x = (double*) malloc(fMaxTrackStore*sizeof(double)) ;
+    fTrackStoreData_y = (double*) malloc(fMaxTrackStore*sizeof(double)) ;
+    fTrackStoreData_z = (double*) malloc(fMaxTrackStore*sizeof(double)) ;
+    //mexPrintf("Assign TrackStoreData...\n");
+    for (unsigned int id=0;id<fMaxTrackStore;id++) {
+      fTrackStoreData_x[id]=0;
+      fTrackStoreData_y[id]=0;
+      fTrackStoreData_z[id]=0;
+    }
+  }
   // - vector of re-generated (unstopped) primary particles
   if (fPrimaryRegenID!=NULL)
     free(fPrimaryRegenID) ;
@@ -564,7 +600,7 @@ int lucretiaManager::access(int M, int N, int O, int x, int y, int z) {
   return y + M*(x + N*z);
 }
 
-int lucretiaManager::access_unchecked(int M, int N, int O, int x, int y, int z) {
+int lucretiaManager::access_unchecked(int M, int N, int x, int y, int z) {
   return y + M*(x + N*z);
 }
 
@@ -592,17 +628,17 @@ void lucretiaManager::indices_linear(
     f011_i = access(M,N,O, x,   y+1, z+1);
     f111_i = access(M,N,O, x+1, y+1, z+1);
   } else {
-    f000_i = access_unchecked(M,N,O, x,   y  , z);
-    f100_i = access_unchecked(M,N,O, x+1, y  , z);
+    f000_i = access_unchecked(M,N, x,   y  , z);
+    f100_i = access_unchecked(M,N, x+1, y  , z);
     
-    f010_i = access_unchecked(M,N,O, x,   y+1, z);
-    f110_i = access_unchecked(M,N,O, x+1, y+1, z);
+    f010_i = access_unchecked(M,N, x,   y+1, z);
+    f110_i = access_unchecked(M,N, x+1, y+1, z);
     
-    f001_i = access_unchecked(M,N,O, x,   y  , z+1);
-    f101_i = access_unchecked(M,N,O, x+1, y  , z+1);
+    f001_i = access_unchecked(M,N, x,   y  , z+1);
+    f101_i = access_unchecked(M,N, x+1, y  , z+1);
     
-    f011_i = access_unchecked(M,N,O, x,   y+1, z+1);
-    f111_i = access_unchecked(M,N,O, x+1, y+1, z+1);
+    f011_i = access_unchecked(M,N, x,   y+1, z+1);
+    f111_i = access_unchecked(M,N, x+1, y+1, z+1);
   }
 }
 
@@ -619,7 +655,7 @@ void lucretiaManager::indices_cubic(
     for (int i=0; i<4; ++i)
       for (int j=0; j<4; ++j)
         for (int k=0; k<4; ++k)
-          f_i[i+4*(j+4*k)] = access_unchecked(M,N,O, x+i-1, y+j-1, z+k-1);
+          f_i[i+4*(j+4*k)] = access_unchecked(M,N, x+i-1, y+j-1, z+k-1);
   }
 }
 
@@ -796,7 +832,7 @@ int lucretiaManager::GetNextX()
   uint32_T iray, useray, i ;
   if (fRayGetPtr >= fBunch->nray || fRayCount >= fMaxPrimaryParticles )
     return -1 ;
-  for (i=fRayGetPtr; i<fBunch->nray; i++) {
+  for (i=fRayGetPtr; i<(unsigned int)fBunch->nray; i++) {
     if (fPrimOrder!=NULL)
       iray=fPrimOrder[i] ;
     else
@@ -829,6 +865,28 @@ void lucretiaManager::SetLucretiaData()
     mxSetData( pPrimaryRegenID, dPrimaryRegenID) ;
     mxSetProperty( GetExtProcessPrimariesData(fEle), *fBunchNo, "regeneratedID", pPrimaryRegenID ) ;
   }
+  // Stored tracking data
+  if (fMaxTrackStore>0) {
+    unsigned int iMax=0,id;
+    iMax=fTrackStoreCounter;
+    if (iMax>0) {
+      mxArray* pTrackStore_x = mxCreateDoubleMatrix(iMax,1,mxREAL) ;
+      mxArray* pTrackStore_y = mxCreateDoubleMatrix(iMax,1,mxREAL) ;
+      mxArray* pTrackStore_z = mxCreateDoubleMatrix(iMax,1,mxREAL) ;
+      double* dTrackStore_x = (double*) mxCalloc(iMax,sizeof(double)) ;
+      double* dTrackStore_y = (double*) mxCalloc(iMax,sizeof(double)) ;
+      double* dTrackStore_z = (double*) mxCalloc(iMax,sizeof(double)) ;
+      memcpy(dTrackStore_x, fTrackStoreData_x, sizeof(double)*iMax) ;
+      memcpy(dTrackStore_y, fTrackStoreData_y, sizeof(double)*iMax) ;
+      memcpy(dTrackStore_z, fTrackStoreData_z, sizeof(double)*iMax) ;
+      mxSetPr( pTrackStore_x, dTrackStore_x ) ;
+      mxSetPr( pTrackStore_y, dTrackStore_y ) ;
+      mxSetPr( pTrackStore_z, dTrackStore_z ) ;
+      mxSetProperty( GetExtProcessPrimariesData(fEle), *fBunchNo, "TrackingData_x", pTrackStore_x ) ;
+      mxSetProperty( GetExtProcessPrimariesData(fEle), *fBunchNo, "TrackingData_y", pTrackStore_y ) ;
+      mxSetProperty( GetExtProcessPrimariesData(fEle), *fBunchNo, "TrackingData_z", pTrackStore_z ) ;
+    }
+  }
   //
   if (fSecondariesCounter>0) {
     mxArray* pSecondaryBunch_x = mxCreateNumericMatrix(6, fSecondariesCounter, mxDOUBLE_CLASS, mxREAL) ;
@@ -850,6 +908,16 @@ void lucretiaManager::SetLucretiaData()
     *dNumSec = fSecondariesCounter ;
     mxSetData( pNumSec, dNumSec );
     mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "NumStored", pNumSec) ;
+  }
+}
+
+void lucretiaManager::WritePrimaryTrackData(double x, double y, double z)
+{
+  if (fMaxTrackStore>0 && fTrackStoreCounter<fMaxTrackStore && fabs(z)<Lcut) {
+    fTrackStoreData_x[fTrackStoreCounter]=x;
+    fTrackStoreData_y[fTrackStoreCounter]=y;
+    fTrackStoreData_z[fTrackStoreCounter]=z;
+    fTrackStoreCounter++;
   }
 }
 

@@ -8,6 +8,9 @@ classdef ExtProcess < handle & ExtPhysics
   properties(Abstract)
     Verbose ;
   end
+  properties(Abstract,Constant)
+    supportedPrimaryParticleTypes ;
+  end
   properties(Access=protected)
     elemno ;
     processID ;
@@ -28,6 +31,8 @@ classdef ExtProcess < handle & ExtPhysics
     MaxPrimaryParticles
     SecondaryStorageCuts % 1 = only store hits on d/s element face, 0 = store all
     ForceProcess % Force ExtProcess regardless of aperture if == true
+    TrackStoreMax % Set >0 to store tracking point data in EXT process (max # points per primary particle to store)
+    PrimaryType % Type of particle to use for primaries transfered from Lucretia to ExtProcess
   end
   properties(Access=protected)
     fPrimarySampleOrder ;
@@ -38,6 +43,8 @@ classdef ExtProcess < handle & ExtPhysics
     fSecondaryStorageCuts = uint8(1) ;
     fForceProcess = false ; % Force ExtProcess regardless of aperture
     extDir % absolute path to root ExtProcess diretcory
+    fTrackStoreMax=0;
+    fPrimaryType
   end
   properties(Abstract,Constant,Hidden)
     dataFiles % define cell array of data files associated with process type (must provide empty cell array if none) [paths relative to Lucretia/src/ExtProcess]
@@ -56,6 +63,24 @@ classdef ExtProcess < handle & ExtPhysics
       else
         obj.extDir=regexprep(td,sprintf('Tracking/TrackThru.%s',mexext),'ExtProcess/');
       end
+    end
+    function val = get.TrackStoreMax(obj)
+      val = uint32(obj.fTrackStoreMax);
+    end
+    function set.PrimaryType(obj,val)
+      if ~ismember(val,obj.supportedPrimaryParticleTypes)
+        error('Unsupported type of primary particle')
+      end
+      obj.fPrimaryType=val;
+    end
+    function val=get.PrimaryType(obj)
+      val=obj.fPrimaryType;
+    end
+    function set.TrackStoreMax(obj,val)
+      if val<0
+        error('Supply positive integer')
+      end
+      obj.fTrackStoreMax=uint32(val);
     end
     function val = get.ForceProcess(obj)
       val=obj.fForceProcess;

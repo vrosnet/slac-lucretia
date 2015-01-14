@@ -25,6 +25,7 @@ class lucretiaManager
   void SetNextSecondary(double x[6], int id, const char* type) ;
   void SetLucretiaData() ;
   void freeMem() ;
+  void WritePrimaryTrackData(double x, double y, double z) ;
   void GetUniformField(double uField[3]) ;
   double interpField(const int fieldno, const double* point) ;
   void ApplyRunCuts(G4UImanager* UI) ;
@@ -33,6 +34,7 @@ class lucretiaManager
   char* Material ; 
   char* Material2 ; 
   char* VacuumMaterial ;
+  char* PrimaryType ; // Type of primary particle to track
   const mxArray *pBx,*pBy,*pBz,*pEx,*pEy,*pEz ; // EM field values
   char* EMStepperMethod ;
   double EMStepSize ;
@@ -49,7 +51,7 @@ class lucretiaManager
   double Ecut ; // Energy cut for storing tracks
   double Thickness ; // Material thickness / m
   int Verbose; // GEANT4 text output verbosity
-  double Lcut; // Final track must be >= this to make it back into Lucretia
+  double Lcut;
   int fNumRaysResumed ; // Keep count of number of un-stopped rays
   uint32_T fMaxSecondaryParticles ; // Max number of secondaries to keep
   uint8_T fSecondaryStorageCuts ; // Control conditions under which secondary particles are stored (0= all 1=d/s face only)
@@ -75,17 +77,21 @@ class lucretiaManager
     double FractionMass;
   } ;
   struct {
-	  double density;
+    double density;
     double pressure;
     double temperature;
     char* state;
     size_t NumComponents;
     struct UserElement* element;
   } UserMaterial[3];
-
+  uint32_T fMaxTrackStore ; // Max number of tracking points to store (per primary)
+  unsigned int fTrackStoreCounter ; // Counter array for keeping track of stored points
+  double* fTrackStoreData_x ; // poimter to stored tracking points
+  double* fTrackStoreData_y ; // poimter to stored tracking points
+  double* fTrackStoreData_z ; // poimter to stored tracking points
   private:
   int access(int M, int N, int O, int x, int y, int z) ;
-  int access_unchecked(int M, int N, int O, int x, int y, int z) ;
+  int access_unchecked(int M, int N, int x, int y, int z) ;
   void indices_linear(
         int &f000_i,
         int &f100_i,
