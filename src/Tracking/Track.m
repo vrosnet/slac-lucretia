@@ -300,7 +300,7 @@ classdef Track < handle
                any(isnan(BEAMLINE{iele}.ExtProcess(iproc).Ez(:)))
                error('Badly formatted EM field components in element %d (NaN''s present)')
             end
-            % If wanting to us an external process, check that the environment
+            % If wanting to use an external process, check that the environment
             % has been set up correctly one time per process type
             if isempty(obj.checkExtProcess) || ~isfield(obj.checkExtProcess,class(BEAMLINE{iele}.ExtProcess(iproc)))
               [resp,message]=BEAMLINE{iele}.ExtProcess(iproc).checkEnv;

@@ -1,6 +1,9 @@
 classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
   %EXTG4PROCESS - class to handle interface of Lucretia beam using GEANT4 engine
   
+  properties(Constant)
+    supportedPrimaryParticleTypes={'e-' 'e+'};
+  end
   properties
     Verbose=0; % Verbosity level for printing status info to stdout in GEANT
     Ecut=0; % Energy cut for GEANT generated tracks / GeV
@@ -25,6 +28,8 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
       obj = obj@ExtProcess() ;
       obj = obj@ExtGeometry() ;
       obj = obj@ExtG4EMField() ;
+      % Default primary particle type is e-
+      obj.PrimaryType = 'e-';
       % List of required environment variables
       for ivar=1:length(obj.dataFiles)
         obj.envVars.(obj.evarNames{ivar})=[obj.extDir obj.dataFiles{ivar}];
@@ -65,7 +70,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
   methods
     function [resp,message]=checkEnv(obj)
       resp=1; message=[];
-      if labindex>1 || (~isempty(obj.envCheckResp) && obj.envCheckResp==true)
+      if isinparfor || (~isempty(obj.envCheckResp) && obj.envCheckResp==true)
         return
       end
       df=obj.dataFiles;
@@ -76,7 +81,7 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
         for idf=1:length(df)
           if ~exist(fullfile(obj.extDir,df{idf}),'file')
             obj.envCheckResp=false;
-            message=sprintf('ExtG4Process is missing required file (labindex= %d) :%s',labindex,fullfile(obj.extDir,df{idf}));
+            message=sprintf('ExtG4Process is missing required file :%s',fullfile(obj.extDir,df{idf}));
           end
         end
       end

@@ -18,13 +18,12 @@ primaryGeneratorAction::primaryGeneratorAction(lucretiaManager* lman)
   : G4VUserPrimaryGeneratorAction(),
     fLman(lman)
 {
-  // Input particles type of electron
+  // Input particles type required
   G4int nofParticles = 1;
     fParticleGun = new G4ParticleGun(nofParticles);
   G4ParticleDefinition* particleDefinition 
-    = G4ParticleTable::GetParticleTable()->FindParticle("e-");
+    = G4ParticleTable::GetParticleTable()->FindParticle(lman->PrimaryType);
   fParticleGun->SetParticleDefinition(particleDefinition);
-  
 }
 
 primaryGeneratorAction::~primaryGeneratorAction()
@@ -39,6 +38,7 @@ void primaryGeneratorAction::GeneratePrimaries(G4Event* Event)
   int xPtr ;
   double Px, Py, Pz, P ;
   //cout << "+-+-+-+-+-+-+- primaryGeneratorAction +-+-+-+-+-+-+- (ele= " << *fLman->fEle << ")\n" ;
+  fParticleGun->SetParticleDefinition(G4ParticleTable::GetParticleTable()->FindParticle(fLman->PrimaryType));
   xPtr = fLman->GetNextX() ;
   while ( xPtr>=0 ) { // Loop through all stopped Lucretia macro-particles
     // X/Y co-ordinates from Lucretia Bunch, place Z at start of geometry
