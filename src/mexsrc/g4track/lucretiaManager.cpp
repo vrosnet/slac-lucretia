@@ -544,8 +544,8 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   const mwSize O=F_dims[2];
   
   const double *pF = mxGetPr(F);
-  const double *pX = &point[0];
-  const double *pY = &point[1];
+  const double *pX = &point[1]; // deliberately switch x <-> y because of C vs. Matlab array indexing
+  const double *pY = &point[0];
   const double *pZ = &point[2];
   double pO ;
   
@@ -553,8 +553,8 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   const double x_low = -(AperX+Thickness)*1e3; const double x_high = (AperX+Thickness)*1e3;
   const double y_low = -(AperY+Thickness)*1e3; const double y_high = (AperY+Thickness)*1e3;
   const double z_low = -Lcut*1e3; const double z_high = Lcut*1e3;
-  /*if (fieldno==0)
-    printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);*/
+  //if (fieldno==0)
+  //  printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);
   if (*pX<x_low || *pX>x_high || *pY<y_low || *pY>y_high || *pZ<z_low || *pZ>z_high)
     return 0;
 
@@ -581,12 +581,12 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
     default:
       mexErrMsgTxt("Unimplemented interpolation method.");
   }
-  /*if (fieldno==0)
-    printf("Bx: %g (BMAX: %g)\n",pO,pF[0]);
-  if (fieldno==1)
-    printf("By: %g (BMAX: %g)\n",pO,pF[0]);
-  if (fieldno==2)
-  printf("Bz: %g (BMAX: %g)\n",pO,pF[0]);*/
+  //if (fieldno==0)
+  //  printf("Bx: %g (BMAX: %g)\n",pO,pF[0]);
+  //if (fieldno==1)
+  //  printf("By: %g (BMAX: %g)\n",pO,pF[0]);
+  //if (fieldno==2)
+  //  printf("Bz: %g (BMAX: %g)\n",pO,pF[0]);
   // Return the interpolated field value
   return pO ;
 }
