@@ -92,7 +92,7 @@ z=bunchIn(5,~stop);
 x=bunchIn(1,~stop);
 y=bunchIn(3,~stop);
 E=bunchIn(6,~stop);
-beamQ(stop)=[];
+beamQ(logical(stop))=[];
 sx=std(x); sy=std(y);
 rb=1.7*(sx+sy)/2;
 gamma=mean(E)./0.511e-3;
