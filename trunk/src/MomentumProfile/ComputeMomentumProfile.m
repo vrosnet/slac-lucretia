@@ -49,6 +49,7 @@ function [stat, V_on, V_off, V_load, V_SR, varargout] = ...
 
   global BEAMLINE ;
   global KLYSTRON ; 
+  varargout{1}=[];
   stat = InitializeMessageStack( ) ;
   P0 = 0 ;
   IssuedBadSRMsg = 0 ;

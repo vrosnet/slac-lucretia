@@ -96,6 +96,7 @@ classdef Match < handle & physConsts
     matchWeights=[]; % Vector of weights for match entries
     userFitFun % function handle for user supplied fitting routine (must take Lucretia beam structure as only argument)
     userOutputFn % User mimiser output function
+    MaxFunEvals=100000; % Max number of function evaluations to allow when performing optimization
   end
   properties(SetAccess=protected)
     matchType={}; % Cell array of match type descriptors (see allowedMatchTypes property)
@@ -361,15 +362,15 @@ classdef Match < handle & physConsts
       % Set global options
       if strcmp(obj.optim,'genetic')
         opts=gaoptimset('Display',obj.optimDisplay,...
-          'TolCon',1e-6,'TolFun',1e-6,'Generations',100000,'PopulationSize',100,'UseParallel','never','Vectorized','off');
+          'TolCon',1e-6,'TolFun',1e-6,'Generations',obj.MaxFunEvals,'PopulationSize',100,'UseParallel','never','Vectorized','off');
       elseif strcmp(obj.optim,'lsqnonlin')
-        opts=optimset('Display',obj.optimDisplay,'MaxFunEvals',100000,'MaxIter',100000,'TolX',1e-5,'TolFun',1e-5,...
+        opts=optimset('Display',obj.optimDisplay,'MaxFunEvals',obj.MaxFunEvals,'MaxIter',100000,'TolX',1e-5,'TolFun',1e-5,...
           'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state));
       elseif strcmp(obj.optim,'fmincon')
-        opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
+        opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',obj.MaxFunEvals,...
           'MaxIter',100000,'TolX',1e-3,'TolFun',1e-1,'UseParallel','never','Algorithm','active-set');
       else
-        opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',100000,...
+        opts=optimset('Display',obj.optimDisplay,'OutputFcn',@(x,optimValues,state) optimOutFun(obj,x,optimValues,state),'MaxFunEvals',obj.MaxFunEvals,...
           'MaxIter',1500,'TolX',1e-6,'TolFun',1e-6,'UseParallel','never');
       end
       
@@ -503,7 +504,14 @@ classdef Match < handle & physConsts
         for ind=obj.varIndex{itype}
           switch obj.varType{itype}
             case 'BEAMLINE'
-              BEAMLINE{ind}.(obj.varField{itype})(obj.varFieldIndex(itype))=x(itype);
+              if strcmp(BEAMLINE{ind}.Class,'SBEN') && strcmp(obj.varField{itype},'B')
+                B0=BEAMLINE{ind}.B(1); brat=x(itype)/B0;
+                BEAMLINE{ind}.Angle=BEAMLINE{ind}.Angle*brat;
+                BEAMLINE{ind}.EdgeAngle=BEAMLINE{ind}.EdgeAngle.*brat;
+                BEAMLINE{ind}.B=BEAMLINE{ind}.B.*brat;
+              else
+                BEAMLINE{ind}.(obj.varField{itype})(obj.varFieldIndex(itype))=x(itype);
+              end
             case 'PS'
               PS(ind).(obj.varField{itype})(obj.varFieldIndex(itype))=x(itype);
               if strcmp(obj.varField{itype},'SetPt'); PSTrim(ind); end;

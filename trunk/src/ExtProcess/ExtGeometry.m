@@ -5,7 +5,7 @@ classdef ExtGeometry < handle
   properties(Constant, Hidden)
     allowedGeometryTypes={'Rectangle','Ellipse','Tapered'};
   end
-  properties(Access=protected)
+  properties(SetAccess=protected)
     allowedMaterials={'Vacuum','User1','User2','User3'};
   end
   properties(SetAccess=protected)
