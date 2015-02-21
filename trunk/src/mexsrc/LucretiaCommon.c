@@ -3513,8 +3513,15 @@ int TrackBunchThruRF( int elemno, int bunchno,
        * phase of the RF, the wave #, and the voltage.  Remember that the
        * particle momenta are in GeV, the voltage in GV, the phase in radians,
        * and the wave # in 1/m: */
-      
-      dP = V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
+      // If ptype=1 (e+), then invert Voltage to apply correct lorentz force
+      if (ThisBunch->ptype[ray] == 1) {
+        dP = -V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
+        //mexPrintf("ptype ==1, dP=%g\n",dP);
+      }
+      else {
+        dP = V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
+        //mexPrintf("ptype = %d, dP = %g\n",ThisBunch->ptype[ray],dP);
+      }
       if ( Mode == 1)
       {
         dPKick = dP ;

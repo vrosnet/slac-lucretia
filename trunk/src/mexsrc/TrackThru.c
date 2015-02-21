@@ -165,8 +165,8 @@ void mexFunction( int nlhs, mxArray *plhs[],
 const char* BeamFieldName[] = {           /* 2 field names */
   "BunchInterval","Bunch"
 } ;
-const char* BunchFieldName[] = {          /* 3 field names */
-  "x", "Q", "stop"
+const char* BunchFieldName[] = {          /* 4 field names */
+  "x", "Q", "stop", "ptype"
 };
 
 /* for efficiency, when we get the number of wakes we can keep it around
@@ -342,7 +342,8 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
     x = mxGetField(BunchField,0,BunchFieldName[0]) ;
     q = mxGetField(BunchField,0,BunchFieldName[1]) ;
     stop = mxGetField(BunchField,0,BunchFieldName[2]) ;
-    if ( (x==NULL) || (q==NULL) || (stop==NULL) )
+    mxArray* ptypePtr = mxGetField(BunchField,i,BunchFieldName[3]) ;
+    if ( (x==NULL) || (q==NULL) || (stop==NULL) )// OK to not have ptype, will assume it is e- in this case
       goto egress ;
     
     /* get the total number of bunches in the beam */
@@ -444,8 +445,11 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
     mxSetField(plhs[1],0,BeamFieldName[0],IntervalField) ;
     
     /* generate a structure mxArray with the correct fields for a beam */
+    if (ptypePtr==NULL) // Don't create ptype if not present in the passed Bunch structure
+      newBunchField = mxCreateStructMatrix(1,ArgStruc.nBunch,3,BunchFieldName);
+    else
+      newBunchField = mxCreateStructMatrix(1,ArgStruc.nBunch,4,BunchFieldName);
     
-    newBunchField = mxCreateStructMatrix(1,ArgStruc.nBunch,3,BunchFieldName);
     if (newBunchField == NULL)
     {
       ArgStruc.Status = -1 ;
@@ -459,6 +463,7 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
      * -> check that the x    field is 6 x npart
      * -> check that the Q    field is 1 x npart
      * -> check that the stop field is 1 x npart
+     * -> check that the ptype field is 1 x npart if there
      * -> copy the bunch from the input beam to the output beam
      * -> allocate a bunch structure for TheBeam
      * -> get pointers to the output beam x, Q, stop fields
@@ -575,7 +580,17 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
       cudaMemcpy(TheBeam.bunches[i]->ngoodray_gpu, &TheBeam.bunches[i]->ngoodray, sizeof(int), cudaMemcpyHostToDevice) ;
       free(stop_local) ;
 #endif      
-      
+      TheBeam.bunches[i]->ptype = (unsigned short int*) malloc( sizeof(unsigned short int)*TheBeam.bunches[i]->nray ) ;
+      if (ptypePtr==NULL) {
+        for (sCount=0 ; sCount<TheBeam.bunches[i]->nray ; sCount++)
+          TheBeam.bunches[i]->ptype[sCount] = 0 ;
+      }
+      else {
+        double* ptypeVal = (double*) mxGetPr( ptypePtr ) ;
+        for (sCount=0 ; sCount<TheBeam.bunches[i]->nray ; sCount++)
+          TheBeam.bunches[i]->ptype[sCount]=(unsigned short int) ptypeVal[sCount];
+        mxSetField(newBunchField,j,BunchFieldName[3], mxDuplicateArray(ptypePtr) ) ; // copy ptype over to output bunch
+      }
     }
     
     /* hook the newBunchField to the output beam data structure */
@@ -955,6 +970,7 @@ void TrackThruSetReturn( struct TrackArgsStruc* TrackArgs,
         mxGPUDestroyGPUArray( TrackArgs->TheBeam->bunches[i]->y_gpu ) ;
 #else
         mxFree( TrackArgs->TheBeam->bunches[i]->y ) ;
+        free( TrackArgs->TheBeam->bunches[i]->ptype ) ;
 #endif
         if (nWakes[0] > 0)
           mxFree( TrackArgs->TheBeam->bunches[i]->ZSR ) ;

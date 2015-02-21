@@ -200,11 +200,13 @@ function [stat, V_on, V_off, V_load, V_SR, varargout] = ...
          bx = BEAMLINE{count}.B(i0) .* sin(BEAMLINE{count}.Tilt(i0)) ;
          Brad = sqrt(bx^2 + by^2) ;
       end
-      [stat,V_SR(eptr)] = CalculateSR(P_elemstart, Brad, Lrad) ;
-      if (stat{1}==0)
-         stat = AddMessageToStack(stat,...
-              ['Invalid SR Options, element ',num2str(count)]) ;
-         return ;
+      if Lrad>0
+        [stat,V_SR(eptr)] = CalculateSR(P_elemstart, Brad, Lrad) ;
+        if (stat{1}==0)
+           stat = AddMessageToStack(stat,...
+                ['Invalid SR Options, element ',num2str(count)]) ;
+           return ;
+        end
       end
       P_elemstart = P_elemstart - V_load(eptr) - V_SR(eptr) ;
   end
