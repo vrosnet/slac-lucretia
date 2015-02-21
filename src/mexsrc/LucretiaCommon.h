@@ -212,6 +212,7 @@ struct Bunch {
 #endif
 	double* Q ;                 /* pointer to charge vector */
 	double* stop ;              /* pointer to stopping element, if any */
+  unsigned short int* ptype ; /* Particle type ID (1=e-, 2=e+) */
 	struct SRWF** ZSR ;         /* longitudinal wake information */
 	struct SRWF** TSR ;         /* transverse wake information */
 	struct LRWFFreq** TLRFreq ; /* LRWF_T frequency domain information */
