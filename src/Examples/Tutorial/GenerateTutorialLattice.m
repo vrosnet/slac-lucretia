@@ -14,8 +14,7 @@ function statall = GenerateTutorialLattice()
 %
 %==========================================================================
 
-  clear global ;
-  global BEAMLINE GIRDER KLYSTRON PS WF
+  global BEAMLINE GIRDER KLYSTRON PS WF %#ok<NUSED>
   statall = InitializeMessageStack() ;
 
 % Ordinarily one would start with a lattice which is defined in an XSIF

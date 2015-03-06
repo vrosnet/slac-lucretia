@@ -34,7 +34,6 @@
 %==========================================================================
 %==========================================================================
 
-  clear all global ;
   global BEAMLINE GIRDER KLYSTRON WF %#ok<NUSED>
   
 % step 1:  generate the lattice and load the wakefields  
