@@ -250,7 +250,7 @@
     disp('Problem in TrackThru!  Halting Execution!') ;
     return ;
   end
-  [x,y,S] = BPMZPlot( instdata{1},'um','um','km' ) ;
+  [x,y,S] = BPMZplot( instdata{1},'um','um','km' ) ;
   subplot(2,1,1)
   ylabel('X BPM Reading [{\mu}m]') ;
   subplot(2,1,2)
