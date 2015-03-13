@@ -2043,12 +2043,12 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
   cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(double)*12, cudaMemcpyHostToDevice) ;
   TrackBunchThruQSOS_kernel<<<blocksPerGrid, threadsPerBlock>>>(ThisBunch->nray, ThisBunch->stop, ThisBunch->y, ThisBunch->x, TrackFlag,
           ThisBunch->ngoodray_gpu, elemno, aper2, nPoleFlag, B, L, Tilt, skew, Xfrms_gpu, dZmod, StoppedParticles_gpu,
-          PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates ) ;
+          PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates, ThisBunch->ptype ) ;
   cudaFree(Xfrms_gpu);
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruQSOS_kernel(ray, ThisBunch->stop, ThisBunch->y, ThisBunch->x, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, nPoleFlag,
-            B, L, Tilt, skew, Xfrms, dZmod, StoppedParticles) ;
+            B, L, Tilt, skew, Xfrms, dZmod, StoppedParticles, ThisBunch->ptype) ;
 #endif
   
   egress:
@@ -2063,11 +2063,11 @@ int TrackBunchThruQSOS( int elemno, int bunchno,
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
         int skew, double* pXfrms, double dZmod, int* stp, double* PascalMatrix, double* Bang,
-        double* MaxMultInd, unsigned long long rSeed, curandState *rState)
+        double* MaxMultInd, unsigned long long rSeed, curandState *rState, unsigned short int* ptype)
 #else
         void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt,
-        int skew, double Xfrms[6][2], double dZmod, int* stp)
+        int skew, double Xfrms[6][2], double dZmod, int* stp, unsigned short int* ptype)
 #endif
 {
   int ray,coord,raystart,doStop,icount ;
@@ -2103,6 +2103,11 @@ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, i
 #ifdef __CUDA_ARCH__
   rState_local = rState[ray] ;
 #endif
+  
+  /* If positivly charged particle, invert B */
+  if (ptype[ray] == 1) {
+    B=-B;
+  }
   
   /* if the ray was previously stopped just copy it over */
   
@@ -2511,7 +2516,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
   TrackBunchThruMult_kernel<<<blocksPerGrid, threadsPerBlock>>>( MultAngleValue, MultBValue, MultTiltValue, MultPoleIndexValue,
           MultPar[MultPoleIndex].Length, ThisBunch->nray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag,
           ThisBunch->ngoodray_gpu, elemno, aper2, L, dB, Tilt, Lrad, Xfrms_gpu, dZmod, splitScale, StoppedParticles_gpu,
-          PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates) ;
+          PascalMatrix, Bang, MaxMultInd, *rSeed, rngStates, ThisBunch->ptype) ;
   cudaFree(Xfrms_gpu);
   cudaFree(MultAngleValue);
   cudaFree(MultBValue);
@@ -2521,7 +2526,7 @@ int TrackBunchThruMult( int elemno, int bunchno,
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruMult_kernel( MultPar[MultAngle].ValuePtr, MultPar[MultB].ValuePtr, MultPar[MultTilt].ValuePtr, MultPar[MultPoleIndex].ValuePtr,
           MultPar[MultPoleIndex].Length, ray, ThisBunch->stop, ThisBunch->x, ThisBunch->y, TrackFlag, &ThisBunch->ngoodray, elemno, aper2, L,
-          dB, Tilt, Lrad, Xfrms, dZmod, splitScale, StoppedParticles) ;
+          dB, Tilt, Lrad, Xfrms, dZmod, splitScale, StoppedParticles, ThisBunch->ptype) ;
 #endif
   
   egress:
@@ -2533,15 +2538,16 @@ int TrackBunchThruMult( int elemno, int bunchno,
 void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
         int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double* pXfrms, double dZmod, double splitScale, int* stp,
-        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState)
+        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState, unsigned short int* ptype)
 #else
 void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
         int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp)
+        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp,
+        unsigned short int* ptype)
 #endif
         
 {
-  int ray, raystart, coord, doStop ;
+  int ray, raystart, coord, doStop, count ;
   double *x, *px, *y, *py, *z, *p0 ;
 #ifdef __CUDA_ARCH__
   ray = blockDim.x * blockIdx.x + threadIdx.x ;
@@ -2567,6 +2573,12 @@ void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, doubl
     for (coord=0 ; coord<6 ; coord++)
       yb[raystart+coord] = xb[raystart+coord] ;
     goto egress ;
+  }
+  
+  /* If positivly charged particle, invert B */
+  if (ptype[ray] == 1) {
+    for (count=0; count<MultPoleIndexLength; count++)
+      MultBValue[count]=-MultBValue[count];
   }
   
   /* make ray coordinates into local ones, including offsets etc which
@@ -2866,13 +2878,13 @@ int TrackBunchThruSBend( int elemno, int bunchno,
   cudaMemcpy(Xfrms_gpu, Xfrms_flat, sizeof(double)*12, cudaMemcpyHostToDevice) ;
   TrackBunchThruSBend_kernel<<<blocksPerGrid, threadsPerBlock>>>( ThisBunch->nray, ThisBunch->x, ThisBunch->y, ThisBunch->stop,
           TrackFlag, Xfrms_gpu, cTT, sTT, Tx, Ty, OffsetFromTiltError, AngleFromTiltError, ThisBunch->ngoodray_gpu, hgap2, intB, intG, L,
-          elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed, rngStates) ;
+          elemno, E1, H1, hgap, fint, Theta, E2, H2, hgapx, fintx, hgapx2, StoppedParticles_gpu, *rSeed, rngStates, ThisBunch->ptype) ;
   cudaFree(Xfrms_gpu);
 #else
   for (ray=0 ;ray<ThisBunch->nray ; ray++)
     TrackBunchThruSBend_kernel(ray, ThisBunch->x, ThisBunch->y, ThisBunch->stop, TrackFlag, Xfrms, cTT, sTT, Tx, Ty,
             OffsetFromTiltError, AngleFromTiltError, &ThisBunch->ngoodray, hgap2, intB, intG, L, elemno, E1, H1, hgap, fint, Theta,
-            E2, H2, hgapx, fintx, hgapx2, StoppedParticles) ;
+            E2, H2, hgapx, fintx, hgapx2, StoppedParticles, ThisBunch->ptype) ;
 #endif
   
   egress:
@@ -2884,12 +2896,13 @@ int TrackBunchThruSBend( int elemno, int bunchno,
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double* pXfrms, double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState)
+        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState,
+        unsigned short int* ptype)
 #else
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2, int* stp)
+        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned short int* ptype)
 #endif
 {
   int ray, coord, doStop, raystart ;
@@ -2919,6 +2932,14 @@ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, 
   
   raystart = 6*ray ;
   
+  /* If positively charged, flip sign of angles and magnetic fields */
+  if (ptype[ray] == 1) {
+     intG=-intG;
+     intB=-intB;
+     Theta=-Theta;
+     E1=-E1;
+     E2=-E2;
+  }
   
   /* if the ray was previously stopped copy it over */
   
@@ -3516,11 +3537,9 @@ int TrackBunchThruRF( int elemno, int bunchno,
       // If ptype=1 (e+), then invert Voltage to apply correct lorentz force
       if (ThisBunch->ptype[ray] == 1) {
         dP = -V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
-        //mexPrintf("ptype ==1, dP=%g\n",dP);
       }
       else {
         dP = V * cos( phi1 + Krf * (*z) ) * Lfrac[slicecount] ;
-        //mexPrintf("ptype = %d, dP = %g\n",ThisBunch->ptype[ray],dP);
       }
       if ( Mode == 1)
       {
@@ -4647,14 +4666,9 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
   }
   
   /* since the rotation transformation can be applied to the magnet
-   * rather than the beam, do that now */
+   * rather than the beam, do that now  (GW 2/21/2015: move to ray loop to allow for +ve particles)*/
   
   Tilt += Xfrms[5][0] ;
-  
-  XField = (B * cos(Tilt) - B2*sin(Tilt)) / GEV2TM ;
-  YField = (B * sin(Tilt) + B2*cos(Tilt)) / GEV2TM ;
-  dx = XField * Lov2 ;
-  dy = YField * Lov2 ;
   
   /* make a shortcut to get to the bunch of interest */
   
@@ -4679,6 +4693,16 @@ int TrackBunchThruCorrector( int elemno, int bunchno,
     {
       continue ;
     }
+    
+    if (ThisBunch->ptype[ray] == 1) {
+      B=-B;
+      B2=-B2;
+    }
+    
+    XField = (B * cos(Tilt) - B2*sin(Tilt)) / GEV2TM ;
+    YField = (B * sin(Tilt) + B2*cos(Tilt)) / GEV2TM ;
+    dx = XField * Lov2 ;
+    dy = YField * Lov2 ;
     
     /* apply synchrotron radiation */
     

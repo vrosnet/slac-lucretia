@@ -586,15 +586,18 @@ __global__ void rngSetup_kernel(curandState *state, unsigned long long rSeed) ;
 __global__ void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 __global__ void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double* pXfrms, double dZmod,
-					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
+					  int* stp, double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState,
+        unsigned short int* ptype) ;
 __global__ void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
         int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
         int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double* pXfrms, double dZmod, double splitScale, int* stp,
-        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState) ;
+        double* PascalMatrix, double* Bang, double* MaxMultInd, unsigned long long rSeed, curandState *rState,
+        unsigned short int* ptype) ;
 __global__ void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double* pXfrms, double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-					   double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState) ;
+					   double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned long long rSeed, curandState *rState,
+        unsigned short int* ptype) ;
 __global__ void TrackBunchThruBPM_kernel(int nray, float* pXfrms, int* TrackFlags, double* qb, double* yb, double* stop, float sintilt, float costilt,
         float* xread_ret, float* yread_ret, float* Q_ret, float* P_ret, float* pxq_ret, float* pyq_ret, float* z_ret, float* sigma_ret ) ;
 __global__ void TrackBunchThruTMap_kernel(double *L, double* dZmod, double* xb, double* yb, double* stop, int* TrackFlag, int N,
@@ -604,14 +607,16 @@ __global__ void TrackBunchThruTMap_kernel(double *L, double* dZmod, double* xb, 
 #else
 void TrackBunchThruDrift_kernel(double* Lfull, double* dZmod, double* yb, double* stop, int* TrackFlag, int N) ;
 void TrackBunchThruQSOS_kernel(int nray, double* stop, double* yb, double* xb, int* TrackFlag, int* ngoodray, int elemno,
-        double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod, int* stp) ;
+        double aper2, int nPoleFlag, double B, double L, double Tilt, int skew, double Xfrms[6][2], double dZmod, int* stp,
+        unsigned short int* ptype) ;
 void TrackBunchThruMult_kernel(double* MultAngleValue, double* MultBValue, double* MultTiltValue, double* MultPoleIndexValue,
         int MultPoleIndexLength, int nray, double* stop, double* xb, double* yb, int* TrackFlag, int* ngoodray,
-        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp) ;
+        int elemno, double aper2, double L, double dB, double Tilt, double Lrad, double Xfrms[6][2], double dZmod, double splitScale, int* stp,
+        unsigned short int* ptype) ;
 void TrackBunchThruSBend_kernel(int nray, double* xb, double* yb, double* stop, int* TrackFlag, double Xfrms[6][2], double cTT,
         double sTT, double Tx, double Ty, double OffsetFromTiltError, double AngleFromTiltError, int* ngoodray, double hgap2,
         double intB, double intG, double L, int elemno, double E1, double H1, double hgap, double fint, double Theta, double E2,
-        double H2, double hgapx, double fintx, double hgapx2, int* stp) ;
+        double H2, double hgapx, double fintx, double hgapx2, int* stp, unsigned short int* ptype) ;
 void TrackBunchThruBPM_kernel(int nray, double Xfrms[6][2], int* TrackFlags, double* qb, double* yb, double* stop, double sintilt, double costilt,
         double* xread_cnt, double* yread_cnt, double* Q_cnt, double* P_cnt, double* pxq_cnt, double* pyq_cnt, double* z_cnt, double sigma_cnt[36] ) ;
 void TrackBunchThruTMap_kernel(double *L, double* dZmod, double* xb, double* yb, double* stop, int* TrackFlag, int N,
