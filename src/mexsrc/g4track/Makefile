@@ -13,7 +13,7 @@
  CCOMP := mex -largeArrayDims CC=c++ 
 
 # CFLAGS := CXXFLAGS='$$CXXFLAGS $(shell geant4-config --cflags)' -DG4MULTITHREADED
- #CLIBS := $(shell geant4-config --libs)
+ CLIBS := $(shell geant4-config --libs)
  CFLAGS := CXXFLAGS='$$CXXFLAGS $(shell geant4-config --cflags)'
 
 # g4track Library
