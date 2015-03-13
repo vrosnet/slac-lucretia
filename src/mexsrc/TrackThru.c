@@ -579,18 +579,23 @@ struct TrackArgsStruc* TrackThruGetCheckArgs( int nlhs, mxArray* plhs[],
 #ifdef __CUDACC__      
       cudaMemcpy(TheBeam.bunches[i]->ngoodray_gpu, &TheBeam.bunches[i]->ngoodray, sizeof(int), cudaMemcpyHostToDevice) ;
       free(stop_local) ;
-#endif      
-      TheBeam.bunches[i]->ptype = (unsigned short int*) malloc( sizeof(unsigned short int)*TheBeam.bunches[i]->nray ) ;
+#endif   
+      unsigned short int* ptype = (unsigned short int*) malloc( sizeof(unsigned short int)*TheBeam.bunches[i]->nray ) ;
       if (ptypePtr==NULL) {
         for (sCount=0 ; sCount<TheBeam.bunches[i]->nray ; sCount++)
-          TheBeam.bunches[i]->ptype[sCount] = 0 ;
+          ptype[sCount] = 0 ;
       }
       else {
         double* ptypeVal = (double*) mxGetPr( ptypePtr ) ;
         for (sCount=0 ; sCount<TheBeam.bunches[i]->nray ; sCount++)
-          TheBeam.bunches[i]->ptype[sCount]=(unsigned short int) ptypeVal[sCount];
+          ptype[sCount]=(unsigned short int) ptypeVal[sCount];
         mxSetField(newBunchField,j,BunchFieldName[3], mxDuplicateArray(ptypePtr) ) ; // copy ptype over to output bunch
       }
+#ifdef __CUDACC__
+      cudaMemcpy(TheBeam.bunches[i]->ptype, &ptype, sizeof(unsigned short int)*TheBeam.bunches[i]->nrayTheBeam.bunches[i]->nray, cudaMemcpyHostToDevice) ;
+#else    
+      TheBeam.bunches[i]->ptype=ptype;
+#endif            
     }
     
     /* hook the newBunchField to the output beam data structure */
