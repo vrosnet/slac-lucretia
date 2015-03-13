@@ -11,10 +11,21 @@ end
 solibs=unique(regexp(strsplit(solibs,'\n'),'/(\S+)','match','once'));
 solibs=solibs(cellfun(@(x) ~isempty(x),solibs));
 for ilib=1:length(solibs)
+  % Ignore Matlab so's
+  if ismac
+    if ~isempty(regexp(solibs{ilib},'maci64', 'once'))
+      continue
+    end
+  else
+    if ~isempty(regexp(solibs{ilib},'glnxa64', 'once'))
+      continue
+    end
+  end
   fprintf('Copying %s to ../Libs/%s ...\n',solibs{ilib},mexext)
   try
-    copyfile(solibs{ilib},sprintf('../Libs/%s',mexext),'f');
-    system(sprintf('svn add ../Libs/%s/%s',mexext,regexprep(solibs{ilib},'.*/','')));
+    system(sprintf('cp -b %s ../Libs/%s',solibs{ilib},mexext));
+%     copyfile(solibs{ilib},sprintf('../Libs/%s',mexext),'f');
+    %system(sprintf('svn add ../Libs/%s/%s',mexext,regexprep(solibs{ilib},'.*/','')));
   catch
   end
 end
