@@ -61,7 +61,7 @@ for bunch=1:numbunches
 
   else 
     [d,v] = eig(squeeze(sigma(:,:,bunch)) * S) ;
-     d ;
+    
 % identify eigenmodes
 
     dvec = max(d(1:2,:)) ;
