@@ -26,7 +26,7 @@
 #===================================================================
 
 # ===== Link to matlab installation directory (needed for GPU compilation)
-MATPATH = /var/MATLAB/R2014b
+MATPATH = /var/MATLAB/R2015a
 # ===== mex compiler to use
 MCOMP:= mex -v -largeArrayDims CC=c++ # used to build mex files
 CCOMP:= mex -c -largeArrayDims CC=c++ # used for compiling library objects
@@ -76,7 +76,7 @@ gpu_init::
 
 g4_init:
 	-cp TrackThru.c TrackThru_g4.c
-	MFLAGS:=${MFLAGS} -DLUCRETIA_G4TRACK CXXFLAGS='$$CXXFLAGS ${G4FLAGS}' CFLAGS='$$CFLAGS $(G4FLAGS)' 
+MFLAGS:=${MFLAGS} -DLUCRETIA_G4TRACK CXXFLAGS='$$CXXFLAGS ${G4FLAGS}' CFLAGS='$$CFLAGS $(G4FLAGS)' 
 
 # Mex files:
 GetRmats.$(MEXEXT) : $(LMAIN) $(LMATL) GetRmats.c
