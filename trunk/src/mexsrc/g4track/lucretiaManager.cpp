@@ -110,8 +110,8 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
       UserMaterial[imat].element[iele].Symbol = (char*) malloc(buflen);
       mxGetString(pEleSymbol, UserMaterial[imat].element[iele].Symbol, buflen) ;
       UserMaterial[imat].element[iele].Z=*mxGetPr(mxGetField(pElement,iele,"Z"));
-      UserMaterial[imat].element[iele].Z=*mxGetPr(mxGetField(pElement,iele,"A"));
-      UserMaterial[imat].element[iele].Z=*mxGetPr(mxGetField(pElement,iele,"FractionMass"));
+      UserMaterial[imat].element[iele].A=*mxGetPr(mxGetField(pElement,iele,"A"));
+      UserMaterial[imat].element[iele].FractionMass=*mxGetPr(mxGetField(pElement,iele,"FractionMass"));
     }
   }
   mxArray* pVacuumMaterial = GetExtProcessData(blele,"VacuumMaterial") ;
@@ -449,7 +449,9 @@ void lucretiaManager::ApplyRunCuts(G4UImanager* UI)
   string buffer, gamCut, elecCut, posiCut ;
   ostringstream gamConvert,elecConvert,posiConvert;
   string partName[5] ;
-  string procName[14] ;
+  string procName[20] ;
+  int npart=5;
+  int nproc=20;
   partName[0] = "gamma";
   partName[1] = "e-";
   partName[2] = "e+";
@@ -469,15 +471,21 @@ void lucretiaManager::ApplyRunCuts(G4UImanager* UI)
   procName[11] = "muPairProd";
   procName[12] = "AnnihiToMuPair";
   procName[13] = "GammaToMuPair";
+  procName[14] = "ee2hadr";
+  procName[15] = "electronNuclear";
+  procName[16] = "positronNuclear";
+  procName[17] = "photonNuclear";
+  procName[18] = "muonNuclear";
+  procName[19] = "Decay";
   gamConvert << fParticleCuts[0];
   UI->ApplyCommand(cutStringGamma + gamConvert.str() + " mm") ; 
   elecConvert << fParticleCuts[1];
   UI->ApplyCommand(cutStringElec + elecConvert.str() + " mm") ;
   posiConvert << fParticleCuts[2];
   UI->ApplyCommand(cutStringPosi + posiConvert.str() + " mm") ;
-  for (ipart=0; ipart<5; ipart++) {
-    for (iproc=0; iproc<14; iproc++) {
-      if (fProcessSelection[ipart+iproc*5])
+  for (ipart=0; ipart<npart; ipart++) {
+    for (iproc=0; iproc<nproc; iproc++) {
+      if (fProcessSelection[ipart+iproc*npart])
 	UI->ApplyCommand(activeString + procName[iproc] + " " + partName[ipart]) ; 
       else
 	UI->ApplyCommand(inactiveString + procName[iproc] + " " + partName[ipart]) ;
