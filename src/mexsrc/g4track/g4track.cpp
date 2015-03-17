@@ -93,6 +93,11 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/process/verbose 1");
     UI->ApplyCommand("/run/particle/verbose 1");
     UI->ApplyCommand("/process/setVerbose 1 all");
+    UI->ApplyCommand("/process/list all");
+    UI->ApplyCommand("/particle/list all");
+    UI->ApplyCommand("/material/g4/printMaterial User1");
+    UI->ApplyCommand("/material/g4/printMaterial User2");
+    UI->ApplyCommand("/material/g4/printMaterial User3");
   }
   else if (lman->Verbose==2) {
     UI->ApplyCommand("/run/verbose 2");
@@ -103,6 +108,12 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/process/verbose 1");
     UI->ApplyCommand("/run/particle/verbose 2");
     UI->ApplyCommand("/process/setVerbose 2 all");
+    UI->ApplyCommand("/process/list all");
+    UI->ApplyCommand("/particle/list all");
+    UI->ApplyCommand("/material/verbose 2");
+    UI->ApplyCommand("/material/g4/printMaterial User1");
+    UI->ApplyCommand("/material/g4/printMaterial User2");
+    UI->ApplyCommand("/material/g4/printMaterial User3");
   }
   else {
     UI->ApplyCommand("/run/verbose 0");

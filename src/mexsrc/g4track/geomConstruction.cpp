@@ -73,7 +73,7 @@ G4Material* geomConstruction::ProcessMaterial(G4String materialName, int matID =
     material = vacuumMaterial ;
   } // Process user generated material description(s)
   else if (strncmp(materialName,"User",4) == 0) {
-    int imat = (int)(materialName[4]-'0') ;
+    int imat = (int)(materialName[4]-'0')-1 ;
     int ic ;
     density=fLman->UserMaterial[imat].density*g/cm3;
     if (fLman->UserMaterial[imat].pressure>0)
@@ -90,12 +90,13 @@ G4Material* geomConstruction::ProcessMaterial(G4String materialName, int matID =
       material = new G4Material(name=materialName, density, ncomponents=fLman->UserMaterial[imat].NumComponents, kStateLiquid, temperature, pressure);
     else
       material = new G4Material(name=materialName, density, ncomponents=fLman->UserMaterial[imat].NumComponents, kStateGas, temperature, pressure);
-    for (ic=0;ic<fLman->UserMaterial[imat].NumComponents;ic++)
+    for (ic=0;ic<fLman->UserMaterial[imat].NumComponents;ic++) {
       material->AddElement(new G4Element(name=fLman->UserMaterial[imat].element[ic].Name,
               symbol=fLman->UserMaterial[imat].element[ic].Symbol,
               z=fLman->UserMaterial[imat].element[ic].Z,
-              fLman->UserMaterial[imat].element[ic].A*g/mole),
+              a=fLman->UserMaterial[imat].element[ic].A*g/mole),
               fractionmass=fLman->UserMaterial[imat].element[ic].FractionMass) ;
+    }
   }
   else { // assume want something from the GEANT4 (NIST) material database
     if (fLman->MatP[matID]>0)
@@ -142,10 +143,10 @@ geomConstruction::~geomConstruction()
 G4VPhysicalVolume* geomConstruction::Construct()
 {
   // Vacuum definition
-  Vacuum = ProcessMaterial(fVacuumMaterial) ;
+  Vacuum = ProcessMaterial(fVacuumMaterial,1) ;
   // Collimator material
-  collMaterial = ProcessMaterial(fCollMaterialName,1);
-  collMaterial2 = ProcessMaterial(fCollMaterialName2,2);
+  collMaterial = ProcessMaterial(fCollMaterialName,2);
+  collMaterial2 = ProcessMaterial(fCollMaterialName2,3);
   
   // Geometry parameters
   //

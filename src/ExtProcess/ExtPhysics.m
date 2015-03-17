@@ -2,7 +2,7 @@ classdef ExtPhysics < handle
   % Details of Physics processes to apply to EXT processes
   
   properties(SetAccess=private)
-    supportedProcessPhysics = {'msc','eIoni','eBrem','annihil','SynRad','phot','compt','conv','Rayl','muIoni','muBrems','muPairProd','AnnihiToMuPair','GammaToMuPair'} ;
+    supportedProcessPhysics = {'msc','eIoni','eBrem','annihil','SynRad','phot','compt','conv','Rayl','muIoni','muBrems','muPairProd','AnnihiToMuPair','GammaToMuPair','ee2hadr','electronNuclear','positronNuclear','photonNuclear','muonNuclear','Decay'} ;
     supportedParticleTypes = {'gamma' 'e-' 'e+' 'mu-' 'mu+'} ;
   end
   properties(Dependent)
@@ -19,11 +19,11 @@ classdef ExtPhysics < handle
   methods
     function obj=ExtPhysics()
       pv=false(length(obj.supportedParticleTypes),length(obj.supportedProcessPhysics));
-      pv(1,[6:9 14])=true;
-      pv(2,[1:3 5])=true;
-      pv(3,[1:5 13])=true;
-      pv(4,[1 10:12])=true;
-      pv(5,[1 10:12])=true;
+      pv(1,[6:9 14 18])=true;
+      pv(2,[1:3 5 16])=true;
+      pv(3,[1:5 13 15 17])=true;
+      pv(4,[1 10:12 19 20])=true;
+      pv(5,[1 10:12 19 20])=true;
       obj.processSelectionVals=pv;
       obj.fRandSeed=uint32(ceil(rand*1e5));
     end

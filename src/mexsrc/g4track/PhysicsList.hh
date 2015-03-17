@@ -25,6 +25,7 @@ public:
 
 private:
   G4bool                 fSRType;
+  G4VPhysicsConstructor*  fParticleList;
   //PhysicsListMessenger*  fMess;
 };
 
