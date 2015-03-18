@@ -46,7 +46,7 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
     xLucretia[0] = x; xLucretia[2] = y; xLucretia[4] = z; // z doesn't get copied back to Lucretia bunch for primaries
     xLucretia[1] = atan(momx/momz) ; xLucretia[3] = atan(momy/momz) ;
     xLucretia[5] = e ;
-    if (z<fLman->Lcut) { // If not at right edge of world, track there assuming vacuum
+    if (z<fLman->Lcut && parentID==0) { // If not at right edge of world, track there assuming vacuum (for primaries)
       xLucretia[0] += (fLman->Lcut - z) * xLucretia[1] ;
       xLucretia[2] += (fLman->Lcut - z) * xLucretia[3] ;
     }
