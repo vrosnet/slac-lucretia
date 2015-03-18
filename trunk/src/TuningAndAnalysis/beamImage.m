@@ -18,15 +18,15 @@ function data=beamImage(beam,nsig,E0,asym,nbins,axhan,dpk,numpix)
 % MDW, Oct 10 2012
 
 % Can we use GPU?
-try
-  if gpuDeviceCount>0
-    dogpu=true;
-  else
-    dogpu=false;
-  end
-catch
+% try
+%   if gpuDeviceCount>0
+%     dogpu=true;
+%   else
+%     dogpu=false;
+%   end
+% catch
   dogpu=false;
-end
+% end
 
 % Turn off frequent annoying warnings
 w1=warning('query','MATLAB:rankDeficientMatrix');
