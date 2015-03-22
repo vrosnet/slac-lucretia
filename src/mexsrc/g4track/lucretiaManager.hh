@@ -7,6 +7,7 @@
 #include "mex.h"
 #include "matrix.h"
 #include "G4UImanager.hh"
+#include "G4TrackStatus.hh"
 
 /* Interpolation code extracted from modified ba_interp3.cpp from Mathworks File Exchange*/
 /* ba_inter3 GPL License (c) 2008 Brian Amberg http://www.brian-amberg.de/ */
@@ -22,7 +23,7 @@ class lucretiaManager
   struct Bunch* fBunch ;
   int GetNextX() ;
   void SetNextX(double x[6], int id, int doresume) ;
-  void SetNextSecondary(double x[6], int id, const char* type) ;
+  void SetNextSecondary(double x[6], int id, const char* type,G4String procName, G4TrackStatus trackStatus) ;
   void SetLucretiaData() ;
   void freeMem() ;
   void WritePrimaryTrackData(double x, double y, double z) ;
@@ -90,6 +91,10 @@ class lucretiaManager
   double* fTrackStoreData_y ; // poimter to stored tracking points
   double* fTrackStoreData_z ; // poimter to stored tracking points
   private:
+  const int fNProc; // number of supported physics processes
+  const int fNPart; // number of particle types for physics processes supported
+  string fPartList[5] ;
+  string fProcList[20] ;
   int access(int M, int N, int O, int x, int y, int z) ;
   int access_unchecked(int M, int N, int x, int y, int z) ;
   void indices_linear(
@@ -126,6 +131,8 @@ class lucretiaManager
   mxArray* fTypeCellPtr ;
   uint32_T* fPrimaryRegenID ;
   uint32_T* fSecondaryPrimaryID ;
+  uint8_T* fSecondaryProcType ;
+  uint8_T* fSecondaryTrackStatus ;
   double* fSecondaryBunch_x ;
   int* fBunchNo ; // Bunch number
   uint32_T* fPrimOrder ; // Order in which to read in primary particles

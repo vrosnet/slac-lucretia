@@ -1,4 +1,5 @@
 #include "lucretiaManager.hh"
+#include "../LucretiaMatlab.h"
 #include <iostream>
 #include <math.h>
 #include <stdlib.h>
@@ -7,7 +8,8 @@
 
 using namespace std;
 
-lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBunch, double L)
+lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBunch, double L):
+  fNProc(20), fNPart(5)
 {
   fPrimIndex=NULL;
   fSecondaryPrimaryID = NULL ;
@@ -24,6 +26,32 @@ lucretiaManager::lucretiaManager(int* blele, int* bunchno, struct Bunch* ThisBun
   for (imat=0;imat<3;imat++) {
     UserMaterial[imat].NumComponents=0;
   }
+  // Supported particles and processes
+  fPartList[0] = "gamma";
+  fPartList[1] = "e-";
+  fPartList[2] = "e+";
+  fPartList[3] = "mu-";
+  fPartList[4] = "mu+";
+  fProcList[0] = "msc";
+  fProcList[1] = "eIoni";
+  fProcList[2] = "eBrem";
+  fProcList[3] = "annihil";
+  fProcList[4] = "SynRad";
+  fProcList[5] = "phot";
+  fProcList[6] = "compt";
+  fProcList[7] = "conv";
+  fProcList[8] = "Rayl";
+  fProcList[9] = "muIoni";
+  fProcList[10] = "muBrems";
+  fProcList[11] = "muPairProd";
+  fProcList[12] = "AnnihiToMuPair";
+  fProcList[13] = "GammaToMuPair";
+  fProcList[14] = "ee2hadr";
+  fProcList[15] = "electronNuclear";
+  fProcList[16] = "positronNuclear";
+  fProcList[17] = "photonNuclear";
+  fProcList[18] = "muonNuclear";
+  fProcList[19] = "Decay";
   Initialize(blele, bunchno, ThisBunch, L) ;
 }
 
@@ -429,10 +457,14 @@ void lucretiaManager::Initialize(int* blele, int* bunchno, struct Bunch* ThisBun
   if (fMaxSecondaryParticles>0) {
     if (fSecondaryBunch_x!=NULL) {
       free(fSecondaryPrimaryID);
+      free(fSecondaryProcType);
+      free(fSecondaryTrackStatus);
       free(fSecondaryBunch_x);
     }
     fSecondaryBunch_x = (double*) malloc(sizeof(double)*fMaxSecondaryParticles*6) ;
     fSecondaryPrimaryID = (uint32_T*) malloc(sizeof(uint32_T)*fMaxSecondaryParticles) ;
+    fSecondaryProcType = (uint8_T*) malloc(sizeof(uint8_T)*fMaxSecondaryParticles) ;
+    fSecondaryTrackStatus = (uint8_T*) malloc(sizeof(uint8_T)*fMaxSecondaryParticles) ;
   }
   fTypeCellPtr = mxCreateCellMatrix(1,fMaxSecondaryParticles) ;
 }
@@ -448,47 +480,19 @@ void lucretiaManager::ApplyRunCuts(G4UImanager* UI)
   int ipart,iproc ;
   string buffer, gamCut, elecCut, posiCut ;
   ostringstream gamConvert,elecConvert,posiConvert;
-  string partName[5] ;
-  string procName[20] ;
-  int npart=5;
-  int nproc=20;
-  partName[0] = "gamma";
-  partName[1] = "e-";
-  partName[2] = "e+";
-  partName[3] = "mu-";
-  partName[4] = "mu+";
-  procName[0] = "msc";
-  procName[1] = "eIoni";
-  procName[2] = "eBrem";
-  procName[3] = "annihil";
-  procName[4] = "SynRad";
-  procName[5] = "phot";
-  procName[6] = "compt";
-  procName[7] = "conv";
-  procName[8] = "Rayl";
-  procName[9] = "muIoni";
-  procName[10] = "muBrems";
-  procName[11] = "muPairProd";
-  procName[12] = "AnnihiToMuPair";
-  procName[13] = "GammaToMuPair";
-  procName[14] = "ee2hadr";
-  procName[15] = "electronNuclear";
-  procName[16] = "positronNuclear";
-  procName[17] = "photonNuclear";
-  procName[18] = "muonNuclear";
-  procName[19] = "Decay";
+  
   gamConvert << fParticleCuts[0];
   UI->ApplyCommand(cutStringGamma + gamConvert.str() + " mm") ; 
   elecConvert << fParticleCuts[1];
   UI->ApplyCommand(cutStringElec + elecConvert.str() + " mm") ;
   posiConvert << fParticleCuts[2];
   UI->ApplyCommand(cutStringPosi + posiConvert.str() + " mm") ;
-  for (ipart=0; ipart<npart; ipart++) {
-    for (iproc=0; iproc<nproc; iproc++) {
-      if (fProcessSelection[ipart+iproc*npart])
-	UI->ApplyCommand(activeString + procName[iproc] + " " + partName[ipart]) ; 
+  for (ipart=0; ipart<fNPart; ipart++) {
+    for (iproc=0; iproc<fNProc; iproc++) {
+      if (fProcessSelection[ipart+iproc*fNPart])
+	UI->ApplyCommand(activeString + fProcList[iproc] + " " + fPartList[ipart]) ; 
       else
-	UI->ApplyCommand(inactiveString + procName[iproc] + " " + partName[ipart]) ;
+	UI->ApplyCommand(inactiveString + fProcList[iproc] + " " + fPartList[ipart]) ;
     }
   }
 }
@@ -511,6 +515,10 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
 {
   const mxArray *F = NULL;
   char method = 0;
+  double* magB; // Lucretia B & L fields of element
+  double* magL;
+  double BMag=0; // Bx or By field of Lucretia magnet
+  char* ElemClass ;
   
   // Which field are we looking up?
   switch(fieldno) {
@@ -533,9 +541,38 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
       F = pEz;
       break;
   }
+  
+  // If Quadrupole or Sextupole and inside aperture, evaluate magnet field for Bx/By
+  
+  if (fieldno<2) {
+    ElemClass = GetElemClass( *fEle ) ;
+    if (strcmp(ElemClass,"QUAD")==0 || strcmp(ElemClass,"SEXT")==0) {
+      magB=GetElemNumericPar(*fEle,"B", NULL) ;
+      magL=GetElemNumericPar(*fEle,"L", NULL) ;
+      if (magB!=NULL && magL!=NULL && fabs(point[0])<AperX*1e3 && fabs(point[1])<AperY*1e3) {
+        if (fieldno==0) { // Bx
+          if (strcmp(ElemClass,"QUAD")==0)
+            BMag = -(*magB / *magL) * point[1] * 1e-3 ;
+          else if (strcmp(ElemClass,"SEXT")==0)
+            BMag = -(*magB / *magL) * point[0] * point[1] *1e-6; 
+        }
+        else if (fieldno==1) { // By
+          if (strcmp(ElemClass,"QUAD")==0)
+            BMag = -(*magB / *magL) * point[0]*1e-3 ;
+          else if (strcmp(ElemClass,"SEXT")==0)
+            BMag = -0.5 * (*magB / *magL) * (point[0]*point[0]*1e-6-point[1]*point[1]*1e-6) ;
+        }
+      }
+    }
+  }
+  
   // If just single field value then return that
-  if (mxGetNumberOfElements(F)<2)
-    return *mxGetPr(F);
+  if (mxGetNumberOfElements(F)<2) {
+    if (fieldno<3)
+      return *mxGetPr(F)+BMag;
+    else
+      return *mxGetPr(F);
+  }
   
   // Interpolation method (1,2,3 == nearest, linear, cubic)
   if (!strcmp(EMInterpMethod,"nearest"))
@@ -552,8 +589,8 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   const mwSize O=F_dims[2];
   
   const double *pF = mxGetPr(F);
-  const double *pX = &point[1]; // deliberately switch x <-> y because of C vs. Matlab array indexing
-  const double *pY = &point[0];
+  const double *pX = &point[0];
+  const double *pY = &point[1];
   const double *pZ = &point[2];
   double pO ;
   
@@ -563,8 +600,8 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   const double z_low = -Lcut*1e3; const double z_high = Lcut*1e3;
   //if (fieldno==0)
   //  printf("X: %g Y: %g Z: %g\n",*pX,*pY,*pZ);
-  if (*pX<x_low || *pX>x_high || *pY<y_low || *pY>y_high || *pZ<z_low || *pZ>z_high)
-    return 0;
+  //if (*pX<x_low || *pX>x_high || *pY<y_low || *pY>y_high || *pZ<z_low || *pZ>z_high)
+  //  return 0;
 
   const double s_x = (double(1)-double(N))/(x_low - x_high);
   const double s_y = (double(1)-double(M))/(y_low - y_high);
@@ -576,15 +613,16 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   
   
   // Do the interpolation
+  // 9deliberately switch x <-> y because of C vs. Matlab array indexing differences for 3d field array from Lucretia)
   switch(method) {
     case 0:
-      interpolate_nearest(&pO, pF, pX, pY, pZ, 1, M, N, O, 1, s_x, o_x, s_y, o_y, s_z, o_z);
+      interpolate_nearest(&pO, pF, pY, pX, pZ, 1, M, N, O, 1, s_x, o_x, s_y, o_y, s_z, o_z);
       break;
     case 1:
-      interpolate_linear(&pO, pF, pX, pY, pZ, 1, M, N, O, 1, s_x, o_x, s_y, o_y, s_z, o_z);
+      interpolate_linear(&pO, pF, pY, pX, pZ, 1, M, N, O, 1, s_x, o_x, s_y, o_y, s_z, o_z);
       break;
     case 2:
-      interpolate_bicubic(&pO, pF, pX, pY, pZ, 1, M, N, O, 1, s_x, o_x, s_y, o_y, s_z, o_z);
+      interpolate_bicubic(&pO, pF, pY, pX, pZ, 1, M, N, O, 1, s_x, o_x, s_y, o_y, s_z, o_z);
       break;
     default:
       mexErrMsgTxt("Unimplemented interpolation method.");
@@ -596,7 +634,11 @@ double lucretiaManager::interpField(const int fieldno, const double* point)
   //if (fieldno==2)
   //  printf("Bz: %g (BMAX: %g)\n",pO,pF[0]);
   // Return the interpolated field value
-  return pO ;
+  //mexPrintf("p0: %f BMag: %f\n",p0,BMag);
+  if (fieldno<3)
+    return BMag+pO ;
+  else
+    return pO ;
 }
 
 /* ======== Interpolation Routines ========= */
@@ -909,6 +951,18 @@ void lucretiaManager::SetLucretiaData()
     mxSetData( pSecondaryPrimaryID, dSecondaryPrimaryID) ;
     mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "PrimaryID", pSecondaryPrimaryID) ;
     //
+    mxArray* pSecondaryProcType = mxCreateNumericMatrix(1, fSecondariesCounter, mxUINT8_CLASS, mxREAL) ;
+    uint8_T* dSecondaryProcType = (uint8_T*) mxMalloc(fSecondariesCounter*sizeof(uint8_T)) ;
+    memcpy( dSecondaryProcType, fSecondaryProcType, fSecondariesCounter*sizeof(uint8_T)) ;
+    mxSetData( pSecondaryProcType, dSecondaryProcType) ;
+    mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "ProcType", pSecondaryProcType) ;
+    //
+    mxArray* pSecondaryTrackStatus = mxCreateNumericMatrix(1, fSecondariesCounter, mxUINT8_CLASS, mxREAL) ;
+    uint8_T* dSecondaryTrackStatus = (uint8_T*) mxMalloc(fSecondariesCounter*sizeof(uint8_T)) ;
+    memcpy( dSecondaryTrackStatus, fSecondaryTrackStatus, fSecondariesCounter*sizeof(uint8_T)) ;
+    mxSetData( pSecondaryTrackStatus, dSecondaryTrackStatus) ;
+    mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "TrackStatus", pSecondaryTrackStatus) ;
+    //
     mxSetProperty( GetExtProcessSecondariesData(fEle), *fBunchNo, "ParticleType", fTypeCellPtr) ;
     //
     mxArray* pNumSec = mxCreateNumericMatrix(1, 1, mxUINT32_CLASS, mxREAL) ;
@@ -929,18 +983,29 @@ void lucretiaManager::WritePrimaryTrackData(double x, double y, double z)
   }
 }
 
-void lucretiaManager::SetNextSecondary(double x[6], int id, const char* type)
+void lucretiaManager::SetNextSecondary(double x[6], int id, const char* type, G4String procName, G4TrackStatus trackStatus)
 {
   int icoord ;
   int iray=fPrimIndex[id] ;
   if (fMaxSecondaryParticles==0)
     return;
+  // Store phase space of secondary particle and ID of primary which generated it
   if (fSecondaryBunch_x != NULL ) {
     for (icoord=0; icoord<6; icoord++)
       fSecondaryBunch_x[fSecondariesCounter*6+icoord] = x[icoord] ;
     mxSetCell(fTypeCellPtr,fSecondariesCounter,mxCreateString(type)) ;
     fSecondaryPrimaryID[fSecondariesCounter] = iray+1 ;
   }
+  // Save information on process generating secondary and the track object status ID
+  fSecondaryProcType[fSecondariesCounter]=0;
+  fSecondaryTrackStatus[fSecondariesCounter]=(uint8_T) trackStatus;
+  for (int iproc=0; iproc<fNProc; iproc++) {
+    if (fProcList[iproc].compare(procName) !=0 )
+      fSecondaryProcType[fSecondariesCounter]++;
+    else
+      break;
+  }
+  fSecondaryProcType[fSecondariesCounter]++; // Matlab indexing
   fSecondariesCounter++ ;
 }
 
