@@ -2,7 +2,8 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
   %EXTG4PROCESS - class to handle interface of Lucretia beam using GEANT4 engine
   
   properties(Constant)
-    supportedPrimaryParticleTypes={'e-' 'e+'};
+    supportedPrimaryParticleTypes={'e-' 'e+' 'gamma' 'mu-' 'mu+'};
+    G4TrackStatus={'Alive' 'StopButAlive' 'StopAndKill' 'KillTrackAndSecondaries' 'Suspend' 'PostponeToNextEvent'};
   end
   properties
     Verbose=0; % Verbosity level for printing status info to stdout in GEANT
@@ -70,8 +71,14 @@ classdef ExtG4Process < ExtProcess & ExtGeometry & ExtG4EMField & handle
   methods
     function [resp,message]=checkEnv(obj)
       resp=1; message=[];
-      if isinparfor || (~isempty(obj.envCheckResp) && obj.envCheckResp==true)
-        return
+      try
+        if  isinparfor || (~isempty(obj.envCheckResp) && obj.envCheckResp==true)
+          return
+        end
+      catch
+        if  (~isempty(obj.envCheckResp) && obj.envCheckResp==true)
+          return
+        end
       end
       df=obj.dataFiles;
       ev=obj.envVars;
