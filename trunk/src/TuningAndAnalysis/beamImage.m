@@ -203,7 +203,7 @@ set(h1,'EdgeColor',[0,0,1],'FaceColor',[0,0,1])
 hold(sh,'on')
 plot(sh,yfit,xi,'r-')
 hold(sh,'off')
-if ~dpk(2); title(sh,sprintf('\\sigma_{dP} = %.1g %%',abs(data.sigE))); end;
+if ~dpk(2); title(sh,sprintf('\\sigma_{dP} = %.3g %%',abs(data.sigE))); end;
 xlabel(sh,'Q (nC)')
 ylabel(sh,'dP (%)')
 sh_p=sh;

@@ -65,6 +65,7 @@ void trackingAction::PostUserTrackingAction(const G4Track* track)
   }
   else if (dosecondaries && (uint32_T)hitsPerParentCounter<fLman->fMaxSecondaryParticlesPerPrimary) {
     hitsPerParentCounter++;
-    fLman->SetNextSecondary(xLucretia, lastPrimaryID, track->GetDynamicParticle()->GetDefinition()->GetParticleName()) ; 
+    fLman->SetNextSecondary(xLucretia, lastPrimaryID, track->GetDynamicParticle()->GetDefinition()->GetParticleName(),
+			    track->GetCreatorProcess()->GetProcessName(), track->GetTrackStatus()) ; 
   }
 }
