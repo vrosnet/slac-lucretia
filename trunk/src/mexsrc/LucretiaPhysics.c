@@ -67,6 +67,7 @@
 #include <stdlib.h>
 #include "LucretiaVersionProto.h"
 #include "LucretiaGlobalAccess.h"
+#include "mex.h"
 
 /* File-scoped variables */
 
@@ -2661,7 +2662,6 @@ double SRSpectrumHB( )
   }
   
   /* Init done, now generate */
-  
   do {
     if(*RanFlatVecPtr(1)<ratio) /* use low energy approximation */
     {
