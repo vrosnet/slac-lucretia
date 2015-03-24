@@ -1275,7 +1275,7 @@ void getLucretiaRandSeed( unsigned long long *rseed )
 {
   mxArray *rseedMat ;
   double* rPtr ;
-  mexEvalString("rseedForMexFunc=rand('seed');");
+  mexEvalString("rseedForMexFunc=ceil(rand*1e9);");
   rseedMat=mexGetVariable("caller","rseedForMexFunc");
   rPtr=mxGetPr(rseedMat);
   *rseed = (unsigned long long) *rPtr ;
@@ -1284,7 +1284,7 @@ unsigned int getLucretiaRandSeedC( )
 {
   mxArray *rseedMat ;
   double seed ;
-  mexEvalString("rseedForMexFunc=rand('seed');");
+  mexEvalString("rseedForMexFunc=ceil(rand*1e9);");
   rseedMat=mexGetVariable("caller","rseedForMexFunc");
   seed=*mxGetPr(rseedMat);
   return (unsigned int) seed ;
