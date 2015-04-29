@@ -31,6 +31,9 @@
 #include "G4PhotoNuclearProcess.hh"
 #include "G4PositronNuclearProcess.hh"
 #include "G4eeToHadrons.hh"
+#include "G4CascadeInterface.hh"
+#include "G4MuonVDNuclearModel.hh"
+#include "G4ElectroVDNuclearModel.hh"
 
 #include "G4MuMultipleScattering.hh"
 #include "G4MuIonisation.hh"
@@ -108,9 +111,17 @@ void PhysicsList::ConstructProcess()
       pmanager->AddDiscreteProcess(new G4GammaConversion);
       pmanager->AddDiscreteProcess(new G4RayleighScattering);
       pmanager->AddDiscreteProcess(new G4GammaConversionToMuons);
-      pmanager->AddDiscreteProcess(new G4PhotoNuclearProcess) ;
+      //pmanager->AddDiscreteProcess(new G4PhotoNuclearProcess) ;
+      G4PhotoNuclearProcess* process = new G4PhotoNuclearProcess();
+      G4CascadeInterface* bertini = new G4CascadeInterface();
+      bertini->SetMaxEnergy(10*GeV);
+      process->RegisterMe(bertini);
+      pmanager->AddDiscreteProcess(process);
     } else if (particleName == "e-") {
-      pmanager->AddDiscreteProcess(new G4ElectronNuclearProcess) ;
+      G4ElectroVDNuclearModel* eNucModel = new G4ElectroVDNuclearModel();
+      G4ElectronNuclearProcess* eNucProcess = new G4ElectronNuclearProcess();
+      eNucProcess->RegisterMe(eNucModel);
+      pmanager->AddDiscreteProcess(eNucProcess) ;
       pmanager->AddProcess(new G4eMultipleScattering,       -1, 1, 1);
       pmanager->AddProcess(new G4eIonisation,               -1, 2, 2);
       pmanager->AddProcess(new G4eBremsstrahlung,           -1, 3, 3);
@@ -132,10 +143,16 @@ void PhysicsList::ConstructProcess()
       }
       pmanager->AddProcess(new G4StepLimiter,               -1,-1, 6);
       pmanager->AddDiscreteProcess(new G4AnnihiToMuPair);
-      pmanager->AddDiscreteProcess(new G4PositronNuclearProcess);
+      G4ElectroVDNuclearModel* eNucModel = new G4ElectroVDNuclearModel();
+      G4PositronNuclearProcess* pNucProcess = new G4PositronNuclearProcess();
+      pNucProcess->RegisterMe(eNucModel);
+      pmanager->AddDiscreteProcess(pNucProcess);
       pmanager->AddDiscreteProcess(new G4eeToHadrons);
     } else if( particleName == "mu+" || particleName == "mu-"    ) {
-      pmanager->AddDiscreteProcess(new G4MuonNuclearProcess) ;
+      G4MuonNuclearProcess* muNucProcess = new G4MuonNuclearProcess();
+      G4MuonVDNuclearModel* muNucModel = new G4MuonVDNuclearModel();
+      muNucProcess->RegisterMe(muNucModel);
+      pmanager->AddDiscreteProcess(muNucProcess) ;
       pmanager->AddProcess(new G4MuMultipleScattering, -1, 1, 1);
       pmanager->AddProcess(new G4MuIonisation,         -1, 2, 2);
       pmanager->AddProcess(new G4MuBremsstrahlung,     -1, 3, 3);

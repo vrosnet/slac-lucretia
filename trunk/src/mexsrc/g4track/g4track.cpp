@@ -99,10 +99,13 @@ int g4track(int* blele, int* bunchno, struct Beam* TheBeam, double* L)
     UI->ApplyCommand("/material/g4/printMaterial User2");
     UI->ApplyCommand("/material/g4/printMaterial User3");
   }
-  else if (lman->Verbose==2) {
+  else if (lman->Verbose==2 || lman->Verbose==3) {
     UI->ApplyCommand("/run/verbose 2");
     UI->ApplyCommand("/event/verbose 1");
-    UI->ApplyCommand("/tracking/verbose 1");
+    if (lman->Verbose==2)
+      UI->ApplyCommand("/tracking/verbose 1");
+    else
+      UI->ApplyCommand("/tracking/verbose 3");
     UI->ApplyCommand("/control/verbose 2");
     UI->ApplyCommand("/run/dumpRegion") ;
     UI->ApplyCommand("/process/verbose 1");
