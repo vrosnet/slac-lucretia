@@ -286,7 +286,7 @@ classdef Track < handle
     function trackThru(obj,cmd)
       global BEAMLINE
       % Any Ext Processes to pre-condition?
-      ext=findcells(BEAMLINE,'ExtProcess');
+      ext=findcells(BEAMLINE,'ExtProcess',[],obj.startInd,obj.finishInd);
       pord=[];
       if ~isempty(ext)
         for iele=ext
@@ -469,7 +469,7 @@ classdef Track < handle
         end
       end
       % Any Ext Processes to finalize data with
-      ext=findcells(BEAMLINE,'ExtProcess');
+      ext=findcells(BEAMLINE,'ExtProcess',[],obj.startInd,obj.finishInd);
       if ~isempty(ext)
         for iele=ext
           for iproc=1:length(BEAMLINE{iele}.ExtProcess)
