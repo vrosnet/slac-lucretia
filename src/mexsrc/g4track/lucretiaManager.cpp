@@ -987,6 +987,7 @@ void lucretiaManager::SetNextSecondary(double x[6], int id, const char* type, G4
 {
   int icoord ;
   int iray=fPrimIndex[id] ;
+
   if (fMaxSecondaryParticles==0)
     return;
   // Store phase space of secondary particle and ID of primary which generated it
