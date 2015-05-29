@@ -79,3 +79,4 @@ dc=sqrt(abs(covm(3,3)));
 dd=sqrt(abs(covm(4,4)));
 de=sqrt(abs(covm(5,5)));
 dq=[da db dc dd de];
+q(4)=abs(q(4));
